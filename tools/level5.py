@@ -121,9 +121,9 @@ s.air(8, 8, 44, 88)             # the hall of chains
 s.air(48, 8, 12, 8)             # way out
 s.kills.append((10 * 6, 96 * 6, 50 * 6, 104 * 6))
 s.rock(8, 96, 6, 2)
-s.rock(46, 16, 14, 2)
+s.rock(44, 16, 16, 2)            # the way out starts right beside the last chain
 for x in (16, 25, 34, 43):
-    s.vine(x, 18, 96)
+    s.vine(x, 11, 96)            # the chains run up past the ledge, so you can step off at the top
 for k, x in enumerate((20, 29, 38)):
     s.orbline(x + 0.5, 30, 0, 56, 8, 8, k * 0.33, 1.2)
 s.hint(1, 85, 'HOLD   UP   TO   CLIMB')
@@ -157,8 +157,8 @@ s.tether(104)
 # ---------------------------------------------------------------- THE TURNING SUN: walls against the wheel
 s = new('e9', 'THE TURNING SUN', 104, 60, 0.9, 4)
 s.cave([(0, 40)], [(0, 14), (8, 28), (96, 14)])
-s.watch(52.5, 21.5, 44, 10, 90, 0, 16, 0.0, I=2.0, spin=True, burn=2.0)
-s.rock(48, 22, 9, 3)            # the sun's hub
+s.rock(48, 22, 9, 3)            # the sun's hub: the eye hangs beneath it, so its light falls on the hall
+s.watch(52.5, 26.5, 44, 10, 90, 0, 16, 0.0, I=2.0, spin=True, burn=2.0)
 for x in (18, 30, 42, 62, 74, 86):
     s.rock(x, 36, 2, 4)          # low walls to crouch behind
 s.hint(1, 20, 'THE   SUN   TURNS  -  KEEP   A   WALL   BETWEEN')

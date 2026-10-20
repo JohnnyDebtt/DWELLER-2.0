@@ -599,6 +599,8 @@
     // the hidden seeker leaks a little light through its false wall; the companion glows softly
     if (w.secret && !s.cmp) softDisc(lctx, w.secret.x - camX, w.secret.y - camY, 22, 0.22);
     if (s.cmp) softDisc(lctx, s.cmpX - camX, s.cmpY - camY, 14, 0.18);
+    if (w.boss && !s.bBurst && s.bWake) { const B = w.boss, ecl = s.cmpL >= 0 && w.lights[s.cmpL] && w.lights[s.cmpL].boss && s.cmpK > 0; softDisc(lctx, B.x - camX, B.y - camY, 70, ecl ? 0.12 : 0.34); }
+    else if (w.boss && !s.bBurst) softDisc(lctx, w.boss.x - camX, w.boss.y - camY, 50, 0.12);
     // quantize
     const darkBGR = (TH.dark[2] << 16) | (TH.dark[1] << 8) | TH.dark[0];
     const id = lctx.getImageData(0, 0, W, H); const d = id.data;
@@ -972,56 +974,126 @@
 
   /* ------------------------------------------------------------------ the Guardian (#255 of the Planetary Guardians) */
   const GS = 2;                                         // drawn at twice its 54 px
+  /* The Guardian is drawn to sit in the cave rather than on it:
+   *  - its 54 px art is doubled with Scale2x (EPX), so its edges are as fine as the world's pixels, not 2x2 blocks;
+   *  - its colours are pulled toward the cave's own ramp, keeping their values;
+   *  - its body is drawn before the dark, so the dark falls on it like on the rock, and its eye lights it from inside;
+   *  - the inner edges of its shields catch that light, and it hovers a pixel or two on its own slow breath. */
+  function epx(src, n) {
+    const s = src.getContext('2d').getImageData(0, 0, n, n).data, N = n * 2;
+    const c = document.createElement('canvas'); c.width = c.height = N;
+    const x = c.getContext('2d'), id = x.createImageData(N, N), d = id.data;
+    const at = (i, j) => (i < 0 || j < 0 || i >= n || j >= n) ? -1 : (j * n + i);
+    const same = (a, b) => a >= 0 && b >= 0 && s[a * 4] === s[b * 4] && s[a * 4 + 1] === s[b * 4 + 1] && s[a * 4 + 2] === s[b * 4 + 2] && s[a * 4 + 3] === s[b * 4 + 3];
+    const put = (o, k) => { d[o] = s[k * 4]; d[o + 1] = s[k * 4 + 1]; d[o + 2] = s[k * 4 + 2]; d[o + 3] = s[k * 4 + 3]; };
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const P = at(i, j), A = at(i, j - 1), B = at(i + 1, j), C2 = at(i - 1, j), D2 = at(i, j + 1);
+      let e1 = P, e2 = P, e3 = P, e4 = P;
+      if (same(C2, A) && !same(C2, D2) && !same(A, B)) e1 = A;
+      if (same(A, B) && !same(A, C2) && !same(B, D2)) e2 = B;
+      if (same(D2, C2) && !same(D2, B) && !same(C2, A)) e3 = C2;
+      if (same(B, D2) && !same(B, A) && !same(D2, C2)) e4 = D2;
+      const o = ((j * 2) * N + i * 2) * 4;
+      put(o, e1); put(o + 4, e2); put(o + N * 4, e3); put(o + N * 4 + 4, e4);
+    }
+    x.putImageData(id, 0, 0); return c;
+  }
+  function toCave(cv, keepBright) {
+    // pull every colour toward the theme's tile ramp at the same lightness; pure whites (the eye) stay white
+    const x = cv.getContext('2d'), id = x.getImageData(0, 0, cv.width, cv.height), d = id.data, r = TH.tile || [[12, 13, 22], [70, 76, 104], [220, 226, 244]];
+    for (let i = 0; i < d.length; i += 4) {
+      if (!d[i + 3]) continue;
+      const L = (0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) / 255;
+      if (keepBright && L > 0.9) continue;
+      const k = L < 0.35 ? L / 0.35 : (L - 0.35) / 0.65, a = L < 0.35 ? r[0] : r[1], b = L < 0.35 ? r[1] : r[2];
+      for (let c = 0; c < 3; c++) d[i + c] = Math.round(0.45 * d[i + c] + 0.55 * (a[c] + (b[c] - a[c]) * k));
+    }
+    x.putImageData(id, 0, 0); return cv;
+  }
+  const GA = {};
+  function guardianArt() {
+    if (GA.ok || !IMG.g255_body) return GA.ok;
+    GA.body = epx(IMG.g255_body, 54); GA.orb = epx(IMG.g255_orb, 54); GA.eyes = epx(IMG.g255_eyes, 54);   // its own colours
+    GA.px = GA.body.getContext('2d').getImageData(0, 0, 108, 108).data;
+    GA.ok = true; return true;
+  }
   const gRot = new Map();
-  function guardianBody(ang) {
-    // rotate the 54 px body on its own pixel grid (nearest neighbour), cached per degree
-    const key = Math.round(((ang % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / (Math.PI / 90));
+  function guardianBody(ang, rim) {
+    // rotate the doubled body on the world's own pixel grid (nearest neighbour), cached per degree;
+    // the rim version keeps only the edge pixels that face the eye
+    if (!guardianArt()) return null;
+    const key = Math.round(((ang % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / (Math.PI / 180)) + (rim ? 1000 : 0);
     let c = gRot.get(key);
     if (c) return c;
-    const src = IMG.g255_body; if (!src) return null;
-    if (!guardianBody.px) guardianBody.px = src.getContext('2d').getImageData(0, 0, 54, 54).data;
-    const sp = guardianBody.px, N = 76, a = key * Math.PI / 90, ca = Math.cos(a), sa = Math.sin(a);
+    const sp = GA.px, M = 108, N = 152, a = (key % 1000) * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
     c = document.createElement('canvas'); c.width = c.height = N;
     const x = c.getContext('2d'), id = x.createImageData(N, N), d = id.data;
+    const op = (u, v) => { const sx = Math.floor(ca * u + sa * v + M / 2), sy = Math.floor(-sa * u + ca * v + M / 2); return (sx < 0 || sy < 0 || sx >= M || sy >= M) ? -1 : (sy * M + sx) * 4; };
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-      const u = i - N / 2 + 0.5, v = j - N / 2 + 0.5;
-      const sx = Math.floor(ca * u + sa * v + 27), sy = Math.floor(-sa * u + ca * v + 27);
-      if (sx < 0 || sy < 0 || sx >= 54 || sy >= 54) continue;
-      const o = (sy * 54 + sx) * 4, q = (j * N + i) * 4;
-      d[q] = sp[o]; d[q + 1] = sp[o + 1]; d[q + 2] = sp[o + 2]; d[q + 3] = sp[o + 3];
+      const u = i - N / 2 + 0.5, v = j - N / 2 + 0.5, o = op(u, v);
+      if (o < 0 || sp[o + 3] < 128) continue;
+      const q = (j * N + i) * 4;
+      if (rim) {
+        // an edge pixel whose neighbour toward the centre is empty: it faces the eye
+        const r = Math.hypot(u, v) || 1, o2 = op(u - u / r * 1.5, v - v / r * 1.5);
+        if (r < 30 || (o2 >= 0 && sp[o2 + 3] >= 128)) continue;
+        d[q] = 255; d[q + 1] = 255; d[q + 2] = 255; d[q + 3] = 255;
+      } else { d[q] = sp[o]; d[q + 1] = sp[o + 1]; d[q + 2] = sp[o + 2]; d[q + 3] = sp[o + 3]; }
     }
     x.putImageData(id, 0, 0);
-    if (gRot.size > 200) gRot.clear();
+    if (gRot.size > 400) gRot.clear();
     gRot.set(key, c); return c;
   }
-  function drawGuardian(ctx, w, s, camX, camY, time) {
-    const B = w.boss; if (!B || s.bBurst) return;
-    const gx = Math.round(B.x - camX), gy = Math.round(B.y - camY);
-    const shake = s.bDie ? Math.round(Math.sin(time * 70) * 2) : 0;
+  function guardianPos(w, s, time) {
+    const B = w.boss;
+    const bob = Math.round(Math.sin(time * 1.4) * 1.6), shake = s.bDie ? Math.round(Math.sin(time * 70) * 2) : 0;
+    return [B.x + shake, B.y + bob];
+  }
+  function drawGuardian(ctx, w, s, camX, camY, time, post) {
+    const B = w.boss; if (!B || s.bBurst || !guardianArt()) return;
+    const [wx, wy] = guardianPos(w, s, time), gx = Math.round(wx - camX), gy = Math.round(wy - camY);
     ctx.imageSmoothingEnabled = false;
-    if (IMG.g255_orb) ctx.drawImage(IMG.g255_orb, gx - 27 * GS + shake, gy - 27 * GS, 54 * GS, 54 * GS);
-    const body = guardianBody(s.bAng || 0);
-    if (body) ctx.drawImage(body, gx - 38 * GS + shake, gy - 38 * GS, 76 * GS, 76 * GS);
-    // the eye: shut while it sleeps, dimmed under the SEEKER, white-hot as it flares
-    if (IMG.g255_eyes) {
-      const ecl = s.cmpL >= 0 && w.lights[s.cmpL] && w.lights[s.cmpL].boss && s.cmpK > 0;
-      ctx.globalAlpha = !s.bWake ? 0.18 : ecl ? 0.25 : 1;
-      ctx.drawImage(IMG.g255_eyes, gx - 27 * GS + shake, gy - 27 * GS, 54 * GS, 54 * GS);
-      if (B.flare.k > 0.2) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = B.flare.k; ctx.drawImage(IMG.g255_eyes, gx - 27 * GS, gy - 27 * GS, 54 * GS, 54 * GS); ctx.globalCompositeOperation = 'source-over'; }
-      ctx.globalAlpha = 1;
+    const ecl = s.cmpL >= 0 && w.lights[s.cmpL] && w.lights[s.cmpL].boss && s.cmpK > 0;
+    if (!post) {
+      // the body, in the world: the dark pass will fall on it
+      ctx.drawImage(GA.orb, gx - 54, gy - 54);
+      const body = guardianBody(s.bAng || 0); if (body) ctx.drawImage(body, gx - 76, gy - 76);
+      return;
     }
+    // after the dark: the inner rims of the shields catch the eye's glow, then the eye itself
+    const glow = !s.bWake ? 0.12 : ecl ? 0.08 : 0.42 + 0.25 * (B.flare.k || 0);
+    const rim = guardianBody(s.bAng || 0, true);
+    if (rim) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = glow; ctx.filter = 'none';
+      if (!GA.tint) { GA.tint = document.createElement('canvas'); GA.tint.width = GA.tint.height = 152; }
+      const tint = GA.tint, tx = tint.getContext('2d');
+      tx.globalCompositeOperation = 'source-over'; tx.clearRect(0, 0, 152, 152);
+      tx.drawImage(rim, 0, 0); tx.globalCompositeOperation = 'source-in'; tx.fillStyle = 'rgb(' + TH.glowRGB + ')'; tx.fillRect(0, 0, 152, 152);
+      ctx.drawImage(tint, gx - 76, gy - 76);
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    }
+    // the eye: shut while it sleeps, dimmed under the SEEKER, white-hot as it flares; it glances toward the Dweller
+    const lx = Math.max(-2, Math.min(2, Math.round((s.x - wx) / 60))), ly = Math.max(-1, Math.min(1, Math.round((s.y - wy) / 80)));
+    // the art's eyes sit left of centre; in the turning body they read better in the middle of the orb
+    const ex = gx - 54 + 11 + (s.bWake ? lx : 0), ey = gy - 54 - 1 + (s.bWake ? ly : 0);
+    ctx.globalAlpha = !s.bWake ? 0.2 : ecl ? 0.28 : 1;
+    ctx.drawImage(GA.eyes, ex, ey);
+    if (B.flare.k > 0.2) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = B.flare.k; ctx.drawImage(GA.eyes, ex, ey); ctx.globalCompositeOperation = 'source-over'; }
+    ctx.globalAlpha = 1;
   }
   // the burst: every pixel of the Guardian flies apart
   const gBits = [];
   function guardianBurst(w, s) {
     const B = w.boss; if (!B) return;
-    const layers = [IMG.g255_orb, guardianBody(s.bAng || 0), IMG.g255_eyes];
+    if (!guardianArt()) return;
+    const layers = [GA.orb, guardianBody(s.bAng || 0), GA.eyes];
     layers.forEach((cv, li) => {
       if (!cv) return;
       const n = cv.width, d = cv.getContext('2d').getImageData(0, 0, n, n).data;
       for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
         const o = (j * n + i) * 4; if (d[o + 3] < 128) continue;
-        const px = B.x + (i - n / 2 + 0.5) * GS, py = B.y + (j - n / 2 + 0.5) * GS;
+        const px = B.x + (i - n / 2 + 0.5), py = B.y + (j - n / 2 + 0.5);
         const dx = px - B.x, dy = py - B.y, r = Math.hypot(dx, dy) || 1, sp = 40 + Math.random() * 160 + (li === 2 ? 120 : 0);
         gBits.push({ x: px, y: py, vx: dx / r * sp + (Math.random() - 0.5) * 40, vy: dy / r * sp + (Math.random() - 0.5) * 40 - 30,
           life: 1.6 + Math.random() * 2.2, max: 3.8, col: 'rgb(' + d[o] + ',' + d[o + 1] + ',' + d[o + 2] + ')', hot: li === 2 || Math.random() < 0.25 });
@@ -1036,7 +1108,7 @@
       if (p.life <= 0) { gBits.splice(i, 1); continue; }
       ctx.globalAlpha = Math.min(1, p.life / 1.2);
       ctx.fillStyle = p.hot && p.life > p.max - 1.0 ? '#ffffff' : p.col;
-      ctx.fillRect(Math.round(p.x - camX), Math.round(p.y - camY), GS, GS);
+      ctx.fillRect(Math.round(p.x - camX), Math.round(p.y - camY), 1, 1);
     }
     ctx.globalAlpha = 1;
   }
@@ -1413,6 +1485,7 @@
     drawFakes(ctx, w, s, camX, camY, Gm.dt || 0.016);
     drawFeatures(ctx, w, s, camX, camY, W, H, time, false);
     drawAlcoves(ctx, w, s, camX, camY, time, false);
+    if (w.boss) drawGuardian(ctx, w, s, camX, camY, time, false);
     drawDecorFront(ctx, w, camX, camY, W, H, time);
     if (!s.won || s.wonT < 30) drawPlayer(ctx, s, camX, camY, 'body', s.burn > 0.02 && !s.dead ? 0.15 + s.burn * 0.6 : 0);
     drawParticles(ctx, camX, camY);
@@ -1421,7 +1494,7 @@
     drawFeatures(ctx, w, s, camX, camY, W, H, time, true);
     // hints live in the dark ceiling rock, drawn above the dark pass so they stay readable
     drawHints(ctx, w, camX, camY, W, H, Gm);
-    if (w.boss) { drawGuardian(ctx, w, s, camX, camY, time); drawAlcoves(ctx, w, s, camX, camY, time, true); drawGuardianBits(ctx, camX, camY, Gm.dt || 0.016); }
+    if (w.boss) { drawGuardian(ctx, w, s, camX, camY, time, true); drawAlcoves(ctx, w, s, camX, camY, time, true); drawGuardianBits(ctx, camX, camY, Gm.dt || 0.016); }
     // emissive things, drawn after the dark
     for (const l of w.lights) {
       if (l.boss || l.x < camX - 60 || l.x > camX + W + 60 || l.y < camY - 60 || l.y > camY + H + 60) continue;

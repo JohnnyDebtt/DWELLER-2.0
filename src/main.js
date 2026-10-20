@@ -34,13 +34,13 @@
   /* ------------------------------------------------------------ progress */
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
-  const P = { beaten: [false, false, false, false, false, false], best: [0, 0, 0, 0, 0, 0], comp: false, cp: {}, fused: false, core: false, coreBest: 0 };
+  const P = { beaten: [false, false, false, false, false, false], best: [0, 0, 0, 0, 0, 0], comp: false, cp: {}, fused: false, core: false, coreBest: 0, seen: {} };
   function loadProgress() {
     try {
       const j = JSON.parse(lsGet('dweller.v2') || 'null');
       if (j && Array.isArray(j.beaten)) {
         for (let i = 0; i < NL; i++) { P.beaten[i] = !!j.beaten[i]; P.best[i] = +(j.best && j.best[i]) || 0; }
-        P.comp = !!j.comp; P.cp = j.cp && typeof j.cp === 'object' ? j.cp : {}; P.fused = !!j.fused; P.seekerId = j.seekerId; P.core = !!j.core; P.coreBest = +j.coreBest || 0;
+        P.comp = !!j.comp; P.cp = j.cp && typeof j.cp === 'object' ? j.cp : {}; P.fused = !!j.fused; P.seekerId = j.seekerId; P.core = !!j.core; P.coreBest = +j.coreBest || 0; P.seen = j.seen && typeof j.seen === 'object' ? j.seen : {};
         return;
       }
     } catch (e) { }
@@ -260,7 +260,9 @@
     if (i !== sectionIdx) {
       sectionIdx = i;
       const sec = world.sections[i];
-      cardText = sec.title; cardT = 0;
+      // the name of a section shows only the first time you ever reach it
+      const seen = P.seen[cur] || (P.seen[cur] = '');
+      if (seen.indexOf('|' + i + '|') < 0) { cardText = sec.title; cardT = 0; P.seen[cur] = seen + '|' + i + '|'; saveProgress(); }
       const m = sec.music || { e: 0.2, root: 0 };
       A.Live.setMood(m.e, m.root);
     }
@@ -727,6 +729,19 @@
     gctx.imageSmoothingEnabled = false;
     gctx.fillStyle = '#000'; gctx.fillRect(0, 0, canvas.width, canvas.height);
     gctx.drawImage(off, 0, 0, LW, LH, Math.round(-ox), Math.round(-oy), LW * SC, LH * SC);
+    drawCard();
+  }
+  /* the section's name: three quarters of its old size (drawn at screen resolution so the letters stay crisp),
+     no band behind it, only a faint one-pixel shadow so it reads over light */
+  function drawCard() {
+    if (!(cardT < 4.5 && mode === 'play' && seekerCardT > 6.5)) return;
+    const a = Math.min(1, cardT / 0.8) * Math.min(1, (4.5 - cardT) / 1.0);
+    const k = Math.max(2, Math.round(SC * 1.5)), sp = R.textSprite(cardText, PAL.snow), sh = R.textSprite(cardText, '#05050a');
+    const w = sp.width * k, h = sp.height * k, x = Math.round((canvas.width - w) / 2), y = Math.round(LH * 0.22 * SC);
+    gctx.imageSmoothingEnabled = false;
+    gctx.globalAlpha = a * 0.6; gctx.drawImage(sh, x + Math.max(1, k >> 2), y + Math.max(1, k >> 2), w, h);
+    gctx.globalAlpha = a * 0.92; gctx.drawImage(sp, x, y, w, h);
+    gctx.globalAlpha = 1;
   }
 
   function drawHUD(ctx) {
@@ -763,17 +778,7 @@
         ctx.fillStyle = g; ctx.fillRect(0, 0, LW, LH);
       }
     }
-    if (cardT < 4.5 && mode === 'play' && seekerCardT > 6.5) {
-      const a = Math.min(1, cardT / 0.8) * Math.min(1, (4.5 - cardT) / 1.0);
-      // a soft band of shadow behind the name, so hints and lights in the world never cross it
-      const cy = Math.round(LH * 0.22), bw = Math.min(LW, cardText.length * 14 + 60);
-      const gr = ctx.createLinearGradient((LW - bw) / 2, 0, (LW + bw) / 2, 0);
-      gr.addColorStop(0, 'rgba(4,5,8,0)'); gr.addColorStop(0.2, 'rgba(4,5,8,0.72)'); gr.addColorStop(0.8, 'rgba(4,5,8,0.72)'); gr.addColorStop(1, 'rgba(4,5,8,0)');
-      ctx.globalAlpha = a; ctx.fillStyle = gr; ctx.fillRect((LW - bw) / 2, cy - 7, bw, 28);
-      ctx.globalAlpha = a * 0.9;
-      R.drawText(ctx, cardText, LW >> 1, cy, PAL.snow, 2, 'center');
-      ctx.globalAlpha = 1;
-    }
+    // the section's name is drawn on the full-resolution screen after the upscale (see drawCard)
     // the companion's charge (top left)
     if (S_.cmp && mode !== 'win') {
       const x = 12, y = Math.round(44 / SC) + 3;

@@ -164,8 +164,8 @@ s = new('f10', 'SCRAPYARD', 130, 64, 0.9, 2)
 s.cave([(0, 44)], [(0, 16), (8, 20), (122, 16)])
 for (x, y, w) in [(10, 41, 5), (15, 39, 4), (19, 37, 5), (24, 40, 4), (28, 42, 4), (36, 41, 4), (40, 38, 5), (45, 36, 6), (51, 39, 4), (55, 41, 5), (64, 41, 4), (68, 38, 4), (72, 35, 6), (78, 38, 4), (82, 41, 4), (90, 40, 5), (95, 37, 5), (100, 39, 4), (104, 41, 5)]:
     s.rock(x, y, w, 44 - y)
-for k, xc in enumerate((26, 52, 80, 106)):
-    pendulum(s, xc, 26, 20, 9, 6, k * 0.25, I=1.3)
+for k, xc in enumerate((18, 40, 62, 84, 106)):
+    pendulum(s, xc, 29, 24, 12, 5, k * 0.2, I=1.3)    # low and wide: they sweep the tops of the heaps
 s.hint(2, 18, 'MIND   THE   SWINGING   LAMPS')
 s.tether(126, 44)
 
@@ -196,8 +196,9 @@ for k, x in enumerate(range(13, 98, 14)):
     s.bounce(x, y, 5)
     s.rock(x, y + 1, 5, 63 - y)
     if x + 12 < 104:
-        s.rock(x + 9, 43, 3, 21)    # a cold post between the plates
+        s.rock(x + 9, 43, 3, 21)    # a post between the plates, under a furnace that breathes in a wave
         s.way(x + 10.5, 43)
+        furnace(s, x + 10.5, 37.5, 9, 4, 1.5, k * 0.67, I=1.25, burn=1.5, warn=0.5)
 for k, x in enumerate((25, 47, 69, 91)):
     furnace(s, x + 0.5, 32.5, 9, 4, 2, k * 1.0, I=1.2, burn=1.5)
 s.hint(1, 14, 'THE   PLATES   ARE   SPRUNG')

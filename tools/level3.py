@@ -149,7 +149,8 @@ for k2, y in enumerate((30, 44, 58, 72, 86)):
         s.beam(32.5, y + 0.5, 3, 24, per=8, on=3, ph=k2 * 1.6, ang=180, chimney=False, burn=1.5)
 for k2, y in enumerate((38, 66)):
     s.plat(14, y, 10, 1, way=True)
-s.kills.append((10 * 6, 96 * 6, 28 * 6, 101 * 6))     # tar at the bottom: ride a thread down
+s.air(10, 100, 18, 4)
+s.kills.append((10 * 6, 101 * 6, 28 * 6, 105 * 6))    # tar in a pit at the bottom: ride a thread down
 s.hint(1, 9, 'DOWN   TO   SLIDE')
 s.way(35, 100)
 s.tether(36, 100)

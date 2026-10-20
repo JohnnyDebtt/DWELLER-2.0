@@ -610,7 +610,8 @@
       // hung from the middle of the strand on a soft spring: you swing in a little when you catch it,
       // lean a pixel or two toward where you are pressing, and settle back; you can't slide off sideways
       const cx = Math.floor((s.x + C.W / 2) / TS) * TS + TS / 2 - C.W / 2;
-      const tx = cx + dirIn * C.LEAN;
+      // lean only into open air, so a ledge beside the strand never catches the head on the way up
+      const tx = dirIn && !rectSolid(w, cx + dirIn * (C.LEAN + 0.6), s.y - 8, C.W, s.h + 16) ? cx + dirIn * C.LEAN : cx;
       s.vx += ((tx - s.x) * C.SPRK - s.vx * C.SPRD) * DT;
       if (s.vx > C.SNAPV) s.vx = C.SNAPV; else if (s.vx < -C.SNAPV) s.vx = -C.SNAPV;
       const off = s.x + s.vx * DT - cx;

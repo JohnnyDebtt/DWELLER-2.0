@@ -131,7 +131,7 @@ s.kills.append((8 * 6, 56 * 6, 96 * 6, 66 * 6))
 for k, x in enumerate(range(14, 92, 7)):
     s.vine(x, 18, 46)
     if k % 2 == 1:
-        s.plat(x - 1, 47, 3, 1, way=True)   # a knot of gristle to rest on
+        s.shelf(x - 1, 47, 3, way=True)   # a knot of gristle to rest on
 for k, x in enumerate((24, 45, 66, 87)):
     beat(s, x + 0.5, 22.5, 11, 4, 2, k * 1.0, I=1.25, burn=1.5)
 s.hint(1, 20, 'LEAP   FROM   CORD   TO   CORD')
@@ -216,12 +216,13 @@ s.tether(136)
 # ---------------------------------------------------------------- THE PULSE: drop into the pits as it passes
 s = new('h14', 'THE PULSE', 150, 56, 1.0, 3)
 s.cave([(0, 40)], [(0, 14), (8, 22), (142, 14)])
-for x in range(16, 140, 16):
-    s.air(x, 40, 4, 4)          # a pocket in the floor to drop into
-    s.way(x + 2, 44)
+for x in range(14, 140, 12):
+    s.air(x, 40, 2, 3)          # a pocket: drop down the slot...
+    s.air(x, 42, 5, 3)          # ...and duck under the floor, where the pulse can't see
+    s.way(x + 3.5, 45)
 for k in range(2):
-    s.orbline(8, 33, 134, 0, 8, 8, k * 0.5, 1.3)
-    s.lights[-1]['burnMul'] = 1.25
+    s.orbline(8, 34, 134, 0, 11, 8, k * 0.5, 1.4)
+    s.lights[-1]['burnMul'] = 2.4   # it burns fast: caught in the open, a full pass is too much
 s.hint(1, 20, 'DROP   INTO   A   POCKET   AS   THE   PULSE   PASSES')
 s.tether(146)
 

@@ -157,11 +157,12 @@ s.air(0, 16, 10, 8)             # way in, high on the left
 s.air(8, 10, 80, 72)            # the tangle
 s.air(86, 72, 10, 8)            # way out, low on the right
 s.rock(80, 80, 16, 2)
-s.kills.append((8 * 6, 78 * 6, 80 * 6, 84 * 6))
+s.air(8, 82, 72, 4)             # the tar lies in a pit, a little below the ground
+s.kills.append((8 * 6, 83 * 6, 80 * 6, 87 * 6))
 for k, x in enumerate((14, 22, 30, 38, 46, 54, 62, 70, 77)):
     s.vine(x, 10 + k * 3, 40 + k * 4)
     if k < 8:
-        s.plat(x - 1, 41 + k * 4, 3, 1, way=True)   # a root knot at the strand's end
+        s.shelf(x - 1, 41 + k * 4, 3, way=True)   # a root knot at the strand's end (climb through it, stand on it)
 for k, (x, y) in enumerate(((26, 34), (42, 46), (58, 58), (70, 66))):
     s.orb(x + 0.5, y, 7, 4, 7, 8, k * 0.25, 1.2)
 s.hint(1, 13, 'DOWN   THROUGH   THE   TANGLE')
@@ -188,10 +189,11 @@ s.air(8, 12, 80, 70)            # the web
 s.air(86, 16, 10, 8)            # way out, high on the right
 s.rock(82, 24, 14, 2)
 s.rock(8, 44, 8, 2)
-s.kills.append((16 * 6, 78 * 6, 88 * 6, 84 * 6))
+s.air(16, 82, 72, 4)            # the tar lies in a pit, a little below the ground
+s.kills.append((16 * 6, 83 * 6, 88 * 6, 87 * 6))
 for k, x in enumerate((18, 26, 34, 42, 50, 58, 66, 74)):
     s.vine(x, 44 - k * 3, 78)
-    s.plat(x + 1, 46 - k * 3, 3, 1, way=True)        # a knot to rest on
+    s.shelf(x + 1, 46 - k * 3, 3, way=True)          # a knot to rest on: you climb past it, not into it
 for k, x in enumerate((30, 54, 70)):
     breathe(s, x + 0.5, 20.5 + k * 4, 10, 6, 3, k * 2.0)
 s.hint(1, 33, 'UP   THROUGH   THE   WEB')
