@@ -27,7 +27,7 @@
     // the SEEKER companion: flies to a light and covers it (an eclipse)
     CMPV: 2.9, CMPHOLD: 480, CMPCD: 224, CMPR: 120,
     // terrain features of the deeper levels
-    BOUNCE: 262, ICEACC: 0.16, ICEFRIC: 0.06, CLIMBUP: 44, CLIMBDN: 80, SHIMMY: 38,
+    BOUNCE: 262, ICEACC: 0.16, ICEFRIC: 0.06, CLIMBUP: 44, CLIMBDN: 80, SHIMMY: 38, SNAPV: 90,
     VENTACC: 1500, VENTMAX: 150, DROP: 10,
   };
   const TT = { ONEWAY: 1, BOUNCE: 2, ICE: 3 };
@@ -116,6 +116,16 @@
   function inMask(w, m, s) {
     const tx = Math.floor((s.x + C.W / 2) / TS), ty = Math.floor((s.y + s.h / 2) / TS);
     return tx >= 0 && ty >= 0 && tx < w.W && ty < w.H && m[ty * w.W + tx] === 1;
+  }
+
+  /* is there room to step off a strand toward dir, with something to stand on just below? */
+  function ledgeBeside(w, s, dir) {
+    const nx = s.x + dir * (C.W + 1);
+    if (rectSolid(w, nx, s.y, C.W, s.h)) return false;
+    const fy = s.y + s.h, x0 = Math.floor(nx / TS), x1 = Math.floor((nx + C.W - EPS) / TS);
+    for (let ty = Math.floor(fy / TS); ty <= Math.floor((fy + 4 * TS) / TS); ty++)
+      for (let tx = x0; tx <= x1; tx++) if (solidAt(w, tx, ty) || ttAt(w, tx, ty) === TT.ONEWAY) return true;
+    return false;
   }
 
   function solidAt(w, tx, ty) {
@@ -487,7 +497,11 @@
         s.vx = dirIn * C.CRAWL; if (dirIn) s.face = dirIn;
       }
     } else if (s.climb) {
-      s.vx = dirIn * C.SHIMMY; if (dirIn) s.face = dirIn;
+      // held to the middle of the strand: no sliding sideways, only facing
+      const cx = Math.floor((s.x + C.W / 2) / TS) * TS + TS / 2 - C.W / 2, d = cx - s.x;
+      s.vx = Math.abs(d) < 0.05 ? 0 : Math.max(-C.SNAPV, Math.min(C.SNAPV, d / DT));
+      if (Math.abs(d) < 0.05) s.x = cx;
+      if (dirIn) s.face = dirIn;
     } else if (s.wlock > 0) {
       // keep wall-jump impulse, allow small steering
       s.vx += dirIn * C.AACC * 0.25 * DT;
@@ -514,6 +528,7 @@
     if (s.climb) {
       // leaping off a vine sideways
       if (jumpPress && dirIn !== 0) { s.climb = false; s.vineCD = 18; s.vy = -C.JUMPV * 0.85; s.vx = dirIn * C.RUN; s.buf = 0; s.ev |= EV.JUMP; s.airT = 0; }
+      else if (dirIn !== 0 && ledgeBeside(w, s, dirIn)) { s.climb = false; s.vineCD = 18; s.vx = dirIn * C.RUN * 0.7; s.vy = 0; s.buf = 0; }   // step off onto a ledge
       else s.buf = 0;
     }
     if (s.buf > 0) {

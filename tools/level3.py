@@ -179,7 +179,7 @@ s.tether(88, 40)
 
 # ---------------------------------------------------------------- MIRROR HALL: the beams cross; hide beneath the X
 s = new('g9', 'MIRROR HALL', 128, 56, 0.85, 5)
-s.cave([(0, 40)], [(0, 14), (8, 22), (120, 14)])
+s.cave([(0, 40)], [(0, 14), (8, 18), (120, 14)])
 s.ice(8, 40, 112)
 for k, x in enumerate((28, 52, 76, 100)):
     prism(s, x - 5, 22, 60, 8, 3, k * 2.0, w=3)
@@ -217,7 +217,7 @@ s.kills.append((8 * 6, 62 * 6, 112 * 6, 72 * 6))
 for k, x in enumerate(range(8, 112, 10)):
     s.shelf(x, 40, 5, way=True)
     if x + 10 < 112:
-        s.beam(x + 7.5, 62, 2, 52, per=8, on=3, ph=k * 0.67, ang=270, chimney=False, burn=2.0)
+        s.beam(x + 7.5, 69.6, 2, 60, per=8, on=3, ph=k * 0.67, ang=270, chimney=False, burn=2.0)   # from the floor of the tar
 s.hint(1, 20, 'THE   LIGHT   RAINS   UPWARD')
 s.tether(116)
 
@@ -251,7 +251,7 @@ s = new('g14', 'GLASS ORCHARD', 140, 60, 1.0, 4)
 s.cave([(0, 40)], [(0, 14), (8, 18), (132, 14)])
 for k, x in enumerate((18, 40, 62, 84, 106)):
     s.rock(x, 18, 3, 13)         # a crystal hanging to row 31
-    s.orb(x + 1.5, 27.0, 6, 8, 9, 8, k * 0.2, 1.2)
+    s.orb(x + 1.5, 35.0, 6, 9, 4, 8, k * 0.2, 1.2)   # round the crystal's tip
 s.hint(1, 18, 'THE   LIGHTS   ORBIT   THE   CRYSTALS')
 s.tether(136)
 

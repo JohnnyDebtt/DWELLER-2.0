@@ -665,9 +665,9 @@
     if (P.comp) R.drawMini(ctx, cx - 14, cy + 58, t, 'on', 1);
   }
   function drawTitleSeeker(ctx, x, y, t) {
-    const sh = R.SHEETS.idle, shv = R.SHEETS.idleV;
+    const sh = R.SHEETS.breath, shv = R.SHEETS.breathV;
     if (!sh) return;
-    const f = 14 + Math.floor(t * 12) % 10;      // the right-facing idle loop, frames 15-24
+    const f = R.BREATH[Math.floor(t * 12) % R.BREATH.length];      // the breathing pose
     const sx = (f % sh.cols) * sh.w, sy = Math.floor(f / sh.cols) * sh.h;
     ctx.globalAlpha = 0.18;
     ctx.drawImage(sh.cv, sx, sy, sh.w, sh.h, x - sh.ax, y - sh.ay, sh.w, sh.h);
@@ -719,8 +719,13 @@
     }
     if (cardT < 4.5 && mode === 'play' && seekerCardT > 6.5) {
       const a = Math.min(1, cardT / 0.8) * Math.min(1, (4.5 - cardT) / 1.0);
+      // a soft band of shadow behind the name, so hints and lights in the world never cross it
+      const cy = Math.round(LH * 0.22), bw = Math.min(LW, cardText.length * 14 + 60);
+      const gr = ctx.createLinearGradient((LW - bw) / 2, 0, (LW + bw) / 2, 0);
+      gr.addColorStop(0, 'rgba(4,5,8,0)'); gr.addColorStop(0.2, 'rgba(4,5,8,0.72)'); gr.addColorStop(0.8, 'rgba(4,5,8,0.72)'); gr.addColorStop(1, 'rgba(4,5,8,0)');
+      ctx.globalAlpha = a; ctx.fillStyle = gr; ctx.fillRect((LW - bw) / 2, cy - 7, bw, 28);
       ctx.globalAlpha = a * 0.9;
-      R.drawText(ctx, cardText, LW >> 1, Math.round(LH * 0.22), PAL.snow, 2, 'center');
+      R.drawText(ctx, cardText, LW >> 1, cy, PAL.snow, 2, 'center');
       ctx.globalAlpha = 1;
     }
     // the companion's charge (top left)

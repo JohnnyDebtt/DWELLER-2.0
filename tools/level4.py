@@ -249,7 +249,7 @@ for k, x in enumerate((28, 46)):
 s.watch(66.5, 13.5, 26, 12, 90, 0, 10, 0.0, I=2.0, spin=True, burn=2.5)
 s.rock(70, 18, 6, 2)
 s.rock(71, 16, 4, 2)
-s.lamp(73.0, 11.5, 24, 1.0, col='shard', haz=False)
+s.lamp(73.0, 12.5, 24, 1.0, col='shard', haz=False)
 s.goal_at(73.0, 13.0)
 s.hint(1, 79, 'THREE   BREATHS   TO   THE   TOP')
 

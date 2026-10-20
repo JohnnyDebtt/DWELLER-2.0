@@ -14,12 +14,18 @@
   /* each level colours the same engine: a transposition (always a Seeker ratio, so the tuning holds),
      the register of the bells, and one voice of its own */
   const FLAVOURS = [
-    { tr: 1, bellOct: 0, dens: 1, voice: '' },                 // I    the descent: ice and bells
-    { tr: 9 / 8, bellOct: -1, dens: 0.8, voice: 'wood' },      // II   mycelium: soft wooden knocks
-    { tr: 19 / 16, bellOct: 1, dens: 1.3, voice: 'glass' },    // III  glass garden: high glass
-    { tr: 3 / 4, bellOct: 0, dens: 0.7, voice: 'anvil' },      // IV   foundry: metal on the beat
-    { tr: 21 / 32, bellOct: -1, dens: 0.55, voice: 'rumble' }, // V    ember deep: low rumble
-    { tr: 7 / 8, bellOct: 0, dens: 0.9, voice: 'heart' },      // VI   the heart: a second heartbeat
+    // I the descent: ice and bells over a heartbeat (the original score, unchanged)
+    { tr: 1, bellOct: 0, dens: 1, voice: '', score: 'descent' },
+    // II mycelium: warm and damp; a kalimba walks in threes against the bar, the caps breathe every six beats
+    { tr: 9 / 8, score: 'mycelium', gain: 1.3, pad: 'warm', drone: 0.55, wind: 0.6, windF: 300, echo: [0.75, 0.34, 1300] },
+    // III glass garden: a high music box in sixteenths, glass chimes, almost no low end
+    { tr: 19 / 16, score: 'glass', gain: 1.75, pad: 'glass', drone: 0.35, wind: 0.8, windF: 1400, echo: [0.5, 0.52, 4200] },
+    // IV foundry: a machine ostinato, anvils on the beat, steam on the off-beat, a whistle now and then
+    { tr: 3 / 4, score: 'foundry', pad: 'grind', drone: 1.0, wind: 0.5, windF: 700, echo: [0.25, 0.22, 2400] },
+    // V ember deep: slow and heavy; great drums, a mournful reed, embers crackling in the dark
+    { tr: 21 / 32, score: 'ember', gain: 0.8, pad: 'ember', drone: 1.25, wind: 0.45, windF: 220, echo: [1.5, 0.44, 900] },
+    // VI the heart: the pulse is the rhythm; blood rushes after every beat, a choir hums, and the beat sometimes stumbles
+    { tr: 7 / 8, score: 'heart', gain: 1.1, pad: 'choir', drone: 0.8, wind: 0.35, windF: 420, echo: [1.0, 0.3, 1500] },
   ];
 
   function hz(ratio, oct) { return F0 * ratio * Math.pow(2, oct); }
@@ -102,7 +108,7 @@
       const c = this.ctx;
       this.windGain = c.createGain(); this.windGain.gain.value = 0; this.windGain.connect(this.musicBus);
       const s = c.createBufferSource(); s.buffer = this.noise; s.loop = true;
-      const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 520; bp.Q.value = 1.4;
+      const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 520; bp.Q.value = 1.4; this.windBP = bp;
       const lfo = c.createOscillator(); lfo.frequency.value = 0.07; const lg = c.createGain(); lg.gain.value = 260; lfo.connect(lg); lg.connect(bp.frequency); lfo.start();
       s.connect(bp); bp.connect(this.windGain); s.start(0, 0);
       const send = c.createGain(); send.gain.value = 0.5; this.windGain.connect(send); send.connect(this.revSend);
@@ -120,6 +126,16 @@
       const ng = c.createGain(); ng.gain.value = 0.10; s.connect(hp); hp.connect(ng); ng.connect(this.fearGain); s.start(0, 1.1);
     }
 
+    /* the room each level plays in: echo time, feedback and colour, and where the wind whistles */
+    applyRoom(t) {
+      const fl = this.fl, ec = fl.echo || [0.75, 0.42, 1800];
+      this.echo.delayTime.setTargetAtTime(BEAT * ec[0], t, 0.3);
+      this.echoFb.gain.setTargetAtTime(ec[1], t, 0.3);
+      this.echoLP.frequency.setTargetAtTime(ec[2], t, 0.3);
+      if (this.windBP) this.windBP.frequency.setTargetAtTime(fl.windF || 520, t, 0.5);
+      this.musicBus.gain.setTargetAtTime(fl.gain || 1, t, 0.4);
+    }
+
     /* chord pad: swap voices when the root changes */
     setRoot(t, idx) {
       if (this.pad && this.rootIdx === idx) return;
@@ -135,13 +151,32 @@
       const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700; lp.Q.value = 0.5;
       g.connect(lp); const out = c.createGain(); out.gain.value = 0.0; lp.connect(out); out.connect(this.musicBus);
       const send = c.createGain(); send.gain.value = 0.55; out.connect(send); send.connect(this.revSend);
-      const r = PALETTE[idx] * this.fl.tr;
-      const notes = [fold(F0 * r * 4, 150, 300), fold(F0 * r * 6, 190, 420), fold(F0 * r * 7, 230, 500), fold(F0 * r * 19 / 16 * 8, 300, 640)];
+      const r = PALETTE[idx] * this.fl.tr, kind = this.fl.pad || '';
+      let notes = [fold(F0 * r * 4, 150, 300), fold(F0 * r * 6, 190, 420), fold(F0 * r * 7, 230, 500), fold(F0 * r * 19 / 16 * 8, 300, 640)];
+      let voices = [['sawtooth', 0.07, 1], ['triangle', 0.12, 1], ['sine', 0.08, 2]];
+      let dest = g;
+      if (kind === 'warm') { notes = [fold(F0 * r * 2, 90, 180), fold(F0 * r * 3, 130, 260), fold(F0 * r * 21 / 16 * 4, 160, 330)]; voices = [['triangle', 0.16, 1], ['sine', 0.12, 2]]; lp.frequency.value = 520; }
+      if (kind === 'glass') {
+        notes = [fold(F0 * r * 8, 600, 1200), fold(F0 * r * 12, 700, 1400), fold(F0 * r * 14, 800, 1600), fold(F0 * r * 9, 900, 1800)]; voices = [['sine', 0.05, 1], ['sine', 0.02, 2]];
+        const trem = c.createGain(); trem.gain.value = 0.7; const tl = c.createOscillator(); tl.frequency.value = 0.75; const tg = c.createGain(); tg.gain.value = 0.3;
+        tl.connect(tg); tg.connect(trem.gain); tl.start(t); trem.connect(g); dest = trem; lp.frequency.value = 3000;
+      }
+      if (kind === 'grind') { notes = [fold(F0 * r * 2, 60, 120), fold(F0 * r * 3, 90, 180), fold(F0 * r * 4, 120, 240)]; voices = [['sawtooth', 0.10, 1], ['square', 0.03, 1]]; lp.frequency.value = 380; lp.Q.value = 4; }
+      if (kind === 'ember') { notes = [fold(F0 * r, 36, 72), fold(F0 * r * 3 / 2, 54, 108), fold(F0 * r * 19 / 16 * 2, 70, 140)]; voices = [['sawtooth', 0.09, 1], ['sine', 0.2, 1]]; lp.frequency.value = 300; }
+      if (kind === 'choir') {
+        // an 'ah': sawtooth voices through two formant filters
+        notes = [fold(F0 * r * 4, 150, 300), fold(F0 * r * 6, 190, 400), fold(F0 * r * 7 / 4 * 4, 230, 460)]; voices = [['sawtooth', 0.13, 1]];
+        const f1 = c.createBiquadFilter(); f1.type = 'bandpass'; f1.frequency.value = 760; f1.Q.value = 5;
+        const f2 = c.createBiquadFilter(); f2.type = 'bandpass'; f2.frequency.value = 1150; f2.Q.value = 7;
+        const mix = c.createGain(); mix.gain.value = 2.2; f1.connect(mix); f2.connect(mix); mix.connect(g);
+        dest = c.createGain(); dest.connect(f1); dest.connect(f2); lp.frequency.value = 2200;
+      }
       const oscs = [];
       notes.forEach((f, i) => {
-        for (const [type, gain, mul] of [['sawtooth', 0.07, 1], ['triangle', 0.12, 1], ['sine', 0.08, 2]]) {
+        for (const [type, gain, mul] of voices) {
           const o = c.createOscillator(); o.type = type; o.frequency.value = f * mul;
-          const vg = c.createGain(); vg.gain.value = gain; o.connect(vg); vg.connect(g); o.start(t);
+          if (kind === 'choir') { const v = c.createOscillator(); v.frequency.value = 4.6 + i * 0.4; const vg2 = c.createGain(); vg2.gain.value = f * 0.004; v.connect(vg2); vg2.connect(o.frequency); v.start(t); oscs.push(v); }
+          const vg = c.createGain(); vg.gain.value = gain; o.connect(vg); vg.connect(dest); o.start(t);
           oscs.push(o);
         }
       });
@@ -155,8 +190,9 @@
       this.energy = e; this.fear = f;
       const tc = 0.6;
       const d = p.duck === undefined ? 1 : p.duck;
-      this.droneGain.gain.setTargetAtTime((0.32 + 0.18 * e) * d, t, tc);
-      this.windGain.gain.setTargetAtTime((0.085 + 0.05 * (1 - e)) * d, t, tc);
+      const fl = this.fl || {};
+      this.droneGain.gain.setTargetAtTime((0.32 + 0.18 * e) * d * (fl.drone || 1), t, tc);
+      this.windGain.gain.setTargetAtTime((0.085 + 0.05 * (1 - e)) * d * (fl.wind || 1), t, tc);
       this.fearGain.gain.setTargetAtTime(0.14 * f * f * d, t, 0.25);
       if (this.pad) { this.pad.out.gain.setTargetAtTime((0.20 + 0.30 * e) * d, t, tc); this.pad.lp.frequency.setTargetAtTime(520 + 1100 * e, t, 1.5); }
       this.droneLP.frequency.setTargetAtTime(210 + 340 * e + 200 * f, t, 1.2);
@@ -211,8 +247,73 @@
       s.start(t, this.rnd() * 2); s.stop(t + 0.12);
     }
 
-    /* one musical step (half a beat). n is the global step number. */
+    /* ----------------------------------------------------------- the voices the other levels add */
+    voice(t, f, vel, dur, partials, dest) {        // a struck tone: [mul, gain, decay] partials
+      const c = this.ctx, g = c.createGain(); g.gain.value = vel; g.connect(dest || this.musicBus);
+      const end = t + dur + 0.1;
+      for (const [mul, gn, dc] of partials) {
+        const o = c.createOscillator(); o.type = 'sine'; o.frequency.value = f * mul;
+        const pg = c.createGain(); this.env(pg, t, 0.003, gn, dur * dc);
+        o.connect(pg); pg.connect(g); o.start(t); o.stop(end);
+      }
+      return g;
+    }
+    kalimba(t, f, vel) {
+      const g = this.voice(t, f, 0.22 * vel, 1.1, [[1, 1, 1], [4.0, 0.35, 0.18], [6.27, 0.12, 0.1]]);
+      const s = this.ctx.createGain(); s.gain.value = 0.45; g.connect(s); s.connect(this.echo);
+      const r = this.ctx.createGain(); r.gain.value = 0.35; g.connect(r); r.connect(this.revSend);
+    }
+    marimba(t, f, vel, dur) { const g = this.voice(t, f, 0.3 * vel, dur || 1.4, [[1, 1, 1], [4, 0.25, 0.12], [9.9, 0.05, 0.05]]); const r = this.ctx.createGain(); r.gain.value = 0.3; g.connect(r); r.connect(this.revSend); }
+    glassPing(t, f, vel, dur) {
+      const g = this.voice(t, f, 0.12 * vel, dur || 1.6, [[1, 1, 1], [2, 0.18, 0.6], [5.2, 0.06, 0.2]]);
+      const s = this.ctx.createGain(); s.gain.value = 0.55; g.connect(s); s.connect(this.echo);
+      const r = this.ctx.createGain(); r.gain.value = 0.8; g.connect(r); r.connect(this.revSend);
+    }
+    anvil(t, f, vel) {
+      const g = this.voice(t, f, 0.16 * vel, 1.3, [[1, 1, 1], [2.76, 0.6, 0.6], [5.4, 0.4, 0.3], [8.93, 0.25, 0.15]]);
+      const r = this.ctx.createGain(); r.gain.value = 0.4; g.connect(r); r.connect(this.revSend);
+      this.tick(t, 1.4 * vel, 4200);
+    }
+    noiseHit(t, dur, type, f0, f1, vel, q, attack) {   // a noise gesture on the music bus
+      const c = this.ctx, s = c.createBufferSource(); s.buffer = this.noise;
+      const bp = c.createBiquadFilter(); bp.type = type; bp.Q.value = q || 1;
+      bp.frequency.setValueAtTime(f0, t); bp.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t + dur);
+      const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vel, t + (attack || 0.01)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      s.connect(bp); bp.connect(g); g.connect(this.musicBus);
+      const sd = c.createGain(); sd.gain.value = 0.3; g.connect(sd); sd.connect(this.revSend);
+      s.start(t, this.rnd() * 2); s.stop(t + dur + 0.05);
+    }
+    machine(t, f, vel, dur) {                       // a gated square for the foundry ostinato
+      const c = this.ctx, o = c.createOscillator(); o.type = 'square'; o.frequency.value = f;
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 6; lp.frequency.setValueAtTime(380 + 900 * this.energy, t); lp.frequency.exponentialRampToValueAtTime(110, t + dur);
+      const g = c.createGain(); this.env(g, t, 0.004, 0.12 * vel, dur);
+      const sub = c.createOscillator(); sub.type = 'sine'; sub.frequency.value = f / 2; const sg = c.createGain(); sg.gain.value = 0.9;
+      o.connect(lp); lp.connect(g); sub.connect(sg); sg.connect(g); g.connect(this.musicBus);
+      o.start(t); sub.start(t); o.stop(t + dur + 0.05); sub.stop(t + dur + 0.05);
+    }
+    reed(t, f, vel, dur, vib) {                    // a slow, breathy lead: duduk, whistle or hum
+      const c = this.ctx, g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vel, t + Math.min(0.6, dur * 0.3));
+      g.gain.setValueAtTime(vel, t + dur * 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = f * 3.2; lp.Q.value = 1.2;
+      const o1 = c.createOscillator(); o1.type = 'sawtooth'; o1.frequency.value = f;
+      const o2 = c.createOscillator(); o2.type = 'triangle'; o2.frequency.value = f; const g2 = c.createGain(); g2.gain.value = 1.6;
+      const v = c.createOscillator(); v.frequency.value = vib || 5; const vg = c.createGain(); vg.gain.setValueAtTime(0, t); vg.gain.linearRampToValueAtTime(f * 0.012, t + dur * 0.5);
+      v.connect(vg); vg.connect(o1.frequency); vg.connect(o2.frequency);
+      o1.connect(lp); o2.connect(g2); g2.connect(lp); lp.connect(g); g.connect(this.musicBus);
+      const s = c.createGain(); s.gain.value = 0.5; g.connect(s); s.connect(this.revSend);
+      const e2 = c.createGain(); e2.gain.value = 0.25; g.connect(e2); e2.connect(this.echo);
+      for (const o of [o1, o2, v]) { o.start(t); o.stop(t + dur + 0.1); }
+    }
+    taiko(t, vel, f) {
+      this.thump(t, f || 36, vel, 1.3);
+      this.noiseHit(t, 0.5, 'lowpass', 420, 70, 0.22 * vel, 0.8, 0.004);
+    }
+
+    /* one musical step (half a beat). n is the global step number. Each level has its own score. */
     step(t, n, p) {
+      const sc = this.fl.score;
+      if (sc && sc !== 'descent') return this['score_' + sc](t, n, p.energy === undefined ? this.energy : p.energy);
       const e = p.energy === undefined ? this.energy : p.energy;
       const idx = this.rootIdx, root = PALETTE[idx] * this.fl.tr, fl = this.fl;
       const r = this.rnd;
@@ -256,6 +357,113 @@
       }
       // drips in the dark
       if (r() < 0.05) this.bell(t + r() * STEP, fold(F0 * PALETTE[Math.floor(r() * 6)] * 32, 1500, 3200), 0.12, 0.9);
+    }
+
+    pick(i) { return PALETTE[((i % 6) + 6) % 6] * PALETTE[this.rootIdx] * this.fl.tr; }
+
+    /* II THE MYCELIUM: in threes against the bar, soft and damp */
+    score_mycelium(t, n, e) {
+      const r = this.rnd, bar = Math.floor(n / 8);
+      // the caps breathe: a slow swell every six beats
+      if (n % 12 === 0) this.noiseHit(t, BEAT * 5, 'lowpass', 260, 900, 0.05 + 0.05 * e, 0.9, BEAT * 2.5);
+      // kalimba walking in threes (6 steps) over the 8-step bar
+      const walk = [0, 4, 2, 5, 4, 2], k = n % 6;
+      if (n % 2 === 0 || e > 0.35) {
+        const up = (Math.floor(n / 24) % 2) ? 1 : 0;
+        this.kalimba(t, fold(F0 * this.pick(walk[k] + up) * 8, 260, 620), (k === 0 ? 0.9 : 0.55) * (0.6 + 0.4 * e));
+      }
+      // soft low marimba: the root, and the fifth on the sixth step
+      if (n % 8 === 0) this.marimba(t, fold(F0 * this.pick(0) * 2, 70, 140), 0.8, 2.2);
+      if (n % 8 === 5 && e > 0.25) this.marimba(t, fold(F0 * this.pick(4) * 2, 90, 180), 0.5, 1.4);
+      // muffled knocks instead of a heartbeat
+      if (n % 8 === 0) this.thump(t, 40, 0.18 + 0.2 * e, 0.3);
+      if (n % 5 === 3) this.tick(t, 0.6, 340 + 140 * (bar % 3));
+      // spores popping
+      if (r() < 0.10) this.tick(t + r() * STEP, 0.35, 2600 + 1600 * r());
+      if (e > 0.6 && n % 2 === 1) this.noiseHit(t, 0.09, 'highpass', 5200, 4000, 0.025 * e, 0.8, 0.004);
+    }
+
+    /* III THE GLASS GARDEN: a high music box in sixteenths, chimes, almost nothing low */
+    score_glass(t, n, e) {
+      const r = this.rnd;
+      const seq = [0, 2, 4, 5, 4, 2, 1], hs = STEP / 2;
+      for (let h = 0; h < 2; h++) {
+        const i = n * 2 + h, k = i % 7;
+        if (h === 1 && e < 0.3 && i % 4 !== 1) continue;
+        const oct = Math.floor(i / 14) % 3;
+        this.glassPing(t + h * hs, fold(F0 * this.pick(seq[k]) * 16 * Math.pow(2, oct === 2 ? 1 : 0), 700, 2300), (k === 0 ? 0.9 : 0.5) * (0.55 + 0.45 * e), 1.3);
+      }
+      // a strummed chord of glass every two bars
+      if (n % 16 === 0) [0, 4, 5, 2].forEach((d, j) => this.glassPing(t + j * 0.07, fold(F0 * this.pick(d) * 32, 1400, 3400), 0.7, 3.4));
+      // a faint sub, so the garden has a floor
+      if (n % 16 === 0) this.marimba(t, fold(F0 * this.pick(0), 40, 80), 0.45, 3.0);
+      // tinks on five, against the seven of the box
+      if (n % 5 === 0) this.tick(t, 0.45, 6200);
+      if (e > 0.55 && n % 5 === 2) this.tick(t + hs, 0.4, 4800);
+      if (r() < 0.06) this.glassPing(t + r() * STEP, fold(F0 * this.pick(Math.floor(r() * 6)) * 64, 2600, 4800), 0.3, 0.8);
+    }
+
+    /* IV THE FOUNDRY: the machine keeps time */
+    score_foundry(t, n, e) {
+      const r = this.rnd, s8 = n % 8;
+      // the machine ostinato in eighths (quarters while it is quiet)
+      const pat = [0, 0, 4, 0, 0, 4, 5, 4];
+      if (e > 0.3 || n % 2 === 0) this.machine(t, fold(F0 * this.pick(pat[s8]) * 2, 50, 110), (s8 === 0 ? 1 : 0.65) * (0.55 + 0.45 * e), STEP * 0.7);
+      // the hammer on every beat, the anvil on one and three
+      if (n % 2 === 0) this.thump(t, 58, 0.28 + 0.35 * e, 0.22);
+      if (s8 === 0) this.anvil(t, fold(F0 * this.pick(0) * 13, 500, 1000), 0.9);
+      if (s8 === 4) this.anvil(t, fold(F0 * this.pick(4) * 13, 500, 1000), 0.55);
+      // a clank on two and four
+      if (s8 === 2 || s8 === 6) this.noiseHit(t, 0.14, 'bandpass', 1700, 900, 0.10 + 0.08 * e, 2.2, 0.003);
+      // steam on the off-beat of three
+      if (s8 === 5) this.noiseHit(t, 0.55, 'highpass', 2600, 5200, 0.05 + 0.04 * e, 0.7, 0.05);
+      // chains in sixteenths when the shift is busy
+      if (e > 0.5) this.tick(t + STEP / 2, 0.35 + 0.3 * r(), 3000 + 1200 * r());
+      // the shift whistle, now and then
+      if (n % 32 === 24) this.reed(t, fold(F0 * this.pick(5) * 8, 260, 520), 0.05 + 0.03 * e, BEAT * 2.5, 6.5);
+    }
+
+    /* V EMBER DEEP: slow and heavy under a buried sun */
+    score_ember(t, n, e) {
+      const r = this.rnd;
+      // the great drum on one, an answer late in the bar
+      if (n % 8 === 0) this.taiko(t, 0.55 + 0.3 * e, 34);
+      if (n % 8 === 5 && e > 0.3) this.taiko(t, 0.28 + 0.2 * e, 42);
+      if (n % 32 === 30 && e > 0.5) { this.taiko(t, 0.3, 46); this.taiko(t + STEP / 2, 0.36, 42); }
+      // the ground groans
+      if (n % 16 === 0) this.noiseHit(t, BEAT * 4, 'lowpass', 140, 50, 0.09 + 0.06 * e, 0.7, 0.4);
+      if (n % 16 === 0) this.pluckBass(t, fold(F0 * this.pick(0), 30, 62), 0.9, BEAT * 3);
+      // a mournful reed, long notes falling through the low palette
+      const phrase = [[0, 0, 4], [2, 3, 1], [4, 2, 0], [3, 1, 0]][Math.floor(n / 32) % 4];
+      if (n % 32 === 0) this.reed(t, fold(F0 * this.pick(phrase[0]) * 4, 150, 300), 0.07 + 0.03 * e, BEAT * 5, 4.2);
+      if (n % 32 === 12) this.reed(t, fold(F0 * this.pick(phrase[1]) * 4, 150, 300), 0.06 + 0.03 * e, BEAT * 3, 4.2);
+      if (n % 32 === 20) this.reed(t, fold(F0 * this.pick(phrase[2]) * 4, 130, 260), 0.06 + 0.03 * e, BEAT * 5, 4.2);
+      // embers crackling
+      const c = r() < 0.4 ? 1 + Math.floor(r() * 3) : 0;
+      for (let i = 0; i < c; i++) this.noiseHit(t + r() * STEP, 0.02 + 0.03 * r(), 'highpass', 2500 + 3000 * r(), 1500, 0.02 + 0.03 * r(), 0.7, 0.001);
+      // a low gong, rarely
+      if (n % 64 === 48) this.bell(t, fold(F0 * this.pick(4) * 4, 110, 220), 0.9, 6);
+    }
+
+    /* VI THE HEART: the pulse is the rhythm, and it stumbles */
+    score_heart(t, n, e) {
+      const r = this.rnd, beat = n % 4 === 0;
+      const stumble = n % 64 === 60;                // arrhythmia: once in a long while the beat comes early
+      if (beat || stumble) {
+        const v = 0.42 + 0.4 * e, tt = stumble ? t - STEP * 0.3 : t;
+        this.thump(tt, 46, v, 0.5); this.thump(tt + 0.19, 46, v * 0.6, 0.34);
+        // blood rushing after the beat
+        this.noiseHit(tt + 0.08, BEAT * 1.4, 'lowpass', 180, 520, 0.05 + 0.05 * e, 1.2, BEAT * 0.5);
+      }
+      // a deep pulse of the root after the beat
+      if (n % 8 === 1) this.pluckBass(t, fold(F0 * this.pick(0) * 2, 44, 96), 0.7, STEP * 3);
+      if (n % 8 === 5 && e > 0.4) this.pluckBass(t, fold(F0 * this.pick(4) * 2, 60, 130), 0.5, STEP * 2);
+      // a hummed line, sparse, in sevens
+      const hum = [5, 4, 0, 1, 4, 0, 2], k = n % 14;
+      if (k % 2 === 0 && [0, 4, 6].includes(k / 2) && r() < 0.6 + 0.3 * e) this.reed(t, fold(F0 * this.pick(hum[k / 2]) * 8, 300, 640), 0.035 + 0.02 * e, BEAT * 2.2, 5.5);
+      // nerves: the 19th and 21st harmonics, together, very quietly
+      if (n % 32 === 16) { this.bell(t, fold(F0 * 19 * this.fl.tr, 900, 1900), 0.25, 3); this.bell(t + 0.05, fold(F0 * 21 * this.fl.tr, 900, 1900), 0.25, 3); }
+      if (e > 0.6 && n % 2 === 1) this.tick(t, 0.35, 1400 + 600 * r());
     }
 
     /* ----------------------------------------------------------- sound effects */
@@ -353,6 +561,7 @@
       const fl = FLAVOURS[i] || FLAVOURS[0];
       if (fl === this.eng.fl) return;
       this.eng.fl = fl; const idx = this.eng.rootIdx; this.eng.rootIdx = -1;
+      this.eng.applyRoom(this.ctx.currentTime);
       this.eng.setRoot(this.ctx.currentTime + 0.05, Math.max(0, idx));
     },
     setMood(e, rootIdx) {
@@ -373,11 +582,12 @@
   /* ------------------------------------------------------------------ offline soundtrack render */
   // arrangement: [seconds, energy, rootIdx]
   const ARRANGEMENT = [[0, 0.12, 0], [24, 0.22, 0], [48, 0.34, 4], [72, 0.46, 2], [96, 0.58, 5], [120, 0.72, 1], [144, 0.86, 3], [168, 1.0, 0], [200, 0.66, 4], [224, 0.30, 0], [248, 0.12, 0]];
-  async function renderTrack(seconds, sampleRate) {
+  async function renderTrack(seconds, sampleRate, level) {
     const OAC = global.OfflineAudioContext || global.webkitOfflineAudioContext;
     const rate = sampleRate || 44100;
     const ctx = new OAC(2, Math.floor(seconds * rate), rate);
     const eng = new Engine(ctx, ctx.destination, { offline: true, volume: 0.7, seed: 48 });
+    if (level) { eng.fl = FLAVOURS[level] || FLAVOURS[0]; eng.applyRoom(0); }
     let ai = 0;
     const steps = Math.floor(seconds / STEP);
     let lastParam = -1;

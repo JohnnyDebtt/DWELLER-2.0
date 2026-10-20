@@ -41,11 +41,11 @@ html = '''<!doctype html>
 <meta property="og:type" content="website">
 <meta property="og:title" content="Dweller">
 <meta property="og:description" content="Stay in the shadow. Reach the rainbow crystal. A dark side-scroller set in The Seeker universe.">
-<meta property="og:image" content="https://johnnydebtt.github.io/DWELLER/dist/preview.png">
+<meta property="og:image" content="https://johnnydebtt.github.io/DWELLER-2.0/dist/preview.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://johnnydebtt.github.io/DWELLER/dist/preview.png">
+<meta name="twitter:image" content="https://johnnydebtt.github.io/DWELLER-2.0/dist/preview.png">
 <style>
 :root{color-scheme:dark}
 html,body{margin:0;height:100%;background:#07070c;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior:none}

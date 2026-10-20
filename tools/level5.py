@@ -150,7 +150,7 @@ s.cave(steps, [(x, y - 16) for x, y in steps])
 for k, (x, y) in enumerate(steps):
     s.ice(x, y, 12)
     if k % 2 == 1:
-        ember(s, x + 6.5, y + 1, 12, 6, 6, k * 0.12)
+        ember(s, x + 6.5, y - 1, 12, 6, 6, k * 0.12)
 s.hint(1, 42, 'THE   OBSIDIAN   IS   SLICK')
 s.tether(104)
 

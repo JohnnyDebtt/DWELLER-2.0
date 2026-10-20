@@ -151,6 +151,23 @@
     x.putImageData(id, 0, 0);
     return c;
   }
+  /* Standing still: the calm pose from the idle sheet (cloak closed, a thin line between the legs),
+   * breathing by lowering the hood and shoulders a pixel, with a visor blink now and then.
+   * Three frames: 0 rest, 1 breath, 2 blink. Built from the sheet so it always matches the art. */
+  function buildBreath() {
+    const src = IMG.idle, c = document.createElement('canvas'); c.width = 96 * 3; c.height = 96;
+    const x = c.getContext('2d'), FX = 3 * 96, WAIST = 48;
+    for (let k = 0; k < 3; k++) x.drawImage(src, FX, 0, 96, 96, k * 96, 0, 96, 96);
+    x.clearRect(96, 0, 96, WAIST);
+    x.drawImage(src, FX, 0, 96, WAIST - 1, 96, 1, 96, WAIST - 1);          // the breath: hood and shoulders down 1px
+    const id = x.getImageData(192, 0, 96, 96), d = id.data;               // the blink: the visor dims
+    for (let i = 0; i < d.length; i += 4) if (d[i + 3] && d[i] > 240 && d[i + 1] > 240 && d[i + 2] > 240) { d[i] = 150; d[i + 1] = 160; d[i + 2] = 170; }
+    x.putImageData(id, 192, 0);
+    sheet('breath', c, 3, 1, 96, 96, 48, 54);
+  }
+  // 54 frames at 12 fps (4.5 s): breathe twice, blink, breathe once more
+  const BREATH = [].concat(Array(9).fill(0), Array(9).fill(1), Array(9).fill(0), Array(9).fill(1),
+    Array(3).fill(0), [2, 2], Array(4).fill(0), Array(9).fill(1));
   function sheet(name, canvas, cols, rows, w, h, ax, ay) {
     const s = { cv: canvas, cols, rows, w, h, ax, ay, n: cols * rows };
     SHEETS[name] = s; return s;
@@ -177,7 +194,8 @@
     P('idle', 12, 2, 96, 96, 48, 54); P('run', 10, 1, 48, 48, 24, 30); P('jump', 12, 1, 48, 48, 24, 30);
     P('fall', 6, 2, 48, 48, 24, 30); P('roll', 4, 1, 48, 48, 24, 30); P('wall', 3, 1, 96, 96, 47, 54);
     P('death', 7, 1, 48, 48, 24, 30);
-    for (const k of ['idle', 'run', 'jump', 'fall', 'roll', 'wall', 'death']) {
+    buildBreath();
+    for (const k of ['idle', 'run', 'jump', 'fall', 'roll', 'wall', 'death', 'breath']) {
       const s = SHEETS[k];
       sheet(k + 'V', whiteOnly(s.cv), s.cols, s.rows, s.w, s.h, s.ax, s.ay);
     }
@@ -590,9 +608,10 @@
     const loop = (i, start, a, b) => { i += start; return i <= b ? i : a + (i - a) % (b - a + 1); };
     switch (s.st) {
       case 'idle': {
+        // a landing crouch (two frames) first, then the breathing pose, the same either way it faces
         const land = s.fromSt === 'fall' || s.fromSt === 'jump' || s.fromSt === 'wall';
-        if (s.face < 0) return ['idle', loop(f, land ? 0 : 2, 3, 11)];
-        return ['idle', loop(f, land ? 12 : 14, 14, 23)];
+        if (land && f < 2) return ['idle', f];
+        return ['breath', BREATH[(f - (land ? 2 : 0)) % BREATH.length]];
       }
       case 'run': {
         const turned = s.t - s.faceT <= s.anim;
@@ -610,7 +629,7 @@
       case 'climb': return ['wall', Math.abs(s.vy) > 1 ? f % 3 : 0];
       case 'death': return ['death', Math.min(6, f)];
     }
-    return ['idle', 14];
+    return ['breath', 0];
   }
 
   function drawPlayer(ctx, s, camX, camY, pass, flash) {
@@ -644,15 +663,31 @@
   function markTether(i, time) { tetherT[i] = 0; tetherT['_' + i] = time; }
   function tickTethers(dt) { for (const k in tetherT) if (k[0] !== '_') tetherT[k] += dt; }
 
+  /* how many open tiles lie straight above / below a tile (capped) */
+  function openUp(w, tx, ty, lim) { let k = 0; while (k < lim && !D.solidAt(w, tx, ty - k - 1)) k++; return k; }
+  function openDown(w, tx, ty, lim) { let k = 0; while (k < lim && !D.solidAt(w, tx, ty + k + 1)) k++; return k; }
+  /* a cord from the underside of the rock above (x, y) down to y - gap, drawn into the rock a pixel so it never floats */
+  function drawCord(ctx, w, wx, wy, camX, camY, gap, lit) {
+    const tx = Math.floor(wx / TS), ty = Math.floor(wy / TS), top = openUp(w, tx, ty, 90);
+    if (top >= 90) return false;
+    const x = Math.round(wx - camX), y0 = Math.round((ty - top) * TS - camY) - 1, y1 = Math.round(wy - camY) - gap;
+    if (y1 <= y0) return true;
+    ctx.fillStyle = lit ? TH.stal[1] : TH.near; ctx.fillRect(x, y0, 1, y1 - y0);
+    ctx.fillStyle = lit ? TH.stal[0] : TH.far[0]; ctx.fillRect(x + 1, y0, 1, Math.max(0, y1 - y0 - 1));
+    ctx.fillStyle = lit ? TH.stal[1] : TH.near; ctx.fillRect(x - 1, y0, 4, 2);           // where it is fixed into the rock
+    return true;
+  }
+
   function drawLampCrystal(ctx, w, l, camX, camY, time, post) {
     const x = Math.round(l.x - camX), y = Math.round(l.y - camY);
     const k = Math.max(0.15, l.k);
     if (l.col === 'cap') {                       // a breathing glowcap on its stalk
       if (!post) {
-        let dn = 0; const tx = Math.floor(l.x / TS), ty = Math.floor(l.y / TS);
-        while (dn < 6 && !D.solidAt(w, tx, ty + dn + 1)) dn++;
-        ctx.fillStyle = TH.near; ctx.fillRect(x - 1, y, 3, (dn + 1) * TS - (l.y - ty * TS) + 1);
-        ctx.fillStyle = TH.mid; ctx.fillRect(x, y, 1, (dn + 1) * TS - (l.y - ty * TS));
+        const tx = Math.floor(l.x / TS), ty = Math.floor(l.y / TS), dn = openDown(w, tx, ty, 8);
+        if (dn < 8) {                            // a cap on a stalk from the floor
+          ctx.fillStyle = TH.near; ctx.fillRect(x - 1, y, 3, (dn + 1) * TS - (l.y - ty * TS) + 1);
+          ctx.fillStyle = TH.mid; ctx.fillRect(x, y, 1, (dn + 1) * TS - (l.y - ty * TS));
+        } else drawCord(ctx, w, l.x, l.y, camX, camY, 2);   // a cap hanging from the roof on its thread
         return;
       }
       const g = Math.min(1, l.k * 1.4);
@@ -665,12 +700,21 @@
       return;
     }
     if (!post) {
-      // vine from the ceiling
-      let top = 0; const tx = Math.floor(l.x / TS), ty = Math.floor(l.y / TS);
-      while (top < 16 && !D.solidAt(w, tx, ty - top - 1)) top++;
-      if (top > 0 && top < 16) {
-        ctx.fillStyle = TH.near; ctx.fillRect(x, y - top * TS, 1, top * TS - 2);
-        ctx.fillStyle = TH.mid; ctx.fillRect(x + 1, y - top * TS, 1, Math.max(0, top * TS - 6));
+      // hung from the roof on a cord; a lamp low over a floor under a far roof stands on a post instead
+      const tx = Math.floor(l.x / TS), ty = Math.floor(l.y / TS), top = openUp(w, tx, ty, 90), dn = openDown(w, tx, ty, 8);
+      let side = 0, sd = 9;
+      for (let k = 0; k < 6; k++) { if (D.solidAt(w, tx - k - 1, ty)) { side = -1; sd = k; break; } if (D.solidAt(w, tx + k + 1, ty)) { side = 1; sd = k; break; } }
+      if (top > 12 && side !== 0) {               // a bracket from the nearest wall
+        const wx = side < 0 ? Math.round((tx - sd) * TS - camX) - 1 : Math.round((tx + sd + 1) * TS - camX) + 1;
+        const xa = Math.min(wx, x), xb = Math.max(wx, x);
+        ctx.fillStyle = TH.near; ctx.fillRect(xa, y - 5, xb - xa + 1, 2); ctx.fillRect(x, y - 5, 1, 3);
+        ctx.fillStyle = TH.mid; ctx.fillRect(xa, y - 5, xb - xa + 1, 1);
+        ctx.fillStyle = TH.near; ctx.fillRect(side < 0 ? wx - 1 : wx - 1, y - 7, 2, 6);
+      } else if (top < 90 && !(top > 30 && dn < 6)) drawCord(ctx, w, l.x, l.y, camX, camY, 2);
+      else if (dn < 8) {
+        const fy = Math.round((ty + dn + 1) * TS - camY);
+        ctx.fillStyle = TH.near; ctx.fillRect(x - 1, y + 2, 3, fy - y - 2); ctx.fillRect(x - 3, fy - 2, 7, 2);
+        ctx.fillStyle = TH.mid; ctx.fillRect(x, y + 2, 1, fy - y - 4); ctx.fillRect(x - 2, fy - 2, 5, 1);
       }
       return;
     }
@@ -682,16 +726,28 @@
     ctx.globalAlpha = f; ctx.fillStyle = '#fff'; ctx.fillRect(x - 1, y - 2, 1, 2); ctx.globalAlpha = 1;
   }
 
-  function drawOrb(ctx, l, camX, camY, time) {
+  function drawOrb(ctx, l, camX, camY, time, w) {
+    if (w && D.solidAt(w, Math.floor(l.x / TS), Math.floor(l.y / TS))) return;   // passing behind the rock
     const x = Math.round(l.x - camX), y = Math.round(l.y - camY);
     drawFrame(ctx, SHEETS.orbT || SHEETS.orb, Math.floor(time * 12 + l.id) % 8, x, y, false);
   }
 
-  function drawWatcher(ctx, l, camX, camY, time, post, caught, S) {
+  function drawWatcher(ctx, l, camX, camY, time, post, caught, S, w) {
     const x = Math.round(l.x - camX), y = Math.round(l.y - camY);
     if (!post) {
+      // an eye with no rock beside it hangs from the roof
+      const tx = Math.floor(l.x / TS), ty = Math.floor(l.y / TS);
+      let near = false;
+      for (let dy = -1; dy <= 1 && !near; dy++) for (let dx = -1; dx <= 1; dx++) if (D.solidAt(w, tx + dx, ty + dy)) { near = true; break; }
+      if (!near && w) drawCord(ctx, w, l.x, l.y, camX, camY, 5);
       drawFrame(ctx, SHEETS.voidBody, 0, x, y, false);
       return;
+    }
+    if (w) {
+      const tx = Math.floor(l.x / TS), ty = Math.floor(l.y / TS);
+      let near = false;
+      for (let dy = -1; dy <= 1 && !near; dy++) for (let dx = -1; dx <= 1; dx++) if (D.solidAt(w, tx + dx, ty + dy)) { near = true; break; }
+      if (!near) { ctx.globalAlpha = 0.7; drawCord(ctx, w, l.x, l.y, camX, camY, 5, true); ctx.globalAlpha = 1; }
     }
     const sh = SHEETS.eye;
     drawFrame(ctx, sh, 0, x, y, false);
@@ -971,20 +1027,45 @@
     if (!post) {
       // vines
       for (const v of L.vines || []) {
-        const x0 = v[0] * TS, y0 = v[1] * TS, hh = v[3] * TS;
-        if (!vis(x0, y0, TS * v[2], hh)) continue;
+        // every strand reaches up to the rock it grows from (drawn only: the climbable part is the vine itself)
+        if (!v.ext) { v.ext = []; for (let k = 0; k < v[2]; k++) { const u = openUp(w, v[0] + k, v[1], 90); v.ext.push(u >= 90 ? 0 : u * TS + 1); } }
+        const x0 = v[0] * TS, y0 = v[1] * TS, hh = v[3] * TS, exM = Math.max.apply(null, v.ext);
+        if (!vis(x0, y0 - exM, TS * v[2], hh + exM)) continue;
         for (let k = 0; k < v[2]; k++) {
           const cx = Math.round(x0 + k * TS + 3 - camX);
-          for (let y = 0; y < hh; y++) {
+          for (let y = -v.ext[k]; y < hh; y++) {
             const yy = Math.round(y0 + y - camY), sw = Math.round(Math.sin(time * 1.2 + (y0 + y) * 0.09 + k) * 1.2);
             if (st === 'foundry' || st === 'ember') { ctx.fillStyle = (y >> 1) % 2 ? md : TH.stal[1]; ctx.fillRect(cx + ((y >> 2) % 2 ? 0 : -1), yy, 2, 1); continue; }
             ctx.fillStyle = st === 'heart' ? TH.tuft[0] : st === 'glass' ? TH.stal[1] : st === 'fungal' ? TH.tuft[0] : TH.stal[1];
             ctx.fillRect(cx + sw, yy, 1, 1);
-            if (y % 7 === 3) { ctx.fillStyle = st === 'glass' ? c1 : TH.tuft[1]; ctx.fillRect(cx + sw + (y % 14 === 3 ? 1 : -1), yy, 1, 1); }
+            const m14 = ((y % 14) + 14) % 14; if (m14 % 7 === 3) { ctx.fillStyle = st === 'glass' ? c1 : TH.tuft[1]; ctx.fillRect(cx + sw + (m14 === 3 ? 1 : -1), yy, 1, 1); }
           }
         }
       }
       // shelves
+      if (!L._shelfTies) {
+        // a shelf with no wall at either end hangs from what is above it: the roof, or the shelf over it
+        const ow = new Set(); for (const r of T.oneway || []) for (let k = 0; k < r[2]; k++) ow.add((r[0] + k) + ',' + r[1]);
+        L._shelfTies = [];
+        for (const r of T.oneway || []) {
+          if (D.solidAt(w, r[0] - 1, r[1]) || D.solidAt(w, r[0] + r[2], r[1])) continue;
+          for (const cx of r[2] >= 6 ? [r[0] + 1, r[0] + r[2] - 2] : [r[0] + (r[2] >> 1)]) {
+            let up = 0; while (up < 60 && !D.solidAt(w, cx, r[1] - up - 1) && !ow.has(cx + ',' + (r[1] - up - 1))) up++;
+            if (up > 0 && up < 60) L._shelfTies.push([cx, r[1] - up, up]);
+          }
+        }
+      }
+      for (const q of L._shelfTies) {
+        const x = Math.round(q[0] * TS + 2 - camX), yt = q[1] * TS - 1, hh = q[2] * TS + 1;
+        if (!vis(q[0] * TS, yt, TS, hh)) continue;
+        const y = Math.round(yt - camY);
+        if (st === 'foundry' || st === 'ember') {      // chains
+          for (let i = 0; i < hh; i += 3) { ctx.fillStyle = (i / 3) % 2 ? md : TH.stal[1]; ctx.fillRect(x, y + i, 1, 2); }
+        } else {
+          ctx.fillStyle = st === 'glass' ? TH.stal[1] : st === 'fungal' || st === 'heart' ? TH.tuft[0] : TH.stal[1];
+          ctx.fillRect(x, y, 1, hh);
+        }
+      }
       for (const r of T.oneway || []) {
         const x0 = r[0] * TS, y0 = r[1] * TS, ww = r[2] * TS;
         if (!vis(x0, y0, ww, TS)) continue;
@@ -1186,7 +1267,15 @@
     // objects behind the player
     for (const l of w.lights) {
       if (l.x < camX - 60 || l.x > camX + W + 60 || l.y < camY - 60 || l.y > camY + H + 60) continue;
-      if (l.t === 'watch') drawWatcher(ctx, l, camX, camY, time, false);
+      if (l.t === 'watch') drawWatcher(ctx, l, camX, camY, time, false, 0, null, w);
+      else if (l.t === 'orb' && TH.style === 'foundry' && l.move && l.move.k === 'line' && l.move.dy === 0) {
+        // a lamp on a crane: it runs on a trolley along the roof
+        if (drawCord(ctx, w, l.x, l.y, camX, camY, 4)) {
+          const tx = Math.floor(l.x / TS), ty = Math.floor(l.y / TS), top = openUp(w, tx, ty, 90);
+          const ry = Math.round((ty - top) * TS - camY), rx = Math.round(l.x - camX);
+          ctx.fillStyle = TH.stal[1]; ctx.fillRect(rx - 3, ry, 7, 2); ctx.fillStyle = TH.near; ctx.fillRect(rx - 2, ry + 2, 5, 1);
+        }
+      }
       else if (l.t === 'lamp' && l.col !== 'rainbow' && l.col !== 'shard') drawLampCrystal(ctx, w, l, camX, camY, time, false);
     }
     for (const c of w.checks) if (c.x > camX - 30 && c.x < camX + W + 30) drawTether(ctx, c, s, camX, camY, time);
@@ -1206,8 +1295,8 @@
     // emissive things, drawn after the dark
     for (const l of w.lights) {
       if (l.x < camX - 60 || l.x > camX + W + 60 || l.y < camY - 60 || l.y > camY + H + 60) continue;
-      if (l.t === 'orb') drawOrb(ctx, l, camX, camY, time);
-      else if (l.t === 'watch') drawWatcher(ctx, l, camX, camY, time, true, s.dead ? 0 : D.lightAt(w, l, s.x + 2.5, s.y + s.h * 0.5) * 3, s);
+      if (l.t === 'orb') drawOrb(ctx, l, camX, camY, time, w);
+      else if (l.t === 'watch') drawWatcher(ctx, l, camX, camY, time, true, s.dead ? 0 : D.lightAt(w, l, s.x + 2.5, s.y + s.h * 0.5) * 3, s, w);
       else if (l.t === 'lamp' && l.col !== 'rainbow' && l.col !== 'shard') drawLampCrystal(ctx, w, l, camX, camY, time, true);
       else if (l.t === 'beam') drawBeamEmitter(ctx, l, camX, camY, time);
     }
@@ -1266,6 +1355,6 @@
   global.DwellerRender = {
     PAL, load, prepare, drawScene, drawText, textWidth, textSprite, spawn, updateParticles, markTether, tickTethers,
     SHEETS, IMG, parts, hsl, hash2, SHARDS, THEMES, drawGem, drawShard, drawMini, drawPortrait, shade,
-    get theme() { return TH; }, SEEKERS, setSeeker, get seekerId() { return seekerId; }, resetTethers() { tetherT = {}; }, noteBounce,
+    get theme() { return TH; }, SEEKERS, setSeeker, BREATH, get seekerId() { return seekerId; }, resetTethers() { tetherT = {}; }, noteBounce,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
