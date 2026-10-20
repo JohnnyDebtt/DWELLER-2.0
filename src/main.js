@@ -7,7 +7,10 @@
   const LEVELS = window.DWELLER_LEVELS || [window.DWELLER_LEVEL];
   const NL = 6;                                   // six levels, six slivers
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
-  const NAMES = ['THE DESCENT', 'THE MYCELIUM', 'THE GLASS GARDEN', 'THE FOUNDRY', 'EMBER DEEP', 'THE HEART'];
+  const NAMES = ['THE DESCENT', 'THE MYCELIUM', 'THE GLASS GARDEN', 'THE FOUNDRY', 'EMBER DEEP', 'THE HEART', 'THE CORE'];
+  const CORE = 6;                                 // the final depth behind the door
+  // what each sliver does to the Guardian when it is set
+  const SLIVER_CARD = ['I  IT LEARNS TO LOOK', 'II  THE ROOM BREATHES', 'III  ITS GAZE SPLITS', 'IV  IT KEEPS THE BEAT', 'V  IT BURNS LIKE A SUN', 'VI  ITS HEART STUMBLES'];
 
   const canvas = document.getElementById('c');
   const gctx = canvas.getContext('2d', { alpha: false });
@@ -31,13 +34,13 @@
   /* ------------------------------------------------------------ progress */
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
-  const P = { beaten: [false, false, false, false, false, false], best: [0, 0, 0, 0, 0, 0], comp: false, cp: {}, fused: false };
+  const P = { beaten: [false, false, false, false, false, false], best: [0, 0, 0, 0, 0, 0], comp: false, cp: {}, fused: false, core: false, coreBest: 0 };
   function loadProgress() {
     try {
       const j = JSON.parse(lsGet('dweller.v2') || 'null');
       if (j && Array.isArray(j.beaten)) {
         for (let i = 0; i < NL; i++) { P.beaten[i] = !!j.beaten[i]; P.best[i] = +(j.best && j.best[i]) || 0; }
-        P.comp = !!j.comp; P.cp = j.cp && typeof j.cp === 'object' ? j.cp : {}; P.fused = !!j.fused; P.seekerId = j.seekerId;
+        P.comp = !!j.comp; P.cp = j.cp && typeof j.cp === 'object' ? j.cp : {}; P.fused = !!j.fused; P.seekerId = j.seekerId; P.core = !!j.core; P.coreBest = +j.coreBest || 0;
         return;
       }
     } catch (e) { }
@@ -204,7 +207,7 @@
     const cw = Math.max(2, Math.round(innerWidth * DPR)), ch = Math.max(2, Math.round(innerHeight * DPR));
     canvas.width = cw; canvas.height = ch;
     canvas.style.width = innerWidth + 'px'; canvas.style.height = innerHeight + 'px';
-    SC = Math.max(1, Math.round(ch / 230));
+    SC = Math.max(1, Math.round(ch / (cur === CORE && mode !== 'map' && mode !== 'title' ? 360 : 230)));   // the Guardian's arena is seen from further back
     LW = Math.ceil(cw / SC) + 1; LH = Math.ceil(ch / SC) + 1;
     off.width = LW; off.height = LH;
     octx.imageSmoothingEnabled = false; gctx.imageSmoothingEnabled = false;
@@ -219,11 +222,13 @@
     R.prepare(world, L.theme, i);
     cur = i;
   }
+  let scFor = -1;
+  function fitView() { const k = cur === CORE && mode !== 'map' && mode !== 'title' ? 1 : 0; if (k !== scFor) { scFor = k; resize(); } }
   function startLevel(i, fresh) {
     audioInit();
     loadLevel(i);
     if (fresh) { delete P.cp[i]; saveProgress(); }
-    S = D.newState(world, { companion: P.comp }); runTicks = 0; R.parts.length = 0; R.resetTethers(); beamPrev = {}; deathFade = 0; flash = 0; shake = 0;
+    S = D.newState(world, { companion: P.comp }); runTicks = 0; R.parts.length = 0; R.clearGuardian(); A.Live.boss = null; R.resetTethers(); beamPrev = {}; deathFade = 0; flash = 0; shake = 0;
     seekerCardT = 99; newBest = false;
     const sv = P.cp[i];
     if (!fresh && sv && sv.cp > 0 && world.checks[sv.cp]) {
@@ -278,12 +283,13 @@
     if (['ArrowUp', 'KeyW', 'ArrowLeft', 'KeyA'].includes(code)) { sel = Math.max(0, sel - 1); A.Live.sfx('ui'); mapMsgT = 99; }
     else if (['ArrowDown', 'KeyS', 'ArrowRight', 'KeyD'].includes(code)) { sel = Math.min(NL, sel + 1); A.Live.sfx('ui'); mapMsgT = 99; }
     else if (['Space', 'Enter', 'KeyZ', 'KeyK'].includes(code)) chooseNode(sel, false);
-    else if (code === 'KeyN') { if (sel < NL) chooseNode(sel, true); }
+    else if (code === 'KeyN') chooseNode(sel, true);
     else if (code === 'Escape' || code === 'Backspace') { mode = 'title'; titleT = 0; syncTouchUI(); }
   }
   function chooseNode(i, fresh) {
     if (i >= NL) {
-      mapMsg = count() >= NL ? 'THE DOOR IS OPEN.  THE FINAL DEPTH IS STILL BEING DUG.' : 'THE DOOR WAITS FOR ALL SIX SLIVERS';
+      if (count() >= NL && P.fused && built(CORE)) { startLevel(CORE, fresh); return; }
+      mapMsg = count() >= NL ? 'THE DOOR IS OPENING' : 'THE DOOR WAITS FOR ALL SIX SLIVERS';
       mapMsgT = 0; A.Live.sfx(count() >= NL ? 'check' : 'nope'); return;
     }
     if (!built(i)) { mapMsg = 'THIS DEPTH IS NOT YET DUG'; mapMsgT = 0; A.Live.sfx('nope'); return; }
@@ -440,9 +446,12 @@
         if (i === 1 && !P.comp && P.beaten[1]) line('SOMETHING WAITS BEHIND A FALSE WALL', '#6b7280');
       }
     } else {
-      line('THE DOOR', count() >= NL ? PAL.snow : '#8a919e', L.narrow ? 1 : 2);
-      line(count() >= NL ? 'THE CRYSTAL IS WHOLE' : count() + ' OF 6 SLIVERS', count() >= NL ? '#d6dbe4' : '#8a919e');
-      line(count() >= NL ? 'THE FINAL DEPTH IS COMING' : 'BEAT EVERY LEVEL TO OPEN IT', '#6b7280');
+      const open = count() >= NL && P.fused, sv = P.cp[CORE];
+      line(open ? 'VII  THE CORE' : 'THE DOOR', count() >= NL ? PAL.snow : '#8a919e', L.narrow ? 1 : 2);
+      line(count() >= NL ? (P.core ? 'THE GUARDIAN IS GONE' : 'A GUARDIAN WAITS BELOW') : count() + ' OF 6 SLIVERS', count() >= NL ? '#d6dbe4' : '#8a919e');
+      if (open && P.coreBest) line('BEST  ' + fmtTime(P.coreBest), '#8a919e');
+      if (open) { ctx.globalAlpha = 0.6 + 0.4 * Math.sin(mapT * 4); line(touchMode ? 'TAP AGAIN TO DESCEND' : sv && sv.cp > 0 ? 'SPACE  CONTINUE FROM THE THIRD SLIVER' : 'SPACE  DESCEND', PAL.gold); ctx.globalAlpha = 1; if (sv && sv.cp > 0 && !touchMode) line('N  START FROM THE TOP', '#8a919e'); }
+      else line(count() >= NL ? 'THE DOOR IS OPENING' : 'BEAT EVERY LEVEL TO OPEN IT', '#6b7280');
     }
     if (P.comp && !L.narrow) { y += 4; R.drawMini(ctx, x + 5, y + 4, mapT, 'on', 1); R.drawText(ctx, 'SEEKER  -  E  ECLIPSE A LIGHT', x + 14, y + 1, '#7f9aa6', 1); y += 14; }
     if (mapMsgT < 3) { ctx.globalAlpha = Math.min(1, (3 - mapMsgT) * 2); R.drawText(ctx, mapMsg, L.narrow ? LW / 2 : x, L.narrow ? LH - 16 : y + 6, '#d6b98a', 1, L.narrow ? 'center' : 'left'); ctx.globalAlpha = 1; }
@@ -472,6 +481,13 @@
     const look = Math.max(-1, Math.min(1, S.vx / 72)) * 26;
     let tx = px - LW / 2 + look;
     let ty = py - LH * 0.56 + (S.vy > 120 ? 22 : 0) + (S.wallDir ? -6 : 0);
+    const B = world.boss;
+    if (B && !S.bBurst) {
+      // lean the view toward the Guardian, as far as keeps the Dweller well inside the frame
+      const gx = B.x - LW / 2, gy = B.y - LH / 2, mx = LW * 0.32, my = LH * 0.30;
+      tx = Math.max(px - LW / 2 - mx, Math.min(px - LW / 2 + mx, tx + (gx - tx) * 0.55));
+      ty = Math.max(py - LH / 2 - my, Math.min(py - LH / 2 + my, ty + (gy - ty) * 0.55));
+    }
     const maxX = world.W * TS - LW, maxY = world.H * TS - LH + 24;
     tx = Math.max(0, Math.min(Math.max(0, maxX), tx));
     ty = Math.max(-24, Math.min(Math.max(-24, maxY), ty));
@@ -519,7 +535,19 @@
     if (ev & EV.ECLIPSE) L.sfx('eclipse');
     if (ev & EV.ECLEND) L.sfx('eclend');
     if (ev & EV.ECLFAIL) L.sfx('nope');
-    if (ev & EV.WIN) {
+    if (ev & EV.SLIVER) {
+      const A0 = world.boss.alc[st.sliverI], col = R.SHARDS[st.sliverI];
+      L.sfx('check'); L.sfx('hush'); flash = 0.7; shake = 1.5; cardText = SLIVER_CARD[st.sliverI]; cardT = 0;
+      for (let i = 0; i < 70; i++) { const a = Math.random() * 6.283, sp = 15 + Math.random() * 60; R.spawn(A0.x, A0.y - 12, Math.cos(a) * sp, Math.sin(a) * sp - 20, 1 + Math.random(), i % 3 ? col : '#ffffff', 1, 20, true); }
+    }
+    if (ev & EV.THROES) { L.sfx('caught', { v: 1.4 }); shake = 4; }
+    if (ev & EV.BURST) { R.guardianBurst(world, st); L.sfx('win'); L.sfx('death'); flash = 2; shake = 6; cardText = 'THE GUARDIAN IS GONE  -  FALL'; cardT = 0; }
+    if (ev & EV.WIN && cur === CORE) {
+      L.sfx('win'); flash = 2; shake = 2;
+      const t = runTicks / D.TICK; winTime = t;
+      newBest = !P.coreBest || t < P.coreBest; if (newBest) P.coreBest = t;
+      P.core = true; delete P.cp[cur]; saveProgress(); sel = NL;
+    } else if (ev & EV.WIN) {
       L.sfx('win'); flash = 1.5; shake = 2;
       const g = world.goal, col = R.SHARDS[cur];
       for (let i = 0; i < 160; i++) { const a = Math.random() * 6.283, sp = 15 + Math.random() * 90; R.spawn(g.x, g.y, Math.cos(a) * sp, Math.sin(a) * sp, 1.5 + Math.random() * 2, i % 3 ? col : '#ffffff', 1 + (i % 4 === 0 ? 1 : 0), 14, true); }
@@ -608,6 +636,7 @@
         shake = Math.max(0, shake - dt * 6); flash = Math.max(0, flash - dt * 1.6);
         const fear = Math.min(1, Math.max(S.ex * 1.15, S.lit * 0.55));
         A.Live.update(S.dead ? 0.1 : fear, mode === 'win' ? 0.7 : 1);
+        if (world.boss) A.Live.boss = { p: S.bP || 0, wake: !!S.bWake, die: S.bDie || 0, burst: !!S.bBurst, warn: S.bFlareWarn };
       } else if (mode === 'pause') {
         R.updateParticles(0);
       } else if (mode === 'title' || mode === 'map') {
@@ -676,6 +705,7 @@
   }
 
   function render(dt) {
+    fitView();
     const ctx = octx;
     ctx.imageSmoothingEnabled = false;
     let ox = 0, oy = 0;
@@ -716,6 +746,22 @@
     if (S_.ex > 0.04 && !S_.dead) {
       const px = Math.round(S_.x + 2.5 - camX), py = Math.round(S_.y - 7 - camY);
       drawBar(ctx, px - 8, py, 16, 2, Math.min(1, S_.ex), S_.ex > 0.7 ? '#e8e0d0' : '#a9c4d2');
+    }
+    if (world.boss && (mode === 'play' || mode === 'pause')) {
+      // the six slivers: set ones burn in their colour, the next one pulses
+      const n = S_.bP || 0, x0 = (LW >> 1) - 5 * 9;
+      for (let i = 0; i < 6; i++) {
+        const x = x0 + i * 18, y = 10, col = R.SHARDS[i];
+        ctx.globalAlpha = i < n ? 1 : i === n && S_.bWake ? 0.45 + 0.35 * Math.sin(gameTime * 6) : 0.22;
+        ctx.fillStyle = col; ctx.fillRect(x, y, 3, 7); ctx.fillRect(x + 1, y - 1, 1, 9);
+      }
+      ctx.globalAlpha = 1;
+      // the flare is coming: the edges of the screen warm a beat before it burns
+      if (S_.bFlareWarn >= 0 && S_.bFlareWarn < 64) {
+        const k = S_.bFlareWarn / 64, g = ctx.createRadialGradient(LW / 2, LH / 2, LH * 0.25, LW / 2, LH / 2, LH * 0.9);
+        g.addColorStop(0, 'rgba(255,220,180,0)'); g.addColorStop(1, 'rgba(255,200,150,' + (0.08 + 0.22 * k * (0.6 + 0.4 * Math.sin(gameTime * 30))).toFixed(3) + ')');
+        ctx.fillStyle = g; ctx.fillRect(0, 0, LW, LH);
+      }
     }
     if (cardT < 4.5 && mode === 'play' && seekerCardT > 6.5) {
       const a = Math.min(1, cardT / 0.8) * Math.min(1, (4.5 - cardT) / 1.0);
@@ -769,6 +815,17 @@
       const a = Math.min(1, Math.max(0, (winT - 1.2) / 1.5));
       ctx.globalAlpha = a * 0.55; ctx.fillStyle = '#05050a'; ctx.fillRect(0, 0, LW, LH); ctx.globalAlpha = a;
       const y0 = Math.round(LH * 0.18);
+      if (cur === CORE) {
+        R.drawText(ctx, 'THE CORE IS QUIET', LW >> 1, y0, PAL.snow, 2, 'center');
+        R.drawText(ctx, 'THE GUARDIAN IS GONE, AND THE DARK BELOW IS YOURS', LW >> 1, y0 + 22, PAL.gold, 1, 'center');
+        R.drawText(ctx, 'TIME  ' + fmtTime(winTime) + (newBest ? '  NEW BEST' : '') + '     LIGHT FOUND YOU  ' + S_.deaths + ' TIMES', LW >> 1, y0 + 36, PAL.snow, 1, 'center');
+        R.drawGem(ctx, LW >> 1, y0 + 70, 0.9, P.beaten, gameTime, true);
+        const cr = ['DWELLER', 'A GAME IN THE SEEKER UNIVERSE  -  OPEN ART, MUSIC AND LORE', 'THE GUARDIAN  -  PLANETARY GUARDIAN #255', 'YOUR COMPANION  -  SEEKER NET #' + R.seekerId, 'THANK YOU FOR DESCENDING'];
+        cr.forEach((c, i) => R.drawText(ctx, c, LW >> 1, y0 + 96 + i * 12, i ? '#a9b2c0' : PAL.gold, 1, 'center'));
+        if (winT > 2.5) { ctx.globalAlpha = a * (0.55 + 0.45 * Math.sin(winT * 3)); R.drawText(ctx, touchMode ? 'TAP FOR THE MAP' : 'ENTER  MAP     N  AGAIN', LW >> 1, y0 + 162, PAL.gold, 1, 'center'); }
+        ctx.globalAlpha = 1;
+        return;
+      }
       R.drawText(ctx, 'A SLIVER OF THE CRYSTAL', LW >> 1, y0, R.SHARDS[cur], 2, 'center');
       R.drawText(ctx, ROMAN[cur] + '  ' + NAMES[cur] + '  COMPLETE', LW >> 1, y0 + 22, PAL.gold, 1, 'center');
       const t = winTime;

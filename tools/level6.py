@@ -85,8 +85,8 @@ for x in (14, 34, 54, 74, 94, 114):
     s.shelf(x, 26, 4)           # a valve: drop down through it...
     s.bounce(x, 36, 4, 1)       # ...or drum back up
 for k, x in enumerate((24, 44, 64, 84, 104)):
-    beat(s, x + 0.5, 21.5, 13, 4, 2, 0.0, I=1.25, burn=1.5)
-    beat(s, x + 10.5, 32.5, 13, 4, 2, 2.0, I=1.25, burn=1.5)
+    beat(s, x + 0.5, 21.5, 11, 4, 1.5, 0.0, I=1.2, burn=1.2, warn=0.6)
+    beat(s, x + 10.5, 32.5, 11, 4, 1.5, 2.0, I=1.2, burn=1.2, warn=0.6)
 s.hint(1, 15, 'WHEN   ONE   BEATS   THE   OTHER   RESTS')
 s.tether(128, 36)
 

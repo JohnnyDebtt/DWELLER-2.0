@@ -76,10 +76,11 @@ class Sec:
             self.floor[x] = rim + depth
         self.kills.append((x0 * TS, (rim + kill) * TS, x1 * TS, (rim + depth + 2) * TS))
 
-    def fake(self, x, y, w, h):
-        """A false wall: drawn as rock, but the Dweller walks through it."""
+    def fake(self, x, y, w, h, tag=None):
+        """A false wall: drawn as rock, but the Dweller walks through it. A tag ('plug', 'nocmp') hands it to the
+        Guardian, which makes it solid or opens it as the fight goes."""
         self.g[y:y + h, x:x + w] = 0
-        self.fakes.append((x, y, w, h))
+        self.fakes.append((x, y, w, h) if tag is None else (x, y, w, h, tag))
 
     # ---- terrain features
     def shelf(self, x, y, w, way=False):
@@ -238,6 +239,10 @@ def assemble(sections, out_path, preview_dir=None, meta=None):
             for k in ('r',):
                 if k in d:
                     d[k] = round(d[k] * TS, 2)
+            if 'top' in d:
+                d['top'] = round((gy + d['top']) * TS, 2)
+            if 'wake' in d:
+                d['wake'] = round((sx + d['wake']) * TS, 2)
             if d['t'] == 'beam':
                 d['w'] = round(d['w'] * TS, 2)
                 d['len'] = round(d.pop('ln') * TS, 2)
@@ -263,8 +268,8 @@ def assemble(sections, out_path, preview_dir=None, meta=None):
             ways.append([round((sx + wx) * TS, 2), round((gy + wy) * TS, 2)])
         for (a, bb, c, d2) in s.kills:
             kills.append([sx * TS + a, gy * TS + bb, sx * TS + c, gy * TS + d2])
-        for (fx, fy, fw, fh) in s.fakes:
-            fakes.append([sx + fx, gy + fy, fw, fh])
+        for f in s.fakes:
+            fakes.append([sx + f[0], gy + f[1], f[2], f[3]] + list(f[4:]))
         sw0 = len(switches)
         for k in tiles:
             for (tx, ty, tw) in s.tiles[k]:
@@ -322,7 +327,7 @@ def assemble(sections, out_path, preview_dir=None, meta=None):
                 gx = int(L['x'] // TS)
                 gyy = int(L['y'] // TS)
                 if sx <= gx < sx + s.w and gy <= gyy < gy + s.hs:
-                    marks[(gx - sx, gyy - gy)] = {'lamp': 'L', 'orb': 'O', 'watch': 'W', 'beam': 'B'}[L['t']]
+                    marks[(gx - sx, gyy - gy)] = {'lamp': 'L', 'orb': 'O', 'watch': 'W', 'beam': 'B', 'gcore': 'G', 'alcove': 'A'}[L['t']]
             for c in checks:
                 gx = int(c['x'] // TS)
                 gyy = int(c['y'] // TS) - 1
@@ -338,7 +343,7 @@ def assemble(sections, out_path, preview_dir=None, meta=None):
                 gyy = int(spawn['y'] // TS) - 1
                 if sx <= gx < sx + s.w and gy <= gyy < gy + s.hs:
                     marks[(gx - sx, gyy - gy)] = 'S'
-            for (fx, fy, fw, fh) in s.fakes:
+            for (fx, fy, fw, fh, *_) in s.fakes:
                 for yy in range(fy, fy + fh):
                     for xx in range(fx, fx + fw):
                         marks.setdefault((xx, yy), 'f')

@@ -26,6 +26,8 @@
     { tr: 21 / 32, score: 'ember', gain: 0.8, pad: 'ember', drone: 1.25, wind: 0.45, windF: 220, echo: [1.5, 0.44, 900] },
     // VI the heart: the pulse is the rhythm; blood rushes after every beat, a choir hums, and the beat sometimes stumbles
     { tr: 7 / 8, score: 'heart', gain: 1.1, pad: 'choir', drone: 0.8, wind: 0.35, windF: 420, echo: [1.0, 0.3, 1500] },
+    // VII the core: every level's voice returns, one with each sliver set, over the Guardian's turning drone
+    { tr: 1, score: 'core', pad: 'glass', drone: 1.2, wind: 0.5, windF: 600, echo: [0.75, 0.4, 2000], gain: 1.0 },
   ];
 
   function hz(ratio, oct) { return F0 * ratio * Math.pow(2, oct); }
@@ -464,6 +466,38 @@
       // nerves: the 19th and 21st harmonics, together, very quietly
       if (n % 32 === 16) { this.bell(t, fold(F0 * 19 * this.fl.tr, 900, 1900), 0.25, 3); this.bell(t + 0.05, fold(F0 * 21 * this.fl.tr, 900, 1900), 0.25, 3); }
       if (e > 0.6 && n % 2 === 1) this.tick(t, 0.35, 1400 + 600 * r());
+    }
+
+    /* VII THE CORE: the descent's bells and heart, and each sliver brings its level's voice back in */
+    score_core(t, n, e) {
+      const b = Live.boss || { p: 0 }, P = b.wake ? b.p : -1, r = this.rnd, s8 = n % 8;
+      if (b.burst) {                                   // after it shatters: only the fall, and a long chord
+        if (n % 16 === 0) [0, 4, 5].forEach((d, j) => this.bell(t + j * 0.05, fold(F0 * this.pick(d) * 8, 300, 900), 0.6, 6));
+        if (n % 4 === 0) this.noiseHit(t, BEAT * 2, 'highpass', 900, 5200, 0.05, 0.7, BEAT);
+        return;
+      }
+      if (b.die) {                                     // the heart stumbles
+        if (r() < 0.55) { this.thump(t + r() * STEP * 0.5, 46, 0.7, 0.4); this.thump(t + 0.12 + r() * 0.1, 46, 0.45, 0.3); }
+        this.noiseHit(t, STEP, 'bandpass', 3000 + 2000 * r(), 800, 0.06, 2, 0.002);
+        return;
+      }
+      // always: the heartbeat of the descent, slow while it sleeps
+      if (n % (P < 0 ? 8 : 4) === 0) { const v = 0.3 + 0.08 * Math.max(0, P); this.thump(t, 48, v, 0.5); this.thump(t + 0.2, 48, v * 0.55, 0.32); }
+      if (P < 0) { if (r() < 0.06) this.bell(t, fold(F0 * this.pick(Math.floor(r() * 6)) * 32, 900, 2400), 0.3, 3); return; }
+      // I: the descent's bells
+      if ([1, 0, 1, 1, 0, 1, 0][n % 7] && r() < 0.5) this.bell(t, fold(F0 * this.pick([0, 2, 4, 5][Math.floor(r() * 4)]) * 16, 380, 2000), 0.5, 2.4);
+      // II: the kalimba in threes
+      if (P >= 1 && n % 2 === 0) this.kalimba(t, fold(F0 * this.pick([0, 4, 2, 5, 4, 2][n % 6]) * 8, 260, 620), 0.5);
+      if (P >= 1 && n % 12 === 0) this.noiseHit(t, BEAT * 5, 'lowpass', 260, 900, 0.06, 0.9, BEAT * 2.5);
+      // III: the music box on the off-steps
+      if (P >= 2 && n % 2 === 1) this.glassPing(t, fold(F0 * this.pick([0, 2, 4, 5, 4, 2, 1][n % 7]) * 16, 700, 2300), 0.5, 1.2);
+      // IV: the machine and the anvil
+      if (P >= 3) { this.machine(t, fold(F0 * this.pick([0, 0, 4, 0, 0, 4, 5, 4][s8]) * 2, 50, 110), s8 === 0 ? 0.9 : 0.55, STEP * 0.7); if (s8 === 0) this.anvil(t, fold(F0 * this.pick(0) * 13, 500, 1000), 0.7); }
+      // V: the great drum, and the flare's warning swell
+      if (P >= 4) { if (s8 === 0) this.taiko(t, 0.6, 34); if (s8 === 5) this.taiko(t, 0.3, 42); }
+      if (b.warn >= 0 && b.warn < 32 && n % 2 === 0) this.noiseHit(t, BEAT * 1.5, 'bandpass', 400, 3200, 0.08, 1.2, BEAT);
+      // V/VI: the reed over the top
+      if (P >= 5 && n % 16 === 0) this.reed(t, fold(F0 * this.pick([0, 4, 2, 5][Math.floor(n / 16) % 4]) * 4, 150, 300), 0.08, BEAT * 4, 4.6);
     }
 
     /* ----------------------------------------------------------- sound effects */

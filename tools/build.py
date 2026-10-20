@@ -16,6 +16,9 @@ assets = {
  'voidBody': 'animations/void/body__r1c1__48x48.png',
  'voidFace': 'animations/void/face__r1c1__48x48.png',
  'orb': 'animations/buzzer/OrbIdle__r1c8__48x48.png',
+ 'g255_orb': 'guardian/g255_orb.png',
+ 'g255_body': 'guardian/g255_body.png',
+ 'g255_eyes': 'guardian/g255_eyes.png',
 }
 data = {k: 'data:image/png;base64,' + base64.b64encode(open(os.path.join(A, v), 'rb').read()).decode() for k, v in assets.items()}
 # the ten SEEKER NET seekers that can wake as the companion

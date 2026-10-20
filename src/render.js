@@ -19,7 +19,7 @@
   /* ------------------------------------------------------------------ level themes
    * Colour follows place: the upper caves are cold and pale, the deep ones warmer and stranger.
    * Each level keeps one accent that nothing else in it shares: its sliver of the crystal. */
-  const SHARDS = ['#ef5b5b', '#f39a4c', '#f1d663', '#6ad890', '#5ca8f2', '#a77cff'];
+  const SHARDS = ['#ef5b5b', '#f39a4c', '#f1d663', '#6ad890', '#5ca8f2', '#a77cff', '#ffffff'];
   const THEMES = {
     descent: { style: 'descent', bgTop: [38, 48, 66], bgBot: [40, 38, 66], far: ['#2e3849', '#2b3545'], mid: '#242c3a', near: '#1a202b', tile: null,
       tuft: ['#4a566b', '#7d8da3'], glow: '#3b6f7e', stal: ['#20242A', '#4F5D73'], lamp: ['#3c5d6b', '#7BACBC', '#91CBDE'],
@@ -39,6 +39,9 @@
     heart: { style: 'heart', bgTop: [38, 26, 42], bgBot: [28, 20, 38], far: ['#3c283e', '#362438'], mid: '#2c1d31', near: '#1c1321', tile: [[24, 17, 27], [118, 98, 108], [238, 228, 214]],
       tuft: ['#8a4f7a', '#f4b0dc'], glow: '#e676c4', stal: ['#1c1321', '#6e5866'], lamp: ['#6a3a64', '#f2a6de', '#ffe4f6'],
       orb: [[52, 26, 50], [226, 140, 204], [255, 238, 250]], glowRGB: '240,132,212', slit: '#f2a6de', dark: [10, 5, 12], sheen: '#9a6c92', pupil: '#ffe4f6', mote: [244, 160, 220] },
+    core: { style: 'glass', bgTop: [20, 22, 34], bgBot: [12, 12, 22], far: ['#22263a', '#1e2134'], mid: '#181a2a', near: '#10111c', tile: [[12, 13, 22], [70, 76, 104], [220, 226, 244]],
+      tuft: ['#4c5578', '#c8d2f4'], glow: '#8fa6e8', stal: ['#10111c', '#4a5274'], lamp: ['#3e4770', '#b8c6f4', '#eef2ff'],
+      orb: [[28, 30, 50], [150, 165, 230], [244, 246, 255]], glowRGB: '190,205,255', slit: '#c8d4ff', dark: [4, 4, 9], sheen: '#7d86b0', pupil: '#eef2ff', mote: [200, 210, 255] },
   };
   let TH = THEMES.descent, shardCol = SHARDS[0], levelIdx = 0;
 
@@ -446,12 +449,21 @@
   }
 
   let fakeCv = [];
+  function crumble(f) {
+    for (let j = 0; j < f[3]; j++) for (let i = 0; i < f[2]; i++) for (let k = 0; k < 2; k++)
+      spawn((f[0] + i) * TS + Math.random() * TS, (f[1] + j) * TS + Math.random() * TS, (Math.random() - 0.5) * 30, Math.random() * 20, 0.9 + Math.random() * 0.8, k ? TH.stal[1] : TH.near, 2, 260);
+  }
   function drawFakes(ctx, w, s, camX, camY, dt) {
     const cx = s.x + 2.5, cy = s.y + s.h * 0.5;
     for (const F of fakeCv) {
       const f = F.f, x0 = f[0] * TS, y0 = f[1] * TS, x1 = x0 + f[2] * TS, y1 = y0 + f[3] * TS;
       const inside = cx > x0 - 8 && cx < x1 + 8 && cy > y0 - 8 && cy < y1 + 8;
-      F.a += ((inside ? 0.28 : 1) - F.a) * Math.min(1, dt * 6);
+      let target = inside ? 0.28 : 1;
+      if (f[4] === 'plug') target = s.bBurst ? 0 : 1;
+      if (f[4] === 'nocmp') target = s.cmp ? 0 : 1;
+      if (f[4] === 'plug' && s.bBurst && F.a > 0.95) crumble(f);
+      F.a += (target - F.a) * Math.min(1, dt * (f[4] ? 3 : 6));
+      if (F.a < 0.01) continue;
       if (x1 < camX - 10 || x0 > camX + 2000 || y1 < camY - 10 || y0 > camY + 2000) continue;
       ctx.globalAlpha = F.a; ctx.drawImage(F.c, Math.round(x0 - TS - camX), Math.round(y0 - TS - camY)); ctx.globalAlpha = 1;
     }
@@ -536,6 +548,15 @@
       }
       return;
     }
+    if (l.t === 'flood') {
+      const fy = Math.round(l.fy - camY);
+      if (fy <= 0) return;
+      ctx.fillStyle = 'rgba(255,255,255,' + (0.95 * a).toFixed(3) + ')'; ctx.fillRect(0, 0, W, Math.min(H, fy));
+      const g = ctx.createLinearGradient(0, fy, 0, fy + 24); g.addColorStop(0, 'rgba(255,255,255,' + (0.9 * a).toFixed(3) + ')'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, fy, W, 24);
+      return;
+    }
+    if (l.boss) l._poly = null;
     // lamp / orb
     let pts = l._poly;
     if (!pts || l.move) {
@@ -949,6 +970,110 @@
     ctx.globalAlpha = 1;
   }
 
+  /* ------------------------------------------------------------------ the Guardian (#255 of the Planetary Guardians) */
+  const GS = 2;                                         // drawn at twice its 54 px
+  const gRot = new Map();
+  function guardianBody(ang) {
+    // rotate the 54 px body on its own pixel grid (nearest neighbour), cached per degree
+    const key = Math.round(((ang % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / (Math.PI / 90));
+    let c = gRot.get(key);
+    if (c) return c;
+    const src = IMG.g255_body; if (!src) return null;
+    if (!guardianBody.px) guardianBody.px = src.getContext('2d').getImageData(0, 0, 54, 54).data;
+    const sp = guardianBody.px, N = 76, a = key * Math.PI / 90, ca = Math.cos(a), sa = Math.sin(a);
+    c = document.createElement('canvas'); c.width = c.height = N;
+    const x = c.getContext('2d'), id = x.createImageData(N, N), d = id.data;
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const u = i - N / 2 + 0.5, v = j - N / 2 + 0.5;
+      const sx = Math.floor(ca * u + sa * v + 27), sy = Math.floor(-sa * u + ca * v + 27);
+      if (sx < 0 || sy < 0 || sx >= 54 || sy >= 54) continue;
+      const o = (sy * 54 + sx) * 4, q = (j * N + i) * 4;
+      d[q] = sp[o]; d[q + 1] = sp[o + 1]; d[q + 2] = sp[o + 2]; d[q + 3] = sp[o + 3];
+    }
+    x.putImageData(id, 0, 0);
+    if (gRot.size > 200) gRot.clear();
+    gRot.set(key, c); return c;
+  }
+  function drawGuardian(ctx, w, s, camX, camY, time) {
+    const B = w.boss; if (!B || s.bBurst) return;
+    const gx = Math.round(B.x - camX), gy = Math.round(B.y - camY);
+    const shake = s.bDie ? Math.round(Math.sin(time * 70) * 2) : 0;
+    ctx.imageSmoothingEnabled = false;
+    if (IMG.g255_orb) ctx.drawImage(IMG.g255_orb, gx - 27 * GS + shake, gy - 27 * GS, 54 * GS, 54 * GS);
+    const body = guardianBody(s.bAng || 0);
+    if (body) ctx.drawImage(body, gx - 38 * GS + shake, gy - 38 * GS, 76 * GS, 76 * GS);
+    // the eye: shut while it sleeps, dimmed under the SEEKER, white-hot as it flares
+    if (IMG.g255_eyes) {
+      const ecl = s.cmpL >= 0 && w.lights[s.cmpL] && w.lights[s.cmpL].boss && s.cmpK > 0;
+      ctx.globalAlpha = !s.bWake ? 0.18 : ecl ? 0.25 : 1;
+      ctx.drawImage(IMG.g255_eyes, gx - 27 * GS + shake, gy - 27 * GS, 54 * GS, 54 * GS);
+      if (B.flare.k > 0.2) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = B.flare.k; ctx.drawImage(IMG.g255_eyes, gx - 27 * GS, gy - 27 * GS, 54 * GS, 54 * GS); ctx.globalCompositeOperation = 'source-over'; }
+      ctx.globalAlpha = 1;
+    }
+  }
+  // the burst: every pixel of the Guardian flies apart
+  const gBits = [];
+  function guardianBurst(w, s) {
+    const B = w.boss; if (!B) return;
+    const layers = [IMG.g255_orb, guardianBody(s.bAng || 0), IMG.g255_eyes];
+    layers.forEach((cv, li) => {
+      if (!cv) return;
+      const n = cv.width, d = cv.getContext('2d').getImageData(0, 0, n, n).data;
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+        const o = (j * n + i) * 4; if (d[o + 3] < 128) continue;
+        const px = B.x + (i - n / 2 + 0.5) * GS, py = B.y + (j - n / 2 + 0.5) * GS;
+        const dx = px - B.x, dy = py - B.y, r = Math.hypot(dx, dy) || 1, sp = 40 + Math.random() * 160 + (li === 2 ? 120 : 0);
+        gBits.push({ x: px, y: py, vx: dx / r * sp + (Math.random() - 0.5) * 40, vy: dy / r * sp + (Math.random() - 0.5) * 40 - 30,
+          life: 1.6 + Math.random() * 2.2, max: 3.8, col: 'rgb(' + d[o] + ',' + d[o + 1] + ',' + d[o + 2] + ')', hot: li === 2 || Math.random() < 0.25 });
+      }
+    });
+  }
+  function drawGuardianBits(ctx, camX, camY, dt) {
+    if (!gBits.length) return;
+    for (let i = gBits.length - 1; i >= 0; i--) {
+      const p = gBits[i];
+      p.vy += 60 * dt; p.vx *= 1 - 0.6 * dt; p.vy *= 1 - 0.6 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+      if (p.life <= 0) { gBits.splice(i, 1); continue; }
+      ctx.globalAlpha = Math.min(1, p.life / 1.2);
+      ctx.fillStyle = p.hot && p.life > p.max - 1.0 ? '#ffffff' : p.col;
+      ctx.fillRect(Math.round(p.x - camX), Math.round(p.y - camY), GS, GS);
+    }
+    ctx.globalAlpha = 1;
+  }
+  // the six alcoves
+  function drawAlcoves(ctx, w, s, camX, camY, time, post) {
+    const B = w.boss; if (!B) return;
+    for (let i = 0; i < B.alc.length; i++) {
+      const A = B.alc[i], x = Math.round(A.x - camX), y = Math.round(A.y - camY);
+      const done = i < (s.bP || 0), next = i === (s.bP || 0) && s.bWake;
+      if (!post) {
+        // a socket of dark stone with a notch for the sliver
+        ctx.fillStyle = TH.near; ctx.fillRect(x - 5, y - 4, 11, 4); ctx.fillRect(x - 3, y - 6, 7, 2);
+        ctx.fillStyle = TH.stal[1]; ctx.fillRect(x - 5, y - 4, 11, 1); ctx.fillRect(x - 1, y - 6, 3, 1);
+        continue;
+      }
+      const col = SHARDS[i];
+      if (done) {
+        const hov = Math.round(Math.sin(time * 2 + i) * 1);
+        drawShard(ctx, x, y - 13 + hov, col, time, 0, 0.55);
+      } else if (next) {
+        const pu = 0.5 + 0.5 * Math.sin(time * 5);
+        if (s.bSet > 0) {             // setting: the sliver grows out of the socket
+          const k = Math.min(1, s.bSet / D.GB.SET);
+          ctx.globalAlpha = 0.4 + 0.6 * k; drawShard(ctx, x, y - 13, col, time, 0, 0.2 + 0.35 * k); ctx.globalAlpha = 1;
+        }
+        ctx.globalAlpha = 0.35 + 0.5 * pu; ctx.fillStyle = col;
+        ctx.fillRect(x - 6, y - 5, 1, 1); ctx.fillRect(x + 6, y - 5, 1, 1); ctx.fillRect(x - 1, y - 9 - Math.round(pu * 2), 3, 1);
+        ctx.fillRect(x, y - 7, 1, 1);
+        // a thread of its colour rising, so it can be found from across the arena
+        ctx.globalAlpha = 0.18 + 0.12 * pu; ctx.fillRect(x, y - 40, 1, 32);
+        ctx.globalAlpha = 1;
+      } else {
+        ctx.globalAlpha = 0.35; ctx.fillStyle = col; ctx.fillRect(x, y - 6, 1, 1); ctx.globalAlpha = 1;
+      }
+    }
+  }
+
   /* ------------------------------------------------------------------ the whole scene */
   function drawBackground(ctx, w, camX, camY, W, H, time) {
     // depth tint: cold at the top, violet-teal in the deep
@@ -1269,7 +1394,7 @@
     drawDecorBack(ctx, w, camX, camY, W, H, time);
     // objects behind the player
     for (const l of w.lights) {
-      if (l.x < camX - 60 || l.x > camX + W + 60 || l.y < camY - 60 || l.y > camY + H + 60) continue;
+      if (l.boss || l.x < camX - 60 || l.x > camX + W + 60 || l.y < camY - 60 || l.y > camY + H + 60) continue;
       if (l.t === 'watch') drawWatcher(ctx, l, camX, camY, time, false, 0, null, w);
       else if (l.t === 'orb' && TH.style === 'foundry' && l.move && l.move.k === 'line' && l.move.dy === 0) {
         // a lamp on a crane: it runs on a trolley along the roof
@@ -1287,6 +1412,7 @@
     if (w.secret && !s.cmp) drawMini(ctx, w.secret.x, w.secret.y - 2, time, 'off', 1);
     drawFakes(ctx, w, s, camX, camY, Gm.dt || 0.016);
     drawFeatures(ctx, w, s, camX, camY, W, H, time, false);
+    drawAlcoves(ctx, w, s, camX, camY, time, false);
     drawDecorFront(ctx, w, camX, camY, W, H, time);
     if (!s.won || s.wonT < 30) drawPlayer(ctx, s, camX, camY, 'body', s.burn > 0.02 && !s.dead ? 0.15 + s.burn * 0.6 : 0);
     drawParticles(ctx, camX, camY);
@@ -1295,9 +1421,10 @@
     drawFeatures(ctx, w, s, camX, camY, W, H, time, true);
     // hints live in the dark ceiling rock, drawn above the dark pass so they stay readable
     drawHints(ctx, w, camX, camY, W, H, Gm);
+    if (w.boss) { drawGuardian(ctx, w, s, camX, camY, time); drawAlcoves(ctx, w, s, camX, camY, time, true); drawGuardianBits(ctx, camX, camY, Gm.dt || 0.016); }
     // emissive things, drawn after the dark
     for (const l of w.lights) {
-      if (l.x < camX - 60 || l.x > camX + W + 60 || l.y < camY - 60 || l.y > camY + H + 60) continue;
+      if (l.boss || l.x < camX - 60 || l.x > camX + W + 60 || l.y < camY - 60 || l.y > camY + H + 60) continue;
       if (l.t === 'orb') drawOrb(ctx, l, camX, camY, time, w);
       else if (l.t === 'watch') drawWatcher(ctx, l, camX, camY, time, true, s.dead ? 0 : D.lightAt(w, l, s.x + 2.5, s.y + s.h * 0.5) * 3, s, w);
       else if (l.t === 'lamp' && l.col !== 'rainbow' && l.col !== 'shard') drawLampCrystal(ctx, w, l, camX, camY, time, true);
@@ -1314,7 +1441,7 @@
     ctx.globalCompositeOperation = 'lighter';
     for (const l of w.lights) {
       if (l.x < camX - l.reach || l.x > camX + W + l.reach || l.y < camY - l.reach || l.y > camY + H + l.reach) continue;
-      if (l.t === 'lamp' || l.t === 'orb') {
+      if ((l.t === 'lamp' || l.t === 'orb') && !(l.boss && l.boss !== 'flare')) {
         if (l.k < 0.02) continue;
         const gr = ctx.createRadialGradient(l.x - camX, l.y - camY, 0, l.x - camX, l.y - camY, l.r * 0.5);
         gr.addColorStop(0, 'rgba(' + TH.glowRGB + ',' + (0.16 * l.k * l.I).toFixed(3) + ')'); gr.addColorStop(1, 'rgba(' + TH.glowRGB + ',0)');
@@ -1358,6 +1485,6 @@
   global.DwellerRender = {
     PAL, load, prepare, drawScene, drawText, textWidth, textSprite, spawn, updateParticles, markTether, tickTethers,
     SHEETS, IMG, parts, hsl, hash2, SHARDS, THEMES, drawGem, drawShard, drawMini, drawPortrait, shade,
-    get theme() { return TH; }, SEEKERS, setSeeker, BREATH, get seekerId() { return seekerId; }, resetTethers() { tetherT = {}; }, noteBounce,
+    get theme() { return TH; }, SEEKERS, setSeeker, BREATH, get seekerId() { return seekerId; }, resetTethers() { tetherT = {}; }, noteBounce, guardianBurst, clearGuardian() { gBits.length = 0; },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -12,7 +12,7 @@
   const DT = 1 / TICK;
   const BEAT = 64;              // ticks per beat at 90 BPM
   const IN = { L: 1, R: 2, J: 4, D: 8, E: 16 };
-  const EV = { JUMP: 1, LAND: 2, ROLL: 4, WJUMP: 8, DEATH: 16, RESPAWN: 32, CHECK: 64, WIN: 128, HARDLAND: 256, SEEKER: 512, ECLIPSE: 1024, ECLFAIL: 2048, ECLEND: 4096, BOUNCE: 8192, HUSH: 16384, GRAB: 32768 };
+  const EV = { JUMP: 1, LAND: 2, ROLL: 4, WJUMP: 8, DEATH: 16, RESPAWN: 32, CHECK: 64, WIN: 128, HARDLAND: 256, SEEKER: 512, ECLIPSE: 1024, ECLFAIL: 2048, ECLEND: 4096, BOUNCE: 8192, HUSH: 16384, GRAB: 32768, SLIVER: 65536, BURST: 131072, THROES: 262144 };
 
   const C = {
     W: 5, H: 10, HR: 5,                      // hitbox: standing 5x10, rolling 5x5
@@ -76,6 +76,11 @@
     put(w.vine, 1, level.vines); put(w.vent, 1, level.vents);
     w.hasOneway = !!(T.oneway && T.oneway.length); w.hasVine = !!(level.vines && level.vines.length);
     w.hasVent = !!(level.vents && level.vents.length); w.hasTT = !!(T.bounce && T.bounce.length) || !!(T.ice && T.ice.length);
+    // the Guardian: its marker and its six alcoves come in the light list but are not lights
+    const markers = level.lights.filter(d => d.t === 'gcore' || d.t === 'alcove');
+    level = Object.assign({}, level, { lights: level.lights.filter(d => d.t !== 'gcore' && d.t !== 'alcove') });
+    w.level = level;
+    if (markers.length) buildBoss(w, level, markers);
     level.lights.forEach((d, i) => {
       const l = Object.assign({ id: i, hazard: true, I: 1, k: 1 }, d);
       l.bx = l.x; l.by = l.y;            // anchor
@@ -91,8 +96,109 @@
       w.lights.push(l);
       if (l.hazard) w.hazards.push(l);
     });
+    if (w.boss) for (const l of w.boss.lights) { l.id = w.lights.length; w.lights.push(l); w.hazards.push(l); }
     updateLights(w, 0);
     return w;
+  }
+
+  /* ------------------------------------------------------------- the Guardian (level VII)
+   * A Guardian of four rotating shields floats in the middle of the arena. Its gaze leaves through the four gaps
+   * between the shields. Six alcoves wait for the six slivers, in order; each one changes how it looks:
+   *   I   it learns to look: it turns faster          II  the room breathes: the gaze's reach swells and ebbs
+   *   III prisms split each beam in two (checkpoint)  IV  the gaze pulses on the beat, and turns faster again
+   *   V   every eight beats it flares like a sun      VI  its rhythm stumbles, it shatters, and the floor opens
+   * The SEEKER's eclipse covers the whole eye; each eclipse teaches it to turn faster and glare wider afterwards. */
+  const GB = { SPIN: Math.PI * 2 / 960, HALF: 0.2, GAPS: [-0.87, 0.70, 2.27, 3.84], SPLIT: 0.27, BREATH: 384,
+    FLARE_PER: 512, FLARE_WARN: 64, FLARE_ON: 44, THROES: 160, FLOODV: 1.5, GLARE: 110, SET: 40 };
+  function buildBoss(w, level, markers) {
+    const core = markers.find(d => d.t === 'gcore');
+    const alc = markers.filter(d => d.t === 'alcove').sort((a, b) => a.n - b.n).map(d => ({ x: d.x, y: d.y, n: d.n }));
+    const B = { x: core.x, y: core.y, r: core.r, top: core.top, alc, lights: [], cones: [], mid: -1, plug: [], nocmp: [] };
+    for (let i = 0; i < 8; i++) {
+      const l = { t: 'watch', boss: 'gaze', x: B.x, y: B.y, bx: B.x, by: B.y, r: B.r, half: GB.HALF, ang: 0, base: 0, amp: 0, per: 1e9, I: 2.0, k: 0, burnMul: 2.2, hazard: true, reach: B.r };
+      B.lights.push(l); B.cones.push(l);
+    }
+    B.flare = { t: 'lamp', boss: 'flare', x: B.x, y: B.y, bx: B.x, by: B.y, r: B.r * 1.15, I: 1.5, k: 0, burnMul: 3.0, hazard: true, reach: B.r * 1.15 };
+    B.flood = { t: 'flood', boss: 'flood', x: B.x, y: B.y, bx: B.x, by: B.y, r: 1e6, I: 1, k: 0, fy: -1e9, burnMul: 4, hazard: true, reach: 1e7 };
+    B.lights.push(B.flare, B.flood);
+    for (const f of level.fakes || []) { if (f[4] === 'plug') B.plug.push(f); if (f[4] === 'nocmp') B.nocmp.push(f); }
+    B.wake = core.wake !== undefined ? core.wake : alc[0].x - 90;
+    // the checkpoint that the third sliver earns
+    let bd = 1e9; w.checks.forEach((c, i) => { const d = Math.hypot(c.x - alc[2].x, c.y - alc[2].y); if (d < bd) { bd = d; B.mid = i; } });
+    w.boss = B; w.plugSolid = false; w.nocmpSolid = false;
+    setRegions(w, B.plug, true); w.plugSolid = true;
+  }
+  function setRegions(w, list, v) {
+    for (const f of list) for (let y = f[1]; y < f[1] + f[3]; y++) for (let x = f[0]; x < f[0] + f[2]; x++) if (x >= 0 && y >= 0 && x < w.W && y < w.H) w.solid[y * w.W + x] = v ? 1 : 0;
+  }
+  function stumble(beat) { let h = (beat * 2654435761) >>> 0; h ^= h >>> 13; h = Math.imul(h, 1274126177) >>> 0; return (h & 1023) / 1023; }
+  function stepBoss(w, s) {
+    const B = w.boss; if (!B) return;
+    if (!s.bInit) {
+      s.bInit = 1; s.bP = s.cp >= B.mid && B.mid >= 0 ? 3 : 0; s.bWake = s.bP > 0 ? 1 : 0; s.bAng = 0; s.bT = 0;
+      s.bEcl = 0; s.bGlare = 0; s.bDie = 0; s.bBurst = 0; s.bWasEcl = 0;
+    }
+    // the floor over the shaft holds until the Guardian shatters; the companion-less cover only stands without the SEEKER
+    const plug = !s.bBurst; if (plug !== w.plugSolid) { setRegions(w, B.plug, plug); w.plugSolid = plug; }
+    const noc = !s.cmp; if (noc !== w.nocmpSolid) { setRegions(w, B.nocmp, noc); w.nocmpSolid = noc; }
+    const cx = s.x + C.W / 2, fy = s.y + s.h;
+    if (!s.bWake && !s.dead && cx > B.wake) s.bWake = 1;
+    if (s.bWake) s.bT++;
+    const P = s.bP, t = s.bT;
+    // placing the next sliver
+    const A = B.alc[P];
+    // a sliver takes a moment to set: stand in the alcove until it takes
+    // the last alcove lies open under the eye: only with the SEEKER covering it can the sliver be set
+    const at = A && s.bWake && !s.dead && s.onG && Math.abs(cx - A.x) < 9 && Math.abs(fy - A.y) < 3 && (P < 5 || s.cmp);
+    s.bSet = at ? (s.bSet || 0) + 1 : 0;
+    if (at && s.bSet >= GB.SET) {
+      s.bSet = 0; s.bP = P + 1; s.ev |= EV.SLIVER; s.sliverI = P;
+      if (s.bP === 3 && B.mid >= 0) { const c = w.checks[B.mid]; s.cp = B.mid; s.cpX = c.x; s.cpY = c.y; s.ev |= EV.CHECK; s.ex = Math.max(0, s.ex - 0.5); }
+      if (s.bP === 6) { s.bDie = 1; s.ev |= EV.THROES; }
+    }
+    // learning from the eclipse
+    const ecl = s.cmpL >= 0 && w.lights[s.cmpL] && w.lights[s.cmpL].boss && s.cmp === 3;
+    if (ecl && !s.bWasEcl) s.bEcl++;
+    if (!ecl && s.bWasEcl) s.bGlare = GB.GLARE;
+    s.bWasEcl = ecl ? 1 : 0;
+    if (s.bGlare > 0) s.bGlare--;
+    // how fast it turns
+    let spin = GB.SPIN * (P >= 1 ? 1.25 : 1) * (P >= 4 ? 1.18 : 1) * (1 + 0.07 * Math.min(5, s.bEcl));
+    let dir = 1;
+    if (s.bDie) {
+      s.bDie++;
+      const beat = Math.floor(s.bDie / 20);
+      dir = stumble(beat + 7) < 0.5 ? -1 : 1; spin *= 2.2 + 2 * stumble(beat);
+      if (s.bDie === GB.THROES) { s.bBurst = s.t; s.ev |= EV.BURST; }
+    }
+    if (s.bWake && !s.bBurst) s.bAng += spin * dir;
+    // the gaze
+    const breath = P >= 2 ? 0.5 - 0.5 * Math.cos(t / GB.BREATH * Math.PI * 2) : 0.5;
+    const reach = B.r * (P >= 2 ? 0.72 + 0.4 * breath : 1);
+    let half = GB.HALF * (P >= 2 ? 0.85 + 0.3 * breath : 1) * (s.bGlare > 0 ? 1.55 : 1);
+    let gain = s.bWake && !s.bBurst ? Math.min(1, t / 96) : 0;
+    if (P >= 4 && !s.bDie) { const ph = t % 64; gain *= ph < 40 ? 1 : ph < 46 ? 1 - (ph - 40) / 6 : ph > 58 ? (ph - 58) / 6 : 0; }
+    if (s.bDie) gain *= 0.25 + 0.2 * Math.sin(s.bDie * 0.9);
+    const split = P >= 3;
+    for (let i = 0; i < 8; i++) {
+      const l = B.cones[i], g = i >> 1, side = i & 1;
+      if (!split && side) { l.k = 0; continue; }
+      l.ang = s.bAng + GB.GAPS[g] + (split ? (side ? 1 : -1) * GB.SPLIT : 0);
+      l.half = split ? half * 0.72 : half; l.r = reach; l.reach = reach; l.k = gain;
+    }
+    // the sun-flare
+    B.flare.k = 0;
+    if (P >= 5 && !s.bDie && s.bWake) {
+      const ph = t % GB.FLARE_PER, on0 = GB.FLARE_PER - GB.FLARE_ON;
+      if (ph >= on0) B.flare.k = Math.min(1, (ph - on0) / 6);
+      else if (ph >= on0 - GB.FLARE_WARN) { const q = ph - (on0 - GB.FLARE_WARN); B.flare.k = 0.06 + 0.04 * Math.sin(q * 0.6); }
+    }
+    s.bFlareWarn = P >= 5 && !s.bDie ? (t % GB.FLARE_PER) - (GB.FLARE_PER - GB.FLARE_ON - GB.FLARE_WARN) : -1;
+    // the flood after it shatters
+    if (s.bBurst) { const e = s.t - s.bBurst - 64; B.flood.k = e > 0 ? 1 : 0; B.flood.fy = B.top + Math.max(0, e) * GB.FLOODV; }
+    else { B.flood.k = 0; B.flood.fy = -1e9; }
+    // the eclipse covers the eye: every beam and the flare
+    if (s.cmpL >= 0 && s.cmpK > 0 && w.lights[s.cmpL] && w.lights[s.cmpL].boss) for (const l of B.lights) if (l.boss !== 'flood') l.k *= 1 - s.cmpK;
   }
 
   function ttAt(w, tx, ty) { return tx < 0 || ty < 0 || tx >= w.W || ty >= w.H ? 0 : w.tt[ty * w.W + tx]; }
@@ -192,6 +298,7 @@
     const lights = w.lights;
     for (let i = 0; i < lights.length; i++) {
       const l = lights[i];
+      if (l.boss) continue;
       l.k = schedGain(l.sched, t);
       const m = l.move;
       if (m) {
@@ -213,6 +320,7 @@
   /* Light intensity at a point, 0..1, occlusion included. */
   function lightAt(w, l, px, py) {
     if (l.k <= 0.001) return 0;
+    if (l.t === 'flood') return py < l.fy ? l.k : py < l.fy + 18 ? l.k * (1 - (py - l.fy) / 18) : 0;
     if (l.t === 'beam') {
       const rx = px - l.x, ry = py - l.y;
       const s = rx * l.dx + ry * l.dy, v = rx * l.nx + ry * l.ny;
@@ -344,7 +452,7 @@
     s.roll = 0; s.crawl = false; s.rollCD = 0; s.wlock = 0; s.coy = 0; s.buf = 0;
     s.st = 'idle'; s.anim = 0; s.ev |= EV.RESPAWN;
     for (let i = 0; i < 8; i++) if (s['hs' + i]) s['hs' + i] = 0;
-    s.climb = false; s.drop = 0;
+    s.climb = false; s.drop = 0; s.bInit = 0;
     if (s.cmp) { s.cmp = 1; s.cmpL = -1; s.cmpK = 0; s.cmpT = 0; s.cmpX = s.cpX - 9; s.cmpY = s.cpY - 22; }
   }
 
@@ -382,7 +490,8 @@
       const l = hz[i];
       const v = lightAt(w, l, cx, cy);
       if (v > bv + 1e-6) { bv = v; best = l.id; }
-      const d = Math.hypot(l.x - cx, l.y - cy);
+      const d = Math.hypot(l.x - cx, l.y - cy) / (l.boss === 'gaze' ? 5 : 1);
+      if (l.boss === 'flood') continue;
       if (d < nd) { nd = d; near = l.id; }
     }
     return bv > 0.02 ? best : near;
@@ -428,11 +537,12 @@
   /* One simulation tick. inp is a bitmask of IN flags. Returns the state (mutated). */
   function step(w, s, inp) {
     s.ev = 0;
-    if (s.won) { s.wonT++; s.t++; updateLights(w, s.t); stepSwitches(w, s); stepCompanion(w, s, 0); s.prev = inp; return s; }
+    if (s.won) { s.wonT++; s.t++; updateLights(w, s.t); stepSwitches(w, s); stepCompanion(w, s, 0); stepBoss(w, s); s.prev = inp; return s; }
     s.t++; s.ticks++;
     updateLights(w, s.t);
     stepSwitches(w, s);
     stepCompanion(w, s, inp);
+    stepBoss(w, s);
 
     if (s.dead) {
       s.deadT++; s.anim++;
@@ -621,7 +731,7 @@
     const cx = s.x + C.W / 2, cy = s.y + s.h / 2;
     for (let i = 0; i < w.checks.length; i++) {
       const c = w.checks[i];
-      if (c.i > s.cp && Math.abs(cx - c.x) < 14 && Math.abs(cy - (c.y - 8)) < 14) {
+      if (c.i > s.cp && !(w.boss && c.i === w.boss.mid) && Math.abs(cx - c.x) < 14 && Math.abs(cy - (c.y - 8)) < 14) {
         s.cp = c.i; s.cpX = c.x; s.cpY = c.y; s.ev |= EV.CHECK; s.ex = Math.max(0, s.ex - 0.5);
       }
     }
@@ -640,7 +750,7 @@
   Object.assign(global.Dweller, {
     TS, TICK, DT, BEAT, IN, EV, C, smooth,
     makeWorld, newState, cloneState, step, solidAt, rectSolid, castRay, rayClear, TT, ttAt, onOneway,
-    lightAt, updateLights, schedGain, playerLit,
+    lightAt, updateLights, schedGain, playerLit, GB,
   });
   if (typeof module !== 'undefined' && module.exports) module.exports = global.Dweller;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

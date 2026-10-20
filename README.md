@@ -20,6 +20,7 @@ the door to the final depth opens.
 | IV | The Foundry | rust and copper | ride hot-air vents up a stack, drop through gantry grates, pull the boiler lever and race the fire, hammers in the forge, a scrapyard, pipeworks, a smelter of sprung plates, an oiled conveyor, a crane yard, climb the bellows |
 | V | Ember Deep | crimson | climb out past a buried sun on ash vents, stepping stones and geysers over tar, three suns and three stones, a walking sun, an obsidian stair, a turning sun, magma locks, ash falls, a magma river, the slag heaps, the kiln |
 | VI | The Heart | bone and magenta | a loop through the atrium, a rib cage climb, weave between two beating ventricles, a maze of vessels, tendons, the aorta, the lungs, a nerve to crawl, the marrow, synapses, a valve chain, the pulse, two valves to still the heart |
+| VII | The Core | void and white | behind the door of six slivers: set them in the Guardian's six alcoves while its gaze turns; each sliver changes it (it turns faster, the room breathes, its gaze splits, it keeps the beat, it flares like a sun, its heart stumbles); then it shatters and the light floods down the shaft after you. Needs the SEEKER |
 
 New pieces along the way: one-way shelves you can drop through, bounce caps, slick glass, vines to climb,
 hot-air vents, and hush stones that put nearby lights to sleep for a few beats.
