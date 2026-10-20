@@ -28,7 +28,7 @@ hot-air vents, and hush stones that put nearby lights to sleep for a few beats.
 Each level is unlocked by beating the one before. The map shows an orb for every level, lit in the
 colour of its sliver once beaten.
 
-**The SEEKER.** Somewhere in level II a wall is not stone. Behind it sleeps a SEEKER. Wake it
+**The SEEKER.** Somewhere in level II a wall is not stone. Behind it sleeps SEEKER NET #1895. Wake it
 and it follows you; press E and it flies to the nearest light and covers it for a few beats (an
 eclipse), then needs a moment to recharge. Every level can be beaten without it.
 

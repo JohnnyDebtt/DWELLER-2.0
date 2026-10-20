@@ -44,7 +44,7 @@ s.hint(8, 20, 'SOME   LIGHTS   WALK')
 for x in (16, 34, 52, 70, 88, 106):
     s.rock(x, 33, 6, 2)
 for x, ph in [(26.0, 0.0), (62.0, 0.5), (98.0, 0.25)]:
-    s.orb(x, 29.5, 24, 12, 2, 8, ph, 1.4)    # under the roof, never in it
+    s.orb(x, 29.5, 24, 11, 2, 8, ph, 1.3)    # under the roof, never in it
 
 # ---------------------------------------------------------------- 2 FLICKER
 s = new('s2', 'IV  FLICKER', 134, 56, 0.35, 4)
