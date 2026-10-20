@@ -28,7 +28,7 @@
   let touchMode = false, speedMul = 1, replay = null, replayI = 0;
   let stepDist = 0, beamPrev = {};
   let titleT = 0, winT = 0, err = '', seekerCardT = 99, newBest = false, winTime = 0;
-  let sel = 0, mapT = 0, mapMsg = '', mapMsgT = 99, flare = null, fuseT = -1;
+  let mapT = 0, flare = null, fuseT = -1;
   const mparts = [];
 
   /* ------------------------------------------------------------ progress */
@@ -40,7 +40,7 @@
       const j = JSON.parse(lsGet('dweller.v2') || 'null');
       if (j && Array.isArray(j.beaten)) {
         for (let i = 0; i < NL; i++) { P.beaten[i] = !!j.beaten[i]; P.best[i] = +(j.best && j.best[i]) || 0; }
-        P.comp = !!j.comp; P.cp = j.cp && typeof j.cp === 'object' ? j.cp : {}; P.fused = !!j.fused; P.seekerId = j.seekerId; P.core = !!j.core; P.coreBest = +j.coreBest || 0; P.seen = j.seen && typeof j.seen === 'object' ? j.seen : {};
+        P.comp = !!j.comp; P.cp = j.cp && typeof j.cp === 'object' ? j.cp : {}; P.fused = !!j.fused; P.seekerId = j.seekerId; P.core = !!j.core; P.coreBest = +j.coreBest || 0; P.seen = j.seen && typeof j.seen === 'object' ? j.seen : {}; P.snv = j.snv;
         return;
       }
     } catch (e) { }
@@ -50,10 +50,10 @@
     try { const v = JSON.parse(lsGet('dweller.v1') || 'null'); if (v && v.cp > 0) P.cp[0] = v; } catch (e) { }
   }
   function saveProgress() { lsSet('dweller.v2', JSON.stringify(P)); }
-  /* one of ten SEEKER NET seekers sleeps in the mycelium; which one is rolled once per save */
+  /* any one of the 2,222 SEEKER NET seekers sleeps in the mycelium; which one is rolled once per save
+     (saves from before every seeker could wake are rolled again) */
   function pickSeeker() {
-    const ids = R.SEEKERS.map(q => q.id);
-    if (!ids.includes(P.seekerId)) { P.seekerId = P.comp ? 1895 : ids[Math.floor(Math.random() * ids.length)]; saveProgress(); }
+    if (P.snv !== 2 || !(P.seekerId >= 1 && P.seekerId <= R.NETN)) { P.seekerId = 1 + Math.floor(Math.random() * R.NETN); P.snv = 2; saveProgress(); }
     R.setSeeker(P.seekerId);
   }
   function unlocked(i) { return i === 0 || (i < NL && P.beaten[i - 1]); }
@@ -94,24 +94,26 @@
     const e = { code: keyCode(ev), repeat: ev.repeat, metaKey: ev.metaKey, altKey: ev.altKey, preventDefault() { ev.preventDefault(); } };
     if (e.metaKey || e.altKey) return;
     const k = KEYMAP[e.code];
-    if (k) { if (!e.repeat && LATCH[k] && mode === 'play') latch |= LATCH[k]; keys[k] = true; e.preventDefault(); }
+    if (k) { if (!e.repeat && LATCH[k] && (mode === 'play' || mode === 'town')) latch |= LATCH[k]; keys[k] = true; e.preventDefault(); }
     if (e.code === 'Backspace' || e.code === 'Tab') e.preventDefault();
-    if (e.repeat && mode !== 'map') return;
+    if (e.repeat) return;
     audioInit();
     if (mode === 'title') {
-      if (['Space', 'Enter', 'ArrowUp', 'KeyW', 'ArrowRight', 'KeyD', 'ArrowLeft', 'KeyA', 'KeyZ', 'KeyK', 'ArrowDown', 'KeyS'].includes(e.code)) toMap();
-    } else if (mode === 'map') {
-      mapKey(e.code);
+      if (['Space', 'Enter', 'ArrowUp', 'KeyW', 'ArrowRight', 'KeyD', 'ArrowLeft', 'KeyA', 'KeyZ', 'KeyK', 'ArrowDown', 'KeyS', 'KeyE'].includes(e.code)) beginTown();
+    } else if (mode === 'town') {
+      if (e.code === 'Enter') townInteract(false);
+      if (e.code === 'KeyN') townInteract(true);
+      if (e.code === 'Escape') toTitle();
     } else if (mode === 'win') {
       if (e.code === 'KeyN') { startLevel(cur, true); return; }
-      if (e.code === 'Escape' || e.code === 'KeyQ') { toMap(); return; }
-      if (winT > 2.5 && (e.code === 'Enter' || e.code === 'Space')) toMap();
+      if (e.code === 'Escape' || e.code === 'KeyQ') { toTown(cur); return; }
+      if (winT > 2.5 && (e.code === 'Enter' || e.code === 'Space')) toTown(cur);
     } else if (mode === 'play') {
       if (e.code === 'Escape' || e.code === 'KeyP') setPause(true);
       if (e.code === 'KeyR' && !S.dead && !S.won) { S.ex = 1; S.grace = 0; }   // give up: let the light take you back to the tether
     } else if (mode === 'pause') {
       if (e.code === 'KeyN') { A.Live.setPaused(false); startLevel(cur, true); return; }
-      if (e.code === 'KeyQ' || e.code === 'Backspace') { A.Live.setPaused(false); toMap(); return; }
+      if (e.code === 'KeyQ' || e.code === 'Backspace') { A.Live.setPaused(false); toTown(cur); return; }
       if (e.code === 'Escape' || e.code === 'KeyP' || e.code === 'Enter' || e.code === 'Space') setPause(false);
     }
     if (e.code === 'KeyM') A.Live.toggleMute();
@@ -150,29 +152,30 @@
       b.addEventListener('contextmenu', (e) => e.preventDefault());
     };
     mk('L', '<'); mk('R', '>'); mk('J', 'JUMP'); mk('D', 'ROLL'); mk('E', 'SEEK');
-    const pb = document.createElement('div'); pb.className = 'tb small'; pb.id = 'tbP'; pb.textContent = 'II'; root.appendChild(pb);
+    const pb = document.createElement('div'); pb.className = 'tb small'; pb.id = 'tbP'; pb.textContent = 'II'; root.appendChild(pb); tbtn.P = pb;
     pb.addEventListener('pointerdown', (e) => { e.preventDefault(); audioInit(); if (mode === 'play') setPause(true); else if (mode === 'pause') setPause(false); });
     addEventListener('touchstart', () => { if (!touchMode) { touchMode = true; } document.body.classList.add('touch'); }, { passive: true });
   }
   function syncTouchUI() {
-    const playing = mode === 'play' || mode === 'pause';
+    const playing = mode === 'play' || mode === 'pause' || mode === 'town';
     document.body.classList.toggle('playing', playing);
-    document.body.classList.toggle('cmp', playing && !!(S && S.cmp));
+    document.body.classList.toggle('cmp', mode === 'town' || (playing && !!(S && S.cmp)));
+    if (tbtn.E) tbtn.E.textContent = mode === 'town' ? 'ENTER' : 'SEEK';
+    if (tbtn.P) tbtn.P.style.display = mode === 'town' ? 'none' : '';
   }
   canvas.addEventListener('pointerdown', (e) => {
     audioInit(); grabFocus();
     if (e.pointerType === 'touch') { touchMode = true; document.body.classList.add('touch'); }
     const r = canvas.getBoundingClientRect();
     const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
-    if (mode === 'title') toMap();
-    else if (mode === 'map') mapTap(fx * LW, fy * LH);
+    if (mode === 'title') beginTown();
     else if (mode === 'pause') {
       if (e.pointerType !== 'touch') { setPause(false); return; }
-      if (fy < 0.3) { A.Live.setPaused(false); toMap(); }
+      if (fy < 0.3) { A.Live.setPaused(false); toTown(cur); }
       else if (fy > 0.68) { A.Live.setPaused(false); startLevel(cur, true); }
       else setPause(false);
     }
-    else if (mode === 'win' && winT > 2.5) toMap();
+    else if (mode === 'win' && winT > 2.5) toTown(cur);
   });
 
   /* gamepad */
@@ -189,15 +192,10 @@
       if (b(1) || b(13) || b(6) || b(7) || ay > 0.7) pad.D = true;
       if (b(2) || b(3) || b(4) || b(5)) pad.E = true;
       const edge = (name, v) => { const was = padPrev[name]; padPrev[name] = v; return v && !was; };
-      if (edge('start', b(9))) { if (mode === 'play') setPause(true); else if (mode === 'pause') setPause(false); else if (mode === 'title') toMap(); else if (mode === 'map') mapKey('Enter'); else if (mode === 'win' && winT > 2.5) toMap(); }
-      if (mode === 'title' && edge('a', b(0))) toMap();
-      else if (mode === 'map') {
-        if (edge('a', b(0))) mapKey('Enter');
-        if (edge('up', b(12) || ay < -0.6 || ax < -0.6)) mapKey('ArrowUp');
-        if (edge('dn', b(13) || ay > 0.6 || ax > 0.6)) mapKey('ArrowDown');
-        if (edge('b', b(1))) mapKey('Escape');
-      } else { edge('a', b(0)); edge('up', false); edge('dn', false); edge('b', b(1)); }
-      if (mode === 'win' && winT > 2.5 && edge('a2', b(0))) toMap();
+      if (edge('start', b(9))) { if (mode === 'play') setPause(true); else if (mode === 'pause') setPause(false); else if (mode === 'title') beginTown(); else if (mode === 'town') toTitle(); else if (mode === 'win' && winT > 2.5) toTown(cur); }
+      if (mode === 'title' && edge('a', b(0))) beginTown();
+      else edge('a', b(0));
+      if (mode === 'win' && winT > 2.5 && edge('a2', b(0))) toTown(cur);
     }
   }
 
@@ -207,7 +205,7 @@
     const cw = Math.max(2, Math.round(innerWidth * DPR)), ch = Math.max(2, Math.round(innerHeight * DPR));
     canvas.width = cw; canvas.height = ch;
     canvas.style.width = innerWidth + 'px'; canvas.style.height = innerHeight + 'px';
-    SC = Math.max(1, Math.round(ch / (cur === CORE && mode !== 'map' && mode !== 'title' ? 360 : 230)));   // the Guardian's arena is seen from further back
+    SC = Math.max(1, Math.round(ch / (cur === CORE && mode !== 'town' && mode !== 'title' ? 360 : 230)));   // the Guardian's arena is seen from further back
     LW = Math.ceil(cw / SC) + 1; LH = Math.ceil(ch / SC) + 1;
     off.width = LW; off.height = LH;
     octx.imageSmoothingEnabled = false; gctx.imageSmoothingEnabled = false;
@@ -223,7 +221,7 @@
     cur = i;
   }
   let scFor = -1;
-  function fitView() { const k = cur === CORE && mode !== 'map' && mode !== 'title' ? 1 : 0; if (k !== scFor) { scFor = k; resize(); } }
+  function fitView() { const k = cur === CORE && mode !== 'town' && mode !== 'title' ? 1 : 0; if (k !== scFor) { scFor = k; resize(); } }
   function startLevel(i, fresh) {
     audioInit();
     loadLevel(i);
@@ -244,12 +242,6 @@
     A.Live.setPaused(false);
     syncTouchUI();
   }
-  function toMap(focus) {
-    mode = 'map'; mapT = 0; mapMsgT = 99;
-    if (focus !== undefined) sel = focus;
-    A.Live.setTheme(-1); A.Live.setMood(0.12, 0);
-    syncTouchUI();
-  }
   function sectionAt(tx) {
     const ss = world.sections;
     for (let i = 0; i < ss.length; i++) if (tx >= ss[i].x0 && tx < ss[i].x1) return i;
@@ -268,215 +260,288 @@
     }
   }
 
-  /* ------------------------------------------------------------ the map of the descent */
-  function mapLayout() {
-    const narrow = LW < 330;
-    const top = 28, bot = narrow ? LH - 74 : LH - 30;
-    const pathX = narrow ? Math.round(LW / 2) : Math.round(Math.min(LW * 0.36, 190));
-    const amp = narrow ? Math.min(28, LW * 0.2) : 34;
-    const span = bot - top - 34;
-    const nodes = [];
-    for (let i = 0; i < NL; i++) nodes.push({ x: Math.round(pathX + Math.sin(i * 1.7 + 0.6) * amp), y: Math.round(top + span * i / (NL - 1)) });
-    nodes.push({ x: pathX, y: Math.round(bot) });   // the door
-    return { nodes, narrow, infoX: narrow ? Math.round(LW / 2) : Math.round(pathX + amp + 34), infoY: narrow ? LH - 54 : Math.round(LH * 0.30) };
+  /* ------------------------------------------------------------ the town above the descent
+   * The Dweller walks the town with the real simulation (on the town's own little world). Each level is a door;
+   * the great door under the mountain takes the whole crystal and leads to the Core. */
+  const T = window.DwellerTown;
+  let tW = null, tS = null, tcamX = 0, tcamY = 0, tAcc = 0, tPrevE = false, still = 0;
+  let near = null, nearKey = '', townMsg = '', townMsgT = 99, titleOut = 99, bootFade = 0, rareCardT = 99;
+  const talk = {};
+  const LINES = {
+    collector: () => [
+      'THE WELL IS DEEPER THAN IT LOOKS', 'I KEEP WHAT THE LIGHT LEAVES BEHIND', 'DONT STAND UNDER THE LAMPS TOO LONG',
+      'SOME SEEKERS SLEEP WHERE NOBODY LOOKS', 'THE ROPE IN THE WELL GOES ALL THE WAY DOWN',
+    ].concat(P.wellUsed ? ['YOU WOKE THE ONE DOWN THERE. GOOD'] : []),
+    exiled: () => [
+      'THEY SENT ME UP. I DONT GO DOWN ANYMORE', 'EVERY DOOR IN THIS TOWN GOES FURTHER DOWN', 'THE MOUNTAIN WAS HERE BEFORE THE TOWN. SO WAS THE DOOR',
+      'IF THE TREES BLINK, STAND STILL', 'NOBODY LIGHTS THE LAMPS. NOBODY WANTS TO BE SEEN',
+    ].concat(P.beaten[1] && !P.comp ? ['THE MYCELIUM HAS A FALSE WALL. SOMETHING SLEEPS BEHIND IT', 'THE MYCELIUM HAS A FALSE WALL. SOMETHING SLEEPS BEHIND IT'] : []).concat(count() >= 3 ? ['YOUR DOORS ARE BURNING NICELY'] : [])
+     .concat(count() >= NL && !P.core ? ['THE GREAT DOOR IS HUMMING. GO ON'] : []),
+    // the silent one speaks only once the Guardian is gone, and always in this order
+    monk: () => P.core ? ['YOU BROKE THE GUARDIAN', 'IT WAS NOT KEEPING YOU OUT', 'IT WAS KEEPING SOMETHING IN', 'GO BACK DOWN IF YOU LIKE. IT IS LISTENING NOW'] : ['...'],
+  };
+  function groundY(x) { return T.groundAt(Math.floor(x / D.TS)) * D.TS; }
+  function townSpawn(x) {
+    tS = D.newState(tW, { companion: P.comp });
+    if (x !== undefined) { tS.x = x - D.C.W / 2; tS.y = groundY(x) - D.C.H; tS.cmpX = x - 9; tS.cmpY = groundY(x) - 22; }
+    tS.grace = 0; tAcc = 0; still = 0; near = null; nearKey = '';
+    snapTown();
   }
-  function mapKey(code) {
-    if (fuseT >= 0) return;
-    if (['ArrowUp', 'KeyW', 'ArrowLeft', 'KeyA'].includes(code)) { sel = Math.max(0, sel - 1); A.Live.sfx('ui'); mapMsgT = 99; }
-    else if (['ArrowDown', 'KeyS', 'ArrowRight', 'KeyD'].includes(code)) { sel = Math.min(NL, sel + 1); A.Live.sfx('ui'); mapMsgT = 99; }
-    else if (['Space', 'Enter', 'KeyZ', 'KeyK'].includes(code)) chooseNode(sel, false);
-    else if (code === 'KeyN') chooseNode(sel, true);
-    else if (code === 'Escape' || code === 'Backspace') { mode = 'title'; titleT = 0; syncTouchUI(); }
+  function doorX(i) { return i >= NL ? T.GREAT.x : T.doorShape(T.DOORS[i]).x; }
+  function toTown(focus) {
+    if (!tW) tW = T.build();
+    mode = 'town'; townMsgT = 99; R.parts.length = 0;
+    townSpawn(focus === undefined ? undefined : doorX(focus) + (focus >= NL ? 0 : 0));
+    A.Live.setTheme(-1); A.Live.setMood(0.12, 0);
+    syncTouchUI();
   }
-  function chooseNode(i, fresh) {
-    if (i >= NL) {
-      if (count() >= NL && P.fused && built(CORE)) { startLevel(CORE, fresh); return; }
-      mapMsg = count() >= NL ? 'THE DOOR IS OPENING' : 'THE DOOR WAITS FOR ALL SIX SLIVERS';
-      mapMsgT = 0; A.Live.sfx(count() >= NL ? 'check' : 'nope'); return;
-    }
-    if (!built(i)) { mapMsg = 'THIS DEPTH IS NOT YET DUG'; mapMsgT = 0; A.Live.sfx('nope'); return; }
-    if (!unlocked(i)) { mapMsg = 'BEAT ' + ROMAN[i - 1] + ' TO OPEN THE WAY'; mapMsgT = 0; A.Live.sfx('nope'); return; }
-    startLevel(i, fresh);
+  function toMap(focus) { toTown(focus); }
+  function toTitle() { mode = 'title'; titleT = 3; titleOut = 99; syncTouchUI(); }
+  function beginTown() { if (mode !== 'title') return; for (const k in keys) keys[k] = false; latch = 0; mode = 'town'; titleOut = 0; syncTouchUI(); A.Live.sfx('ui'); }
+
+  function townCamTarget() {
+    const px = tS.x + 2.5, py = tS.y + tS.h;
+    const camY0 = T.GY - LH * 0.8;
+    let tx = px - LW / 2 + Math.max(-1, Math.min(1, tS.vx / 72)) * 20;
+    let ty = py > T.GY + 14 ? py - LH * 0.55 : camY0;
+    tx = Math.max(0, Math.min(T.WPX - LW, tx));
+    ty = Math.max(camY0, Math.min(T.HPX - LH, ty));
+    return [tx, ty, camY0];
   }
-  function mapTap(x, y) {
-    if (fuseT >= 0) return;
-    const L = mapLayout();
-    let best = -1, bd = 18;
-    L.nodes.forEach((n, i) => { const d = Math.hypot(n.x - x, n.y - y); if (d < bd) { bd = d; best = i; } });
-    if (best < 0) return;
-    if (best === sel) chooseNode(best, false); else { sel = best; A.Live.sfx('ui'); mapMsgT = 99; }
+  function snapTown() { const t = townCamTarget(); tcamX = t[0]; tcamY = t[1]; }
+
+  function townNear() {
+    const px = tS.x + 2.5, feet = tS.y + tS.h;
+    if (feet > T.GY + 20) return Math.abs(px - T.RAREX) < 14 && feet > T.RAREY - 8 ? { k: 'rare', x: T.RAREX, y: T.RAREY - 34 } : null;
+    for (const d of T.DOORS) {
+      const sh = T.doorShape(d);
+      if (Math.abs(px - sh.x) < sh.w / 2 + 3 && Math.abs(feet - T.GY) < 3) return { k: 'door', i: d.i, x: sh.x, y: sh.y - sh.h - 14 };
+    }
+    if (Math.abs(px - T.GREAT.x) < 24 && Math.abs(feet - T.GREAT.y) < 3) return { k: 'great', x: T.GREAT.x, y: T.GREAT.y - 70 };
+    for (const q of T.RES) if (Math.abs(px - q.x) < 18 && Math.abs(feet - T.GY) < 8) return { k: 'res', q, x: q.x, y: T.GY - 30 };
+    return null;
   }
-  function nodeCol(i) { return R.SHARDS[i]; }
-  function drawMap(ctx, dt) {
-    const t = mapT;
-    const L = mapLayout(), N = L.nodes;
-    ctx.fillStyle = '#07070c'; ctx.fillRect(0, 0, LW, LH);
-    // faint strata: the deeper, the warmer
-    const TN = ['descent', 'mycelium', 'glass', 'foundry', 'ember', 'heart'];
-    const grd = ctx.createLinearGradient(0, N[0].y, 0, N[NL].y);
-    for (let i = 0; i < NL; i++) {
-      const c = R.THEMES[TN[i]].bgBot, a = P.beaten[i] || unlocked(i) ? 0.30 : 0.12;
-      grd.addColorStop(i / NL, 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')');
-    }
-    grd.addColorStop(1, 'rgba(20,16,26,0.2)');
-    ctx.fillStyle = grd; ctx.fillRect(0, 0, LW, LH);
-    // the path
-    for (let i = 0; i < NL; i++) {
-      const a = N[i], b = N[i + 1];
-      const lit = P.beaten[i];
-      const steps = Math.max(4, Math.round(Math.hypot(b.x - a.x, b.y - a.y) / 3));
-      for (let k = 1; k < steps; k++) {
-        const u = k / steps, x = Math.round(a.x + (b.x - a.x) * u), y = Math.round(a.y + (b.y - a.y) * u);
-        if (lit) { ctx.globalAlpha = 0.45 + 0.35 * Math.sin(t * 3 - k * 0.5 - i); ctx.fillStyle = nodeCol(i); }
-        else { ctx.globalAlpha = 0.5; ctx.fillStyle = '#2a2f3c'; }
-        ctx.fillRect(x, y, 1, 1);
-      }
-    }
-    ctx.globalAlpha = 1;
-    // the orbs
-    ctx.globalCompositeOperation = 'lighter';
-    for (let i = 0; i < NL; i++) {
-      if (!P.beaten[i] || (fuseT >= 0)) continue;
-      const n = N[i], rgb = hexRGB(nodeCol(i));
-      const fl = flare && flare.i === i ? Math.max(0, Math.min(1, 1 - flare.t / 1.6)) : 0;
-      const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, 18 + fl * 30);
-      g.addColorStop(0, 'rgba(' + rgb + ',' + (0.35 + 0.5 * fl).toFixed(3) + ')'); g.addColorStop(1, 'rgba(' + rgb + ',0)');
-      ctx.fillStyle = g; ctx.fillRect(n.x - 50, n.y - 50, 100, 100);
-    }
-    ctx.globalCompositeOperation = 'source-over';
-    for (let i = 0; i < NL; i++) {
-      const n = N[i];
-      const open = built(i) && unlocked(i);
-      const r = 4;
-      if (P.beaten[i]) {
-        const pulse = 0.85 + 0.15 * Math.sin(t * 2 + i);
-        disc(ctx, n.x, n.y, r + 1, R.shade(nodeCol(i), -0.35));
-        disc(ctx, n.x, n.y, r, nodeCol(i));
-        disc(ctx, n.x - 1, n.y - 1, 1.6, R.shade(nodeCol(i), 0.6 * pulse));
-      } else if (open) {
-        const pulse = 0.55 + 0.45 * Math.sin(t * 4);
-        ring(ctx, n.x, n.y, r, 'rgba(214,226,236,' + pulse.toFixed(3) + ')');
-        disc(ctx, n.x, n.y, 1.5, 'rgba(214,226,236,' + (0.4 * pulse).toFixed(3) + ')');
-      } else {
-        ring(ctx, n.x, n.y, r, '#2c313d');
-      }
-      // numeral
-      R.drawText(ctx, ROMAN[i], n.x - 10, n.y - 3, P.beaten[i] ? '#cfd6e0' : open ? '#8a919e' : '#3c4250', 1, 'right');
-      // the secret of the mycelium
-      if (i === 1 && (P.comp || P.beaten[1])) {
-        if (P.comp) R.drawMini(ctx, n.x + 13, n.y - 1, t, 'on', 1);
-        else { ctx.globalAlpha = 0.35 + 0.25 * Math.sin(t * 2); R.drawText(ctx, '?', n.x + 9, n.y - 3, '#8a919e', 1); ctx.globalAlpha = 1; }
-      }
-    }
-    // the door and the crystal it waits for
-    const dn = N[NL];
-    const all = count() >= NL;
-    const fusing = fuseT >= 0, fu = fusing ? Math.min(1, fuseT / 2.2) : 0;
-    const open = all && (P.fused || (fusing && fuseT > 2.6));
-    drawDoor(ctx, dn.x, dn.y, open, t, fusing ? Math.max(0, (fuseT - 2.2) / 1.2) : (P.fused ? 1 : 0));
-    const have = P.beaten.map((b, i) => b && (!fusing || fu >= 1));
-    R.drawGem(ctx, dn.x, dn.y - 10, 0.6, have, t, all);
-    if (fusing) {
-      for (let i = 0; i < NL; i++) {
-        if (fu >= 1) break;
-        const n = N[i], e = fu * fu * (3 - 2 * fu);
-        const x = n.x + (dn.x - n.x) * e, y = n.y + (dn.y - 10 - n.y) * e - Math.sin(e * Math.PI) * 14;
-        R.drawShard(ctx, x, y, nodeCol(i), t, 0, 0.55);
-      }
-      if (fuseT > 2.2 && fuseT < 2.9) { ctx.globalAlpha = Math.max(0, 1 - (fuseT - 2.2) / 0.7); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, LW, LH); ctx.globalAlpha = 1; }
-    }
-    // selection
-    const sn = N[sel];
-    const bs = sel === NL ? 18 : 8, pul = Math.round(Math.sin(t * 5) * 1);
-    ctx.fillStyle = PAL.gold;
-    for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-      const x = sn.x + sx * (bs + pul), y = (sel === NL ? sn.y - 8 : sn.y) + sy * (bs + pul);
-      ctx.fillRect(x - (sx > 0 ? 2 : 0), y, 3, 1); ctx.fillRect(x, y - (sy > 0 ? 2 : 0), 1, 3);
-    }
-    drawMapInfo(ctx, L);
-    // particles
-    for (let i = mparts.length - 1; i >= 0; i--) {
-      const p = mparts[i]; p.life -= dt; if (p.life <= 0) { mparts.splice(i, 1); continue; }
-      p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 20 * dt;
-      ctx.globalAlpha = Math.min(1, p.life / p.max); ctx.fillStyle = p.c; ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1);
-    }
-    ctx.globalAlpha = 1;
+  function say(msg, sfx) { townMsg = msg; townMsgT = 0; if (sfx) A.Live.sfx(sfx); }
+  function townInteract(fresh) {
+    if (mode !== 'town' || fuseT >= 0 || !near) return;
+    if (near.k === 'door') {
+      const i = near.i;
+      if (!built(i)) return say('THIS DEPTH IS NOT YET DUG', 'nope');
+      if (!unlocked(i)) return say('SEALED  -  BEAT ' + ROMAN[i - 1] + ' TO OPEN IT', 'nope');
+      startLevel(i, fresh);
+    } else if (near.k === 'great') {
+      if (count() < NL) return say('IT WANTS THE WHOLE CRYSTAL  -  ' + count() + ' OF 6', 'nope');
+      if (!P.fused) { fuseT = 0; A.Live.sfx('check'); return; }
+      if (built(CORE)) startLevel(CORE, fresh);
+    } else if (near.k === 'res') {
+      const L = LINES[near.q.id](); talk[near.q.id] = ((talk[near.q.id] || 0) + 1) % L.length; A.Live.sfx('ui');
+    } else if (near.k === 'rare') wakeRare();
   }
-  function hexRGB(hex) { const n = parseInt(hex.slice(1), 16); return ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255); }
-  function disc(ctx, x, y, r, c) { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x + 0.5, y + 0.5, r, 0, Math.PI * 2); ctx.fill(); }
-  function ring(ctx, x, y, r, c) { ctx.strokeStyle = c; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x + 0.5, y + 0.5, r, 0, Math.PI * 2); ctx.stroke(); }
-  function drawDoor(ctx, x, y, open, t, k) {
-    const w = 14, h = 34, top = y - h + 8;
-    ctx.fillStyle = '#12141c'; ctx.beginPath(); ctx.moveTo(x - w, y + 8); ctx.lineTo(x - w, top + 8); ctx.quadraticCurveTo(x, top - 8, x + w, top + 8); ctx.lineTo(x + w, y + 8); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = open ? 'rgba(240,240,255,0.7)' : '#2c313d'; ctx.lineWidth = 1; ctx.stroke();
-    if (open) {
-      const ig = ctx.createLinearGradient(0, top, 0, y + 8);
-      ig.addColorStop(0, 'rgba(255,255,255,' + (0.30 * k).toFixed(3) + ')'); ig.addColorStop(1, 'rgba(180,160,255,' + (0.10 * k).toFixed(3) + ')');
-      ctx.fillStyle = ig; ctx.beginPath(); ctx.moveTo(x - w + 2, y + 8); ctx.lineTo(x - w + 2, top + 9); ctx.quadraticCurveTo(x, top - 5, x + w - 2, top + 9); ctx.lineTo(x + w - 2, y + 8); ctx.closePath(); ctx.fill();
-      ctx.globalCompositeOperation = 'lighter';
-      for (let i = 0; i < 6; i++) {
-        const g = ctx.createRadialGradient(x, y - 2, 0, x, y - 2, 26);
-        const a = 0.12 * k * (0.7 + 0.3 * Math.sin(t * 2 + i));
-        g.addColorStop(0, 'rgba(' + hexRGB(R.SHARDS[i]) + ',' + a.toFixed(3) + ')'); g.addColorStop(1, 'rgba(' + hexRGB(R.SHARDS[i]) + ',0)');
-        ctx.fillStyle = g; ctx.fillRect(x - 30, y - 30, 60, 50);
-      }
-      ctx.globalCompositeOperation = 'source-over';
-    } else {
-      ctx.fillStyle = '#2c313d'; ctx.fillRect(x - 1, y + 4, 3, 3);
+  /* the sleeper under the well: a rare seeker (one of the 222 rarest in SEEKER NET). Once per save, it takes your
+     seeker's place, and yours sleeps down there instead */
+  function rareChoice() {
+    const rare = R.NET && R.NET.rare || [];
+    if (!(P.rareId >= 1) && rare.length) { let q; do { q = rare[Math.floor(Math.random() * rare.length)][0]; } while (q === P.seekerId && rare.length > 1); P.rareId = q; saveProgress(); }
+    return P.rareId;
+  }
+  function rareRank(id) { const r = (R.NET && R.NET.rare || []).find(q => q[0] === id); return r ? r[1] + 1 : 0; }
+  function wakeRare() {
+    if (P.wellUsed) return say('YOUR OLD SEEKER SLEEPS HERE NOW. LET IT REST');
+    if (!P.comp) return say('IT SLEEPS. IT WAITS FOR A SEEKER OF YOUR OWN', 'nope');
+    const id = rareChoice();
+    P.wellOld = P.seekerId; P.seekerId = id; P.wellUsed = true; saveProgress();
+    R.setSeeker(id);
+    A.Live.sfx('seeker'); flash = 0.6; rareCardT = 0;
+    for (let i = 0; i < 60; i++) { const a = Math.random() * 6.283, sp = 10 + Math.random() * 45; R.spawn(T.RAREX, T.RAREY - 16, Math.cos(a) * sp, Math.sin(a) * sp - 10, 0.8 + Math.random(), i % 2 ? '#5daa99' : '#d5f8fc', 1, 10, true); }
+  }
+
+  function townStep(inp) {
+    D.step(tW, tS, inp & ~IN.E);
+    if (tS.ev) handleEvents(tS.ev & (EV.JUMP | EV.WJUMP | EV.LAND | EV.HARDLAND | EV.ROLL | EV.GRAB), tS);
+    if (tS.onG && Math.abs(tS.vx) > 30 && tS.st === 'run') {
+      stepDist += Math.abs(tS.vx) / D.TICK;
+      if (stepDist > 11) { stepDist = 0; A.Live.sfx('step', { v: 0.8 }); if (Math.random() < 0.5) puff(tS, 1, 0.4); }
     }
   }
-  function drawMapInfo(ctx, L) {
-    const x = L.infoX, al = L.narrow ? 'center' : 'left';
-    let y = L.infoY;
-    const line = (txt, col, sc) => { R.drawText(ctx, txt, x, y, col, sc || 1, al); y += (sc || 1) * 7 + 5; };
-    R.drawText(ctx, 'DWELLER', L.narrow ? LW / 2 : x, 10, '#5d6474', 1, L.narrow ? 'center' : 'left');
-    if (!L.narrow) R.drawText(ctx, count() + ' / 6  SLIVERS', LW - 8, 10, '#5d6474', 1, 'right');
-    if (sel < NL) {
-      const i = sel;
-      line(ROMAN[i] + '  ' + NAMES[i], P.beaten[i] ? R.SHARDS[i] : unlocked(i) && built(i) ? PAL.snow : '#5d6474', L.narrow ? 1 : 2);
-      if (!built(i)) line('NOT YET DUG', '#5d6474');
-      else if (!unlocked(i)) line('SEALED  -  BEAT ' + ROMAN[i - 1] + ' FIRST', '#5d6474');
-      else {
-        if (P.beaten[i]) line('SLIVER FOUND' + (P.best[i] ? '    BEST  ' + fmtTime(P.best[i]) : ''), '#a9b2c0');
-        else line('THE SLIVER STILL GLOWS BELOW', '#8a919e');
-        const sv = P.cp[i];
-        const blink = 0.6 + 0.4 * Math.sin(mapT * 3);
-        ctx.globalAlpha = blink;
-        line(touchMode ? 'TAP AGAIN TO DESCEND' : sv && sv.cp > 0 ? 'SPACE  CONTINUE FROM TETHER ' + sv.cp : 'SPACE  DESCEND', PAL.gold);
-        ctx.globalAlpha = 1;
-        if (sv && sv.cp > 0 && !touchMode) line('N  START FROM THE TOP', '#8a919e');
-        if (i === 1 && !P.comp && P.beaten[1]) line('SOMETHING WAITS BEHIND A FALSE WALL', '#6b7280');
-      }
-    } else {
-      const open = count() >= NL && P.fused, sv = P.cp[CORE];
-      line(open ? 'VII  THE CORE' : 'THE DOOR', count() >= NL ? PAL.snow : '#8a919e', L.narrow ? 1 : 2);
-      line(count() >= NL ? (P.core ? 'THE GUARDIAN IS GONE' : 'A GUARDIAN WAITS BELOW') : count() + ' OF 6 SLIVERS', count() >= NL ? '#d6dbe4' : '#8a919e');
-      if (open && P.coreBest) line('BEST  ' + fmtTime(P.coreBest), '#8a919e');
-      if (open) { ctx.globalAlpha = 0.6 + 0.4 * Math.sin(mapT * 4); line(touchMode ? 'TAP AGAIN TO DESCEND' : sv && sv.cp > 0 ? 'SPACE  CONTINUE FROM THE THIRD SLIVER' : 'SPACE  DESCEND', PAL.gold); ctx.globalAlpha = 1; if (sv && sv.cp > 0 && !touchMode) line('N  START FROM THE TOP', '#8a919e'); }
-      else line(count() >= NL ? 'THE DOOR IS OPENING' : 'BEAT EVERY LEVEL TO OPEN IT', '#6b7280');
+  function townFrame(dt) {
+    if (!tW) { tW = T.build(); townSpawn(); }
+    mapT += dt; townMsgT += dt; rareCardT += dt; titleOut += dt; bootFade += dt;
+    const stepDt = 1 / D.TICK;
+    tAcc += dt; let n = 0;
+    while (tAcc >= stepDt && n < 12) {
+      let inp = mode === 'town' && fuseT < 0 && rareCardT > 5.5 ? inputMask() : 0;
+      latch = 0;
+      const e = !!(inp & IN.E), was = mode;
+      if (e && !tPrevE) townInteract(false);
+      tPrevE = e;
+      if (mode !== was) return;             // a door was taken
+      townStep(inp);
+      still = inp === 0 && tS.onG && Math.abs(tS.vx) < 1 ? still + stepDt : 0;
+      tAcc -= stepDt; n++;
     }
-    if (P.comp && !L.narrow) { y += 4; R.drawMini(ctx, x + 5, y + 4, mapT, 'on', 1); R.drawText(ctx, 'SEEKER  -  E  ECLIPSE A LIGHT', x + 14, y + 1, '#7f9aa6', 1); y += 14; }
-    if (mapMsgT < 3) { ctx.globalAlpha = Math.min(1, (3 - mapMsgT) * 2); R.drawText(ctx, mapMsg, L.narrow ? LW / 2 : x, L.narrow ? LH - 16 : y + 6, '#d6b98a', 1, L.narrow ? 'center' : 'left'); ctx.globalAlpha = 1; }
-    if (!touchMode && !L.narrow) R.drawText(ctx, 'ARROWS  CHOOSE     SPACE  DESCEND     ESC  TITLE', LW - 8, LH - 12, '#3f4554', 1, 'right');
-  }
-  function mapFrame(dt) {
-    mapT += dt; mapMsgT += dt;
+    if (n >= 12) tAcc = 0;
+    R.updateParticles(dt);
+    const t = townCamTarget(), kx = 1 - Math.exp(-dt * 5.5), ky = 1 - Math.exp(-dt * 4.5);
+    tcamX += (t[0] - tcamX) * kx; tcamY += (t[1] - tcamY) * ky;
+    const nn = townNear(), key = nn ? nn.k + (nn.i !== undefined ? nn.i : nn.q ? nn.q.id : '') : '';
+    if (key !== nearKey) {
+      nearKey = key; townMsgT = 99;
+      if (nn && nn.k === 'res') { const L = LINES[nn.q.id](); talk[nn.q.id] = nn.q.id === 'monk' ? (talk.monk === undefined ? 0 : (talk.monk + 1) % L.length) : Math.floor(Math.random() * L.length); }
+    }
+    near = nn;
+    // a sliver found for the first time lights its door
     if (flare) {
       flare.t += dt;
       if (flare.pending && flare.t > 0) {
         flare.pending = false; A.Live.sfx('check');
-        const n = mapLayout().nodes[flare.i];
-        for (let k = 0; k < 40; k++) { const a = Math.random() * 6.283, sp = 8 + Math.random() * 30; mparts.push({ x: n.x, y: n.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 10, life: 0.8 + Math.random(), max: 1.8, c: k % 2 ? R.SHARDS[flare.i] : '#ffffff' }); }
+        const x = doorX(flare.i), y = T.GY - 12;
+        for (let k = 0; k < 50; k++) { const a = Math.random() * 6.283, sp = 8 + Math.random() * 34; R.spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp - 14, 0.8 + Math.random(), k % 2 ? R.SHARDS[flare.i] : '#ffffff', 1, 20, true); }
       }
-      if (flare.t > 2) flare = null;
+      if (flare.t > 2.2) flare = null;
     }
+    // the crystal goes into the great door
     if (fuseT >= 0) {
       fuseT += dt;
-      if (fuseT > 2.2 && !P.fused) { P.fused = true; saveProgress(); A.Live.sfx('win'); }
-      if (fuseT > 4) fuseT = -1;
-    } else if (count() >= NL && !P.fused && !flare) { fuseT = 0; sel = NL; }
+      if (fuseT > 2.2 && fuseT - dt <= 2.2) { A.Live.sfx('win'); flash = 1.2; shake = 2; }
+      if (fuseT > 4.2) { P.fused = true; saveProgress(); fuseT = -1; }
+    }
   }
 
+  /* the town's words are drawn at half size, after the upscale, at the screen's own resolution so they stay crisp.
+     ht() queues one (x, y in town pixels, y at the top of the letters); HS is how many town pixels a letter pixel takes */
+  const HT = [];
+  let HK = 1, HS = 0.5;
+  function ht(t, x, y, col, align, alpha, sc) { HT.push([t, x, y, col, align || 'left', alpha === undefined ? ctxAlpha : alpha, sc || 1]); }
+  let ctxAlpha = 1;
+  function htW(t, sc) { return R.textWidth(t) * HS * (sc || 1); }
+  function flushHT() {
+    for (const [t, x, y, col, al, a, sc] of HT) {
+      if (a <= 0) continue;
+      const sp = R.textSprite(t, col), k = HK * sc, w = sp.width * k;
+      let X = x * SC; if (al === 'center') X -= w / 2; else if (al === 'right') X -= w;
+      gctx.globalAlpha = Math.min(1, a); gctx.drawImage(sp, Math.round(X), Math.round(y * SC), w, sp.height * k);
+    }
+    gctx.globalAlpha = 1; HT.length = 0;
+  }
+  function wrap(text, max) {
+    const out = []; let ln = '';
+    for (const w of text.split(' ')) { const t = ln ? ln + ' ' + w : w; if (R.textWidth(t) > max && ln) { out.push(ln); ln = w; } else ln = t; }
+    if (ln) out.push(ln); return out;
+  }
+  function drawTown(ctx, dt) {
+    const camY0 = T.GY - LH * 0.8;
+    const sx = shake > 0 ? (Math.random() - 0.5) * shake : 0;
+    HK = Math.max(1, Math.round(SC / 2)); HS = HK / SC; HT.length = 0; ctxAlpha = 1;
+    const LH7 = Math.ceil(7 * HS) + 3;          // one line of half-size text, with its gap
+    T.draw(ctx, {
+      text: (t, x, y, c, al) => ht(t, x, y, c, al, 1), s: tS, camX: tcamX + sx, camY: tcamY, camY0, LW, LH, time: gameTime, dt, P, still, fuse: fuseT, flare,
+      inRoom: tS.y + tS.h > (T.WELL.room[2] + 1) * D.TS,
+      unlocked: (i) => built(i) && unlocked(i), rareId: rareChoice(), rareUsed: !!P.wellUsed, oldId: P.wellOld,
+    });
+    const cx = Math.round(tcamX + sx), cy = Math.round(tcamY);
+    T.signText(ctx, cx, cy, touchMode, P.comp, (t, x, y, c, al) => ht(t, x, y, c, al, 1), HS);
+    // the six slivers flying into the great door
+    if (fuseT >= 0 && fuseT < 2.3) {
+      const px = tS.x + 2.5, py = tS.y - 4;
+      for (let i = 0; i < NL; i++) {
+        const a = -Math.PI / 2 + i * Math.PI / 3;
+        const ox = px + Math.cos(gameTime * 2 + i * 1.047) * 12, oy = py - 10 + Math.sin(gameTime * 2 + i * 1.047) * 6;
+        const tx = T.GREAT.x + Math.cos(a) * 10, ty = T.GREAT.y - 42 + Math.sin(a) * 6;
+        const rise = Math.min(1, fuseT / 0.8), u = Math.max(0, Math.min(1, (fuseT - 0.8) / 1.4)), e = u * u * (3 - 2 * u);
+        const x0 = px + (ox - px) * rise, y0 = py + (oy - py) * rise;
+        R.drawShard(ctx, x0 + (tx - x0) * e - cx, y0 + (ty - y0) * e - cy - Math.sin(e * Math.PI) * 18, R.SHARDS[i], gameTime, 0, 0.45);
+      }
+    }
+    // what is near: a door's name and what it holds, the great door, a resident's words, the sleeper
+    const lines = [];
+    if (near && fuseT < 0 && mode === 'town') {
+      const key = touchMode ? 'ENTER' : 'E';
+      if (near.k === 'door') {
+        const i = near.i, sv = P.cp[i];
+        lines.push([ROMAN[i] + '  ' + NAMES[i], P.beaten[i] ? R.SHARDS[i] : unlocked(i) && built(i) ? PAL.snow : '#8a919e']);
+        if (!built(i)) lines.push(['NOT YET DUG', '#6b7280']);
+        else if (!unlocked(i)) lines.push(['SEALED  -  BEAT ' + ROMAN[i - 1] + ' FIRST', '#6b7280']);
+        else {
+          lines.push([P.beaten[i] ? 'SLIVER FOUND' + (P.best[i] ? '   BEST ' + fmtTime(P.best[i]) : '') : 'THE SLIVER STILL GLOWS BELOW', '#a9b2c0']);
+          lines.push([key + '  ' + (sv && sv.cp > 0 ? 'CONTINUE FROM TETHER ' + sv.cp : 'DESCEND'), PAL.gold, true]);
+          if (sv && sv.cp > 0 && !touchMode) lines.push(['N  FROM THE TOP', '#8a919e']);
+        }
+      } else if (near.k === 'great') {
+        const all = count() >= NL, sv = P.cp[CORE];
+        lines.push([P.fused ? 'VII  THE CORE' : 'THE GREAT DOOR', all ? PAL.snow : '#a9b2c0']);
+        if (!all) lines.push([count() + ' OF 6 SLIVERS  -  IT WANTS THE WHOLE CRYSTAL', '#8a919e']);
+        else if (!P.fused) lines.push([key + '  SET THE CRYSTAL', PAL.gold, true]);
+        else {
+          lines.push([P.core ? 'THE GUARDIAN IS GONE' + (P.coreBest ? '   BEST ' + fmtTime(P.coreBest) : '') : 'A GUARDIAN WAITS BELOW', '#d6dbe4']);
+          lines.push([key + '  ' + (sv && sv.cp > 0 ? 'CONTINUE FROM THE THIRD SLIVER' : 'DESCEND'), PAL.gold, true]);
+          if (sv && sv.cp > 0 && !touchMode) lines.push(['N  FROM THE TOP', '#8a919e']);
+        }
+      } else if (near.k === 'res') {
+        const L = LINES[near.q.id](), t = L[(talk[near.q.id] || 0) % L.length];
+        for (const w of wrap(t, Math.min(200, LW - 24) / HS)) lines.push([w, near.q.id === 'monk' && !P.core ? '#6b7280' : '#c3cbd6']);
+        if (L.length > 1) lines.push([key + '  MORE', '#5d6474']);
+      } else if (near.k === 'rare') {
+        if (P.wellUsed) lines.push(['SEEKER NET #' + P.wellOld + ' SLEEPS HERE', '#7f9aa6']);
+        else {
+          lines.push(['A RARE SEEKER SLEEPS HERE', '#9fd3c7']);
+          lines.push(['SEEKER NET #' + rareChoice() + '  -  RARITY ' + rareRank(rareChoice()) + ' OF ' + R.NETN, '#7f9aa6']);
+          if (P.comp) { lines.push([key + '  WAKE IT  -  YOURS WILL SLEEP IN ITS PLACE', PAL.gold, true]); lines.push(['IT WAKES ONLY ONCE', '#5d6474']); }
+          else lines.push(['IT WAITS FOR A SEEKER OF YOUR OWN', '#6b7280']);
+        }
+      }
+    }
+    if (townMsgT < 3) lines.push([townMsg, '#d6b98a']);
+    if (lines.length && near) {
+      let y = Math.round(near.y + 8 - cy - lines.length * LH7);
+      y = Math.max(4, y);
+      for (const [t, c, blink] of lines) {
+        const w = htW(t), x = Math.max(w / 2 + 3, Math.min(LW - w / 2 - 3, near.x - cx));
+        ctx.globalAlpha = 0.6; ctx.fillStyle = '#05060a'; ctx.fillRect(Math.floor(x - w / 2) - 2, y - 1, Math.ceil(w) + 4, LH7); ctx.globalAlpha = 1;
+        ht(t, x, y + 1, c, 'center', blink ? 0.65 + 0.35 * Math.sin(mapT * 4) : 1); y += LH7;
+      }
+    } else if (townMsgT < 3) ht(townMsg, LW >> 1, LH - 14, '#d6b98a', 'center', Math.min(1, (3 - townMsgT) * 2));
+    // a small count in the corner
+    if (mode === 'town') {
+      ctx.globalAlpha = Math.min(1, Math.max(0, titleOut - 0.4)) * 0.8;
+      R.drawGem(ctx, LW - 12, 11, 0.25, P.beaten, gameTime, count() >= NL);
+      ht(count() + '/6', LW - 19, 9, '#6b7280', 'right', ctx.globalAlpha);
+      if (P.comp) R.drawMini(ctx, 12, 14, gameTime, 'on', 1);
+      ctx.globalAlpha = 1;
+    }
+    if (flash > 0) { ctx.globalAlpha = Math.min(1, flash) * 0.5; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, LW, LH); ctx.globalAlpha = 1; }
+    // the rare seeker wakes
+    if (rareCardT < 5.5) {
+      const a = Math.min(1, rareCardT / 0.6) * Math.min(1, (5.5 - rareCardT) / 1.0), y0 = Math.round(LH * 0.3);
+      ctx.globalAlpha = a * 0.8; ctx.fillStyle = '#05070b'; ctx.fillRect(0, y0 - 26, LW, 60); ctx.globalAlpha = a;
+      R.drawPortrait(ctx, LW / 2 - 46, y0 + 4, 0.75, a);
+      ctx.globalAlpha = a;
+      ht('A RARE SEEKER WAKES', LW / 2 - 20, y0 - 12, PAL.snow, 'left', a, 2);
+      ht('SEEKER NET  #' + P.seekerId + '  -  RARITY ' + rareRank(P.seekerId) + ' OF ' + R.NETN, LW / 2 - 20, y0 + 2, '#9fd3c7', 'left', a);
+      ht('#' + P.wellOld + ' SLEEPS IN ITS PLACE', LW / 2 - 20, y0 + 2 + LH7, '#8a919e', 'left', a);
+      ctx.globalAlpha = 1;
+    }
+    // the title, over the town
+    const ta = mode === 'title' ? Math.min(1, Math.max(0, (bootFade - 1.0) / 1.8)) : Math.max(0, 1 - titleOut / 0.8);
+    if (ta > 0) drawTitleText(ctx, ta);
+    // the first fade in from the dark
+    // (drawn over the words too, in render)
+  }
+  function drawTitleText(ctx, a) {
+    const cx = LW >> 1; let y = Math.round(LH * 0.16);
+    const sc = Math.max(1, Math.min(3, Math.floor(LH / 90), Math.floor((LW - 12) / (R.textWidth('DWELLER') * 2))));
+    const g = ctx.createLinearGradient(0, 0, 0, LH * 0.6);
+    g.addColorStop(0, 'rgba(3,4,8,' + (0.55 * a).toFixed(3) + ')'); g.addColorStop(1, 'rgba(3,4,8,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, LW, LH * 0.6);
+    const L7 = Math.ceil(7 * HS) + 3, logo = Math.ceil(7 * HS * sc * 2);
+    ht('DWELLER', cx, y, PAL.snow, 'center', a, sc * 2);
+    const tag = wrap('STAY IN THE DARK  -  REACH THE LIGHT THAT ISNT FIRE', (LW - 16) / HS);
+    tag.forEach((t, k) => ht(t, cx, y + logo + 6 + k * L7, PAL.muted, 'center', a * 0.8));
+    y += logo + 6 + tag.length * L7;
+    if (mode === 'title') {
+      ht(touchMode ? 'TAP TO BEGIN' : 'PRESS SPACE TO BEGIN', cx, y + 4, PAL.gold, 'center', a * (0.55 + 0.45 * Math.sin(titleT * 3)));
+      if (!touchMode) ht('ESC  TITLE     M  MUTE     F  FULLSCREEN', cx, y + 4 + L7 * 1.5, PAL.muted, 'center', a * 0.5);
+    }
+  }
   /* ------------------------------------------------------------ camera */
   function camTarget() {
     const px = S.x + 2.5, py = S.y + S.h * 0.5;
@@ -548,7 +613,7 @@
       L.sfx('win'); flash = 2; shake = 2;
       const t = runTicks / D.TICK; winTime = t;
       newBest = !P.coreBest || t < P.coreBest; if (newBest) P.coreBest = t;
-      P.core = true; delete P.cp[cur]; saveProgress(); sel = NL;
+      P.core = true; delete P.cp[cur]; saveProgress();
     } else if (ev & EV.WIN) {
       L.sfx('win'); flash = 1.5; shake = 2;
       const g = world.goal, col = R.SHARDS[cur];
@@ -559,7 +624,6 @@
       if (newBest) P.best[cur] = t;
       P.beaten[cur] = true; delete P.cp[cur]; saveProgress();
       if (first) flare = { i: cur, t: -0.4, pending: true };
-      sel = cur + 1 < NL && built(cur + 1) ? cur + 1 : cur;
     }
   }
   function puff(st, n, k) {
@@ -641,10 +705,10 @@
         if (world.boss) A.Live.boss = { p: S.bP || 0, wake: !!S.bWake, die: S.bDie || 0, burst: !!S.bBurst, warn: S.bFlareWarn };
       } else if (mode === 'pause') {
         R.updateParticles(0);
-      } else if (mode === 'title' || mode === 'map') {
+      } else if (mode === 'title' || mode === 'town') {
         A.Live.update(0.0, 1);
-        R.updateParticles(dt);
-        if (mode === 'map') mapFrame(dt);
+        shake = Math.max(0, shake - dt * 6); flash = Math.max(0, flash - dt * 1.6);
+        townFrame(dt);
       }
       render(dt);
     } catch (e) {
@@ -661,40 +725,6 @@
   }
   function fmtTime(t) { t = Math.max(0, t); const m = Math.floor(t / 60), s = Math.floor(t % 60), c = Math.floor((t * 10) % 10); return m + ':' + (s < 10 ? '0' : '') + s + '.' + c; }
 
-  function drawTitle(ctx) {
-    const t = titleT;
-    ctx.fillStyle = '#07070c'; ctx.fillRect(0, 0, LW, LH);
-    const cx = Math.floor(LW / 2), cy = Math.floor(LH / 2);
-    ctx.globalCompositeOperation = 'lighter';
-    for (let i = 0; i < 6; i++) {
-      const a = t * 0.3 + i * 1.05;
-      const gr = ctx.createRadialGradient(cx + Math.cos(a) * 30, cy + 40 + Math.sin(a) * 6, 0, cx + Math.cos(a) * 30, cy + 40, 90);
-      const c = hexRGB(R.SHARDS[i]), al = P.beaten[i] ? 0.08 : 0.025;
-      gr.addColorStop(0, 'rgba(' + c + ',' + al + ')'); gr.addColorStop(1, 'rgba(' + c + ',0)');
-      ctx.fillStyle = gr; ctx.fillRect(0, 0, LW, LH);
-    }
-    ctx.globalCompositeOperation = 'source-over';
-    const sc = Math.max(1, Math.min(3, Math.floor(LH / 90)));
-    const a = Math.min(1, t / 2);
-    ctx.globalAlpha = a;
-    R.drawText(ctx, 'DWELLER', cx, cy - 46 * (sc / 2) - 8, PAL.snow, sc * 2, 'center');
-    ctx.globalAlpha = a * 0.8;
-    R.drawText(ctx, 'STAY IN THE DARK  -  REACH THE LIGHT THAT ISNT FIRE', cx, cy - 8, PAL.muted, 1, 'center');
-    const blink = 0.55 + 0.45 * Math.sin(t * 3);
-    ctx.globalAlpha = a * blink;
-    R.drawText(ctx, touchMode ? 'TAP TO DESCEND' : 'PRESS SPACE TO DESCEND', cx, cy + 14, PAL.gold, 1, 'center');
-    ctx.globalAlpha = a * 0.6;
-    if (!touchMode) {
-      R.drawText(ctx, 'A D  MOVE     SPACE  JUMP     S  ROLL / CRAWL' + (P.comp ? '     E  SEEKER' : ''), cx, LH - 30, PAL.muted, 1, 'center');
-      R.drawText(ctx, 'ESC  PAUSE     M  MUTE     F  FULLSCREEN', cx, LH - 20, PAL.muted, 1, 'center');
-    }
-    R.drawText(ctx, count() + ' OF 6 SLIVERS', cx, LH - 44 + (touchMode ? 20 : 0), PAL.stone4, 1, 'center');
-    ctx.globalAlpha = a;
-    R.drawGem(ctx, cx + 64, cy + 64, 0.55, P.beaten, t, count() >= NL);
-    ctx.globalAlpha = 1;
-    drawTitleSeeker(ctx, cx, cy + 74, t);
-    if (P.comp) R.drawMini(ctx, cx - 14, cy + 58, t, 'on', 1);
-  }
   function drawTitleSeeker(ctx, x, y, t) {
     const sh = R.SHEETS.breath, shv = R.SHEETS.breathV;
     if (!sh) return;
@@ -714,10 +744,8 @@
     if (mode === 'loading') {
       ctx.fillStyle = '#07070c'; ctx.fillRect(0, 0, LW, LH);
       R.drawText(ctx, 'DWELLER', LW >> 1, (LH >> 1) - 8, PAL.muted, 2, 'center');
-    } else if (mode === 'title') {
-      drawTitle(ctx);
-    } else if (mode === 'map') {
-      drawMap(ctx, dt);
+    } else if (mode === 'title' || mode === 'town') {
+      drawTown(ctx, dt);
     } else {
       const sx = shake > 0 ? (Math.random() - 0.5) * shake * 1.2 : 0, sy = shake > 0 ? (Math.random() - 0.5) * shake * 1.2 : 0;
       const cxp = camX + sx, cyp = camY + sy;
@@ -729,6 +757,10 @@
     gctx.imageSmoothingEnabled = false;
     gctx.fillStyle = '#000'; gctx.fillRect(0, 0, canvas.width, canvas.height);
     gctx.drawImage(off, 0, 0, LW, LH, Math.round(-ox), Math.round(-oy), LW * SC, LH * SC);
+    if (mode === 'title' || mode === 'town') {
+      flushHT();
+      if (bootFade < 2.5) { gctx.globalAlpha = 1 - bootFade / 2.5; gctx.fillStyle = '#000'; gctx.fillRect(0, 0, canvas.width, canvas.height); gctx.globalAlpha = 1; }
+    }
     drawCard();
   }
   /* the section's name: three quarters of its old size (drawn at screen resolution so the letters stay crisp),
@@ -808,7 +840,7 @@
     }
     if (mode === 'pause') {
       ctx.fillStyle = 'rgba(5,5,10,0.7)'; ctx.fillRect(0, 0, LW, LH);
-      R.drawText(ctx, touchMode ? 'TAP HERE  -  MAP' : 'Q  MAP', LW >> 1, Math.round(LH * 0.16), '#8a919e', 1, 'center');
+      R.drawText(ctx, touchMode ? 'TAP HERE  -  TOWN' : 'Q  TOWN', LW >> 1, Math.round(LH * 0.16), '#8a919e', 1, 'center');
       R.drawText(ctx, ROMAN[cur] + '  ' + NAMES[cur], LW >> 1, (LH >> 1) - 36, '#8a919e', 1, 'center');
       R.drawText(ctx, 'PAUSED', LW >> 1, (LH >> 1) - 22, PAL.snow, 2, 'center');
       R.drawText(ctx, touchMode ? 'TAP TO RESUME' : 'ESC  RESUME', LW >> 1, (LH >> 1) + 2, PAL.gold, 1, 'center');
@@ -827,7 +859,7 @@
         R.drawGem(ctx, LW >> 1, y0 + 70, 0.9, P.beaten, gameTime, true);
         const cr = ['DWELLER', 'A GAME IN THE SEEKER UNIVERSE  -  OPEN ART, MUSIC AND LORE', 'THE GUARDIAN  -  PLANETARY GUARDIAN #255', 'YOUR COMPANION  -  SEEKER NET #' + R.seekerId, 'THANK YOU FOR DESCENDING'];
         cr.forEach((c, i) => R.drawText(ctx, c, LW >> 1, y0 + 96 + i * 12, i ? '#a9b2c0' : PAL.gold, 1, 'center'));
-        if (winT > 2.5) { ctx.globalAlpha = a * (0.55 + 0.45 * Math.sin(winT * 3)); R.drawText(ctx, touchMode ? 'TAP FOR THE MAP' : 'ENTER  MAP     N  AGAIN', LW >> 1, y0 + 162, PAL.gold, 1, 'center'); }
+        if (winT > 2.5) { ctx.globalAlpha = a * (0.55 + 0.45 * Math.sin(winT * 3)); R.drawText(ctx, touchMode ? 'TAP FOR THE TOWN' : 'ENTER  TOWN     N  AGAIN', LW >> 1, y0 + 162, PAL.gold, 1, 'center'); }
         ctx.globalAlpha = 1;
         return;
       }
@@ -837,7 +869,7 @@
       R.drawText(ctx, 'TIME  ' + fmtTime(t) + (newBest ? '  NEW BEST' : '') + '     LIGHT FOUND YOU  ' + S_.deaths + ' TIMES', LW >> 1, y0 + 36, PAL.snow, 1, 'center');
       R.drawGem(ctx, LW >> 1, y0 + 70, 0.9, P.beaten, gameTime, count() >= NL);
       R.drawText(ctx, count() + ' OF 6 SLIVERS', LW >> 1, y0 + 92, '#a9b2c0', 1, 'center');
-      if (winT > 2.5) { ctx.globalAlpha = a * (0.55 + 0.45 * Math.sin(winT * 3)); R.drawText(ctx, touchMode ? 'TAP FOR THE MAP' : 'ENTER  MAP     N  AGAIN', LW >> 1, y0 + 108, PAL.gold, 1, 'center'); }
+      if (winT > 2.5) { ctx.globalAlpha = a * (0.55 + 0.45 * Math.sin(winT * 3)); R.drawText(ctx, touchMode ? 'TAP FOR THE TOWN' : 'ENTER  TOWN     N  AGAIN', LW >> 1, y0 + 108, PAL.gold, 1, 'center'); }
       ctx.globalAlpha = 1;
     }
   }
@@ -863,7 +895,7 @@
     const ld = document.getElementById('loading'); if (ld) ld.remove();
     mode = 'title'; titleT = 0;
     // the map opens on the deepest level you can play
-    sel = 0; for (let i = 0; i < NL; i++) if (built(i) && unlocked(i)) sel = i;
+    tW = T.build(); townSpawn(); rareChoice();
     if (q.get('speed')) speedMul = Math.max(1, Math.min(32, parseFloat(q.get('speed')) || 1));
     lastT = performance.now();
     requestAnimationFrame(frame);
@@ -872,7 +904,7 @@
       get state() { return S; }, get world() { return world; }, get mode() { return mode; }, get level() { return cur; }, get progress() { return P; },
       start(fresh) { startLevel(cur < 0 ? 0 : cur, !!fresh); },
       startLevel(i, fresh) { startLevel(i, fresh === undefined ? true : !!fresh); },
-      map() { toMap(); },
+      map() { toTown(); }, town(f) { toTown(f); }, get townState() { return tS; }, get near() { return near; }, interact(f) { townInteract(!!f); }, teleportTown(x, y) { tS.x = x; tS.y = y; snapTown(); },
       setProgress(o) { Object.assign(P, o); saveProgress(); },
       replay(inputs, speed) { replay = inputs; replayI = 0; speedMul = speed || 1; },
       setSpeed(v) { speedMul = v; },

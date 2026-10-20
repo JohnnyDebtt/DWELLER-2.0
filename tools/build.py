@@ -16,15 +16,19 @@ assets = {
  'voidBody': 'animations/void/body__r1c1__48x48.png',
  'voidFace': 'animations/void/face__r1c1__48x48.png',
  'orb': 'animations/buzzer/OrbIdle__r1c8__48x48.png',
+ 'collector': 'animations/collector/Idle__r1c24__48x48.png',
+ 'exiled': 'animations/exiled1/Idle__r1c24__48x48.png',
+ 'monk': 'animations/monk/Idle__r1c24__48x48.png',
  'g255_orb': 'guardian/g255_orb.png',
  'g255_body': 'guardian/g255_body.png',
  'g255_eyes': 'guardian/g255_eyes.png',
 }
 data = {k: 'data:image/png;base64,' + base64.b64encode(open(os.path.join(A, v), 'rb').read()).decode() for k, v in assets.items()}
-# the ten SEEKER NET seekers that can wake as the companion
-seekers = json.load(open(os.path.join(A, 'seeker/seekers.json')))
-for q in seekers:
-    data['seeker%d' % q['id']] = 'data:image/png;base64,' + base64.b64encode(open(os.path.join(A, 'seeker/seeker%d.png' % q['id']), 'rb').read()).decode()
+# every SEEKER NET seeker can wake as the companion: all 2,222 portraits on one sheet, and their traits
+# (python3 -I tools/seekernet.py <collections/SEEKER_NET> makes both)
+data['seekernet'] = 'data:image/png;base64,' + base64.b64encode(open(os.path.join(A, 'seeker/net.png'), 'rb').read()).decode()
+data['seekerlids'] = 'data:image/png;base64,' + base64.b64encode(open(os.path.join(A, 'seeker/net_lids.png'), 'rb').read()).decode()
+seekernet = open(os.path.join(A, 'seeker/net.json')).read().strip()
 # terrain: the ice-biome tileset and each level's baked tiles (node tools/bake_levels.cjs)
 data['tiles'] = json.load(open(os.path.join(root, 'tools/ice_tiling.json')))['main']['image']
 for n in range(1, 10):
@@ -74,7 +78,7 @@ body.cmp #tbE{display:flex}
  Includes or adapts assets from The Seeker by The Seeker contributors, licensed CC BY 4.0:
  https://creativecommons.org/licenses/by/4.0/
  Original project: https://github.com/TheSeekerGame/the-seeker
- The companion is one of ten SEEKER NET seekers (#1895, 2, 7, 11, 13, 14, 15, 25, 29, 78; https://github.com/TheSeekerGame/collections), drawn from their layers.
+ The companion is any one of the 2,222 SEEKER NET seekers (https://github.com/TheSeekerGame/collections), drawn from their layers.
  Changes were made where applicable (re-lit, recoloured, re-sliced for a low-resolution renderer).
 -->
 <canvas id="c"></canvas>
@@ -85,11 +89,12 @@ body.cmp #tbE{display:flex}
 <script>%SIM%</script>
 <script>%RENDER%</script>
 <script>%AUDIO%</script>
+<script>%TOWN%</script>
 <script>%MAIN%</script>
 </body></html>'''
-out = (html.replace('%ASSETS%', json.dumps(data)).replace('%LEVELS%', levels).replace('%SEEKERS%', json.dumps([dict(id=q['id'], cw=q['cw'], name=q['name']) for q in seekers]))
+out = (html.replace('%ASSETS%', json.dumps(data)).replace('%LEVELS%', levels).replace('%SEEKERS%', seekernet)
        .replace('%SIM%', rd('src/sim.js')).replace('%RENDER%', rd('src/render.js'))
-       .replace('%AUDIO%', rd('src/audio.js')).replace('%MAIN%', rd('src/main.js')))
+       .replace('%AUDIO%', rd('src/audio.js')).replace('%TOWN%', rd('src/town.js')).replace('%MAIN%', rd('src/main.js')))
 p = os.path.join(root, 'dist/dweller.html')
 open(p, 'w', encoding='utf-8').write(out)
 print('wrote', p, len(out) // 1024, 'KB')

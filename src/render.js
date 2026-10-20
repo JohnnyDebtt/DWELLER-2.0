@@ -846,12 +846,22 @@
   ];
   const MINI_KB = '..kkkkkkk..';
   const MINI_COL = { r: '#a2324e', a: '#485f67', L: '#8ea6db', B: '#6c78a2', S: '#30446c', K: '#000000', g: '#5daa99', k: '#c59154', d: '#905937' };
-  /* the ten seekers that can wake in the mycelium: each mini takes its colours from the seeker's colorway */
-  const SEEKERS = (global.DWELLER_SEEKERS || [{ id: 1895 }]);
-  let seekerId = SEEKERS[0].id;
-  function miniColours(m) {
-    if (!m || !m.cw || m.id === 1895) return MINI_COL;
-    const c = m.cw;
+  /* any of the 2,222 SEEKER NET seekers can wake in the mycelium: NET holds every token's traits (one character per
+     trait, in NET.keys order, indexing NET.names) and IMG.seekernet holds every portrait, 54 x 54, in token order */
+  const NET = global.DWELLER_SEEKERS && global.DWELLER_SEEKERS.t ? global.DWELLER_SEEKERS : null;
+  const NETN = NET ? NET.t.length : 1;
+  const B62 = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  function seekerTraits(id) {
+    if (!NET || !(id >= 1 && id <= NETN)) return null;
+    const c = NET.t[id - 1], o = {};
+    NET.keys.forEach((k, i) => { o[k] = NET.names[k][B62.indexOf(c[i])]; });
+    return o;
+  }
+  let seekerId = 1895;
+  function miniColours(id) {
+    const tr = seekerTraits(id);
+    if (!tr || id === 1895 || !NET.cw[tr.Colorway]) return MINI_COL;
+    const c = NET.cw[tr.Colorway];
     return { r: c.X, a: '#485f67', L: shade(c.B, 0.3), B: c.B, S: c.D, K: '#000000', g: c.T, k: c.P, d: c.D };
   }
   let MCOL = MINI_COL;
@@ -867,12 +877,87 @@
     setSeeker(seekerId);
   }
   function setSeeker(id) {
-    const m = SEEKERS.find(q => q.id === id) || SEEKERS[0];
-    seekerId = m.id; MCOL = miniColours(m);
+    seekerId = id >= 1 && id <= NETN ? id : 1895; MCOL = miniColours(seekerId);
     SHEETS.mini = miniCanvas(false); SHEETS.miniOff = miniCanvas(true);
+    SHEETS.seek = IMG.seekernet && NET ? seekerSmall(seekerId) : null;
+  }
+  /* the companion is the seeker's own art at a little under a third of its size (54 px to 15): each block takes its
+     most common colour, but a bright detail (an eye, a light) in the block wins, so the face survives. It is shrunk
+     twice, with its eyes and with them shut (IMG.seekerlids holds, for every seeker, the pixels that change when its
+     screen is blank), so it can blink, go blank while it recharges, and sleep */
+  const lum = (r, g, b) => 0.3 * r + 0.59 * g + 0.11 * b;
+  function shrinkSeeker(d, F, N) {
+    const out = new Uint8ClampedArray(N * N * 4);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const cnt = new Map(); let op = 0, best = null, bn = 0, bright = null, bl = 0;
+      const bx0 = Math.floor(x * F), bx1 = Math.min(54, Math.max(bx0 + 1, Math.floor((x + 1) * F)));
+      const by0 = Math.floor(y * F), by1 = Math.min(54, Math.max(by0 + 1, Math.floor((y + 1) * F))), all = (bx1 - bx0) * (by1 - by0);
+      for (let j = by0; j < by1; j++) for (let q = bx0; q < bx1; q++) {
+        const o = (j * 54 + q) * 4;
+        if (!d[o + 3]) continue;
+        op++;
+        const key = (d[o] << 16) | (d[o + 1] << 8) | d[o + 2], n = (cnt.get(key) || 0) + 1; cnt.set(key, n);
+        if (n > bn) { bn = n; best = key; }
+        const L = lum(d[o], d[o + 1], d[o + 2]); if (L > bl) { bl = L; bright = key; }
+      }
+      if (!op) continue;
+      let c = best;
+      if (bright !== null && bl > lum(best >> 16, (best >> 8) & 255, best & 255) + 90 && bl > 150) c = bright;
+      else if (op * 1.8 < all) continue;                // mostly empty: leave it out, so the outline stays crisp
+      const o = (y * N + x) * 4;
+      out[o] = c >> 16; out[o + 1] = (c >> 8) & 255; out[o + 2] = c & 255; out[o + 3] = 255;
+    }
+    return out;
+  }
+  function seekerSmall(id) {
+    const i = id - 1, src = document.createElement('canvas'); src.width = 54; src.height = 54;
+    const sx = src.getContext('2d'), tx = (i % NET.cols) * 54, ty = Math.floor(i / NET.cols) * 54;
+    sx.drawImage(IMG.seekernet, tx, ty, 54, 54, 0, 0, 54, 54);
+    const full = sx.getImageData(0, 0, 54, 54).data;
+    if (IMG.seekerlids) sx.drawImage(IMG.seekerlids, tx, ty, 54, 54, 0, 0, 54, 54);
+    const bare = sx.getImageData(0, 0, 54, 54).data;
+    const F = 3.6, N = Math.round(54 / F);
+    const A = shrinkSeeker(full, F, N), B = shrinkSeeker(bare, F, N);
+    let x0 = N, y0 = N, x1 = -1, y1 = -1;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (A[(y * N + x) * 4 + 3] || B[(y * N + x) * 4 + 3]) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+    const w = x1 - x0 + 1, h = y1 - y0 + 1;
+    const E = [];
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const o = (y * N + x) * 4; if (A[o] !== B[o] || A[o + 1] !== B[o + 1] || A[o + 2] !== B[o + 2] || A[o + 3] !== B[o + 3]) E.push([x - x0, y - y0]); }
+    const mk = (P, fn) => {
+      const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
+      const img = x.createImageData(w, h);
+      for (let y = 0; y < h; y++) for (let q = 0; q < w; q++) { const a = ((y + y0) * N + q + x0) * 4, b2 = (y * w + q) * 4; for (let k = 0; k < 4; k++) img.data[b2 + k] = P[a + k]; }
+      x.putImageData(img, 0, 0); if (fn) fn(x); return c;
+    };
+    const on = mk(A), shut = mk(B), cool = mk(B);
+    const off = mk(B, (x) => { x.globalCompositeOperation = 'source-atop'; x.fillStyle = 'rgba(6,8,14,0.6)'; x.fillRect(0, 0, w, h); });
+    let ex = w / 2, ey = h / 2; if (E.length) { ex = E.reduce((a, e) => a + e[0], 0) / E.length; ey = E.reduce((a, e) => a + e[1], 0) / E.length; }
+    return { on, shut, cool, off, w, h, ex: Math.round(ex), ey: Math.round(ey) };
   }
   /* draws the companion; mode: 'on' (eyes), 'off' (dormant battery), 'cool' (recharging bar) */
   function drawMini(ctx, x, y, time, mode, face, k) {
+    const sk = SHEETS.seek;
+    if (sk) {
+      x = Math.round(x); y = Math.round(y);
+      const bob = Math.round(Math.sin(time * 3.1) * 0.8);
+      const blink = (time % 3.7) < 0.12;
+      const cv = mode === 'off' ? sk.off : mode === 'cool' ? sk.cool : blink ? sk.shut : sk.on;
+      const flip = face < 0, X = -Math.floor(sk.w / 2), Y = -Math.floor(sk.h / 2) + bob;
+      ctx.save(); ctx.translate(x, y); if (flip) ctx.scale(-1, 1);
+      ctx.drawImage(cv, X, Y);
+      if (mode === 'off' && Math.floor(time * 1.5) % 2 === 0) { ctx.fillStyle = '#a2324e'; ctx.fillRect(X + sk.ex - 1, Y + sk.ey, 2, 1); }
+      ctx.restore();
+      if (mode === 'cool') {
+        // the charge, as a thin bar under it
+        const bw = Math.max(5, Math.min(9, sk.w - 4)), bx = x - (bw >> 1), by = y + Math.ceil(sk.h / 2) + bob + 1;
+        ctx.fillStyle = '#1b3a40'; ctx.fillRect(bx, by, bw, 1);
+        ctx.fillStyle = '#5daa99'; ctx.fillRect(bx, by, Math.max(0, Math.round(bw * (k || 0))), 1);
+      }
+      return;
+    }
+    drawMiniOld(ctx, x, y, time, mode, face, k);
+  }
+  function drawMiniOld(ctx, x, y, time, mode, face, k) {
     x = Math.round(x); y = Math.round(y);
     const bob = Math.round(Math.sin(time * 3.1) * 0.8), kb = Math.round(Math.sin(time * 3.1 + 1.2) * 1);
     const cv = mode === 'off' ? SHEETS.miniOff : SHEETS.mini;
@@ -897,10 +982,11 @@
     ctx.restore();
   }
   /* the unlock card: the real SEEKER NET art */
-  function drawPortrait(ctx, x, y, scale, alpha) {
-    const im = IMG['seeker' + seekerId] || IMG.seeker1895; if (!im) return;
+  function drawPortrait(ctx, x, y, scale, alpha, id) {
+    const im = IMG.seekernet; if (!im || !NET) return;
+    const i = (id || seekerId) - 1, cols = NET.cols;
     ctx.globalAlpha = alpha === undefined ? 1 : alpha;
-    ctx.drawImage(im, Math.round(x - 27 * scale), Math.round(y - 27 * scale), 54 * scale, 54 * scale);
+    ctx.drawImage(im, (i % cols) * 54, Math.floor(i / cols) * 54, 54, 54, Math.round(x - 27 * scale), Math.round(y - 27 * scale), 54 * scale, 54 * scale);
     ctx.globalAlpha = 1;
   }
 
@@ -1558,6 +1644,6 @@
   global.DwellerRender = {
     PAL, load, prepare, drawScene, drawText, textWidth, textSprite, spawn, updateParticles, markTether, tickTethers,
     SHEETS, IMG, parts, hsl, hash2, SHARDS, THEMES, drawGem, drawShard, drawMini, drawPortrait, shade,
-    get theme() { return TH; }, SEEKERS, setSeeker, BREATH, get seekerId() { return seekerId; }, resetTethers() { tetherT = {}; }, noteBounce, guardianBurst, clearGuardian() { gBits.length = 0; },
+    get theme() { return TH; }, NETN, NET, seekerTraits, setSeeker, drawFrame, drawPlayer, drawParticles, BREATH, get seekerId() { return seekerId; }, resetTethers() { tetherT = {}; }, noteBounce, guardianBurst, clearGuardian() { gBits.length = 0; },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -8,7 +8,7 @@ the door to the final depth opens.
 - **Play:** open `dist/dweller.html` in any browser. It is one self-contained file: code, art and
   procedurally generated music are all inside.
 - **Controls:** A/D or arrows move · Space jump · S roll/crawl · E send the SEEKER (once found) ·
-  Esc pause (N new descent, Q map) · M mute · F fullscreen. Touch and gamepads work too.
+  Esc pause (N new descent, Q town) · M mute · F fullscreen. Touch and gamepads work too.
 
 ## The levels
 
@@ -25,20 +25,27 @@ the door to the final depth opens.
 New pieces along the way: one-way shelves you can drop through, bounce caps, slick glass, vines to climb,
 hot-air vents, and hush stones that put nearby lights to sleep for a few beats.
 
-Each level is unlocked by beating the one before. The map shows an orb for every level, lit in the
-colour of its sliver once beaten.
+**The town.** Between descents you walk a hollow village in a dead wood under the mountains. Every level
+is a door somewhere in town (a house, a hollow tree, a ring of glass, a forge, an ember hut, an arch of
+thorns); a door is sealed until the level before it is beaten, and glows in the colour of its sliver once
+you have it. Walk up to a door and press E (ENTER on touch) to descend; N starts it from the top. The great
+door under the mountain takes the whole crystal: bring all six slivers, set them, and it opens onto the
+Core. Wooden signs at the edge of town show the controls. A few residents have things to say, and the town
+keeps three quiet secrets.
 
-**The SEEKER.** Somewhere in level II a wall is not stone. Behind it sleeps SEEKER NET #1895. Wake it
+**The SEEKER.** Somewhere in level II a wall is not stone. Behind it sleeps a seeker from SEEKER NET, any one of all 2,222, rolled for your save. Wake it
 and it follows you; press E and it flies to the nearest light and covers it for a few beats (an
 eclipse), then needs a moment to recharge. Every level can be beaten without it.
 
 ## Source
 
 - `src/` — the game: `sim.js` (deterministic 96 Hz simulation, also runs in Node), `render.js`,
-  `audio.js` (Web Audio, Seeker 48 Hz tuning), `main.js` (map, menus, input).
+  `audio.js` (Web Audio, Seeker 48 Hz tuning), `main.js` (menus, input, flow), `town.js` (the town above the descent).
 - `tools/` — `level1.py` … `level6.py` build the levels with `levelkit.py`; `bot.js` is a search bot
-  that proves every level can be beaten; `build.py` bundles everything into `dist/dweller.html`.
-- `test/` — browser checks with Playwright (replays of the bot's solutions, map flow, the companion).
+  that proves every level can be beaten; `build.py` bundles everything into `dist/dweller.html`;
+  `seekernet.py` draws all 2,222 SEEKER NET seekers from the collection's layers into `assets/seeker/net.png`
+  (with their traits in `net.json`, and in `net_lids.png` the pixels that change when each one shuts its eyes).
+- `test/` — browser checks with Playwright (replays of the bot's solutions, the town, the companion).
 
 Build: `python3 tools/levelN.py` for each level (writes `build/levelN.json`), then
 `python3 tools/build.py`. The build first runs `node tools/bake_levels.cjs`, which bakes every level's terrain
@@ -49,5 +56,5 @@ The Seeker with `python3 tools/extract_ice_tiling.py path/to/the-seeker tools/ic
 ## Credits and licence
 
 Code is MIT. Includes or adapts assets from The Seeker by The Seeker contributors, licensed CC BY 4.0
-(https://github.com/TheSeekerGame/the-seeker). The companion is drawn from SEEKER NET #1895
-(https://github.com/TheSeekerGame/collections). Changes were made where applicable.
+(https://github.com/TheSeekerGame/the-seeker). The companion is any SEEKER NET seeker, drawn from the collection's layers
+(https://github.com/TheSeekerGame/collections). The town's residents are The Seeker's collector, exile and monk. Changes were made where applicable.
