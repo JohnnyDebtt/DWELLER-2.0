@@ -27,7 +27,7 @@
     // the SEEKER companion: flies to a light and covers it (an eclipse)
     CMPV: 2.9, CMPHOLD: 480, CMPCD: 224, CMPR: 120,
     // terrain features of the deeper levels
-    BOUNCE: 262, ICEACC: 0.16, ICEFRIC: 0.06, CLIMBUP: 44, CLIMBDN: 80, SHIMMY: 38, SNAPV: 90,
+    BOUNCE: 262, ICEACC: 0.16, ICEFRIC: 0.06, CLIMBUP: 44, CLIMBDN: 80, SHIMMY: 38, SNAPV: 90, LEAN: 1.5, SPRK: 170, SPRD: 16, SWAYMAX: 2.4,
     VENTACC: 1500, VENTMAX: 150, DROP: 10,
   };
   const TT = { ONEWAY: 1, BOUNCE: 2, ICE: 3 };
@@ -497,10 +497,14 @@
         s.vx = dirIn * C.CRAWL; if (dirIn) s.face = dirIn;
       }
     } else if (s.climb) {
-      // held to the middle of the strand: no sliding sideways, only facing
-      const cx = Math.floor((s.x + C.W / 2) / TS) * TS + TS / 2 - C.W / 2, d = cx - s.x;
-      s.vx = Math.abs(d) < 0.05 ? 0 : Math.max(-C.SNAPV, Math.min(C.SNAPV, d / DT));
-      if (Math.abs(d) < 0.05) s.x = cx;
+      // hung from the middle of the strand on a soft spring: you swing in a little when you catch it,
+      // lean a pixel or two toward where you are pressing, and settle back; you can't slide off sideways
+      const cx = Math.floor((s.x + C.W / 2) / TS) * TS + TS / 2 - C.W / 2;
+      const tx = cx + dirIn * C.LEAN;
+      s.vx += ((tx - s.x) * C.SPRK - s.vx * C.SPRD) * DT;
+      if (s.vx > C.SNAPV) s.vx = C.SNAPV; else if (s.vx < -C.SNAPV) s.vx = -C.SNAPV;
+      const off = s.x + s.vx * DT - cx;
+      if (Math.abs(off) > C.SWAYMAX) { s.x = cx + Math.sign(off) * C.SWAYMAX - s.vx * DT; s.vx *= -0.3; }
       if (dirIn) s.face = dirIn;
     } else if (s.wlock > 0) {
       // keep wall-jump impulse, allow small steering

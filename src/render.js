@@ -632,10 +632,13 @@
     return ['breath', 0];
   }
 
+  let sceneTime = 0;
   function drawPlayer(ctx, s, camX, camY, pass, flash) {
     const [name, idx] = playerFrame(s);
     const sh = SHEETS[pass === 'visor' ? name + 'V' : name];
-    const fx = Math.round(s.x + 2.5 - camX), fy = Math.round(s.y + s.h - camY);
+    let fx = Math.round(s.x + 2.5 - camX); const fy = Math.round(s.y + s.h - camY);
+    // on a strand you sway with it, the way the vine is drawn swaying
+    if (s.st === 'climb' && TH.style !== 'foundry' && TH.style !== 'ember') fx += Math.round(Math.sin(sceneTime * 1.2 + (s.y + 3) * 0.09) * 1.2);
     const flip = s.st === 'wall' ? s.wdir < 0 : s.st === 'climb' ? s.face > 0 : s.face < 0;
     drawFrame(ctx, sh, idx, fx, fy, flip);
     if (pass === 'body' && flash > 0.02) {
@@ -1261,7 +1264,7 @@
   }
 
   function drawScene(ctx, Gm, camX, camY, W, H) {
-    const w = Gm.w, s = Gm.s, time = Gm.time;
+    const w = Gm.w, s = Gm.s, time = Gm.time; sceneTime = time;
     drawBackground(ctx, w, camX, camY, W, H, time);
     drawDecorBack(ctx, w, camX, camY, W, H, time);
     // objects behind the player
