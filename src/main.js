@@ -205,7 +205,7 @@
     const cw = Math.max(2, Math.round(innerWidth * DPR)), ch = Math.max(2, Math.round(innerHeight * DPR));
     canvas.width = cw; canvas.height = ch;
     canvas.style.width = innerWidth + 'px'; canvas.style.height = innerHeight + 'px';
-    SC = Math.max(1, Math.round(ch / (cur === CORE && mode !== 'town' && mode !== 'title' ? 360 : 230)));   // the Guardian's arena is seen from further back
+    SC = Math.max(1, Math.round(ch / (cur === CORE && mode !== 'town' && mode !== 'title' ? 360 : (window.__viewH || 230))));   // the Guardian's arena is seen from further back
     LW = Math.ceil(cw / SC) + 1; LH = Math.ceil(ch / SC) + 1;
     off.width = LW; off.height = LH;
     octx.imageSmoothingEnabled = false; gctx.imageSmoothingEnabled = false;
@@ -382,6 +382,7 @@
     if (n >= 12) tAcc = 0;
     R.updateParticles(dt);
     const t = townCamTarget(), kx = 1 - Math.exp(-dt * 5.5), ky = 1 - Math.exp(-dt * 4.5);
+    if (window.__townCam !== undefined) { t[0] = Math.max(0, Math.min(T.WPX - LW, window.__townCam - LW / 2)); }   // (for pictures of the town)
     tcamX += (t[0] - tcamX) * kx; tcamY += (t[1] - tcamY) * ky;
     const nn = townNear(), key = nn ? nn.k + (nn.i !== undefined ? nn.i : nn.q ? nn.q.id : '') : '';
     if (key !== nearKey) {
@@ -491,6 +492,7 @@
       }
     }
     if (townMsgT < 3) lines.push([townMsg, '#d6b98a']);
+    if (window.__clean) lines.length = 0;                // (for pictures of the town)
     if (lines.length && near) {
       let y = Math.round(near.y + 8 - cy - lines.length * LH7);
       y = Math.max(4, y);
@@ -501,7 +503,7 @@
       }
     } else if (townMsgT < 3) ht(townMsg, LW >> 1, LH - 14, '#d6b98a', 'center', Math.min(1, (3 - townMsgT) * 2));
     // a small count in the corner
-    if (mode === 'town') {
+    if (mode === 'town' && !window.__clean) {
       ctx.globalAlpha = Math.min(1, Math.max(0, titleOut - 0.4)) * 0.8;
       R.drawGem(ctx, LW - 12, 11, 0.25, P.beaten, gameTime, count() >= NL);
       ht(count() + '/6', LW - 19, 9, '#6b7280', 'right', ctx.globalAlpha);
@@ -529,6 +531,10 @@
   function drawTitleText(ctx, a) {
     const cx = LW >> 1; let y = Math.round(LH * 0.16);
     const sc = Math.max(1, Math.min(3, Math.floor(LH / 90), Math.floor((LW - 12) / (R.textWidth('DWELLER') * 2))));
+    if (window.__clean) {                               // (for pictures of the town: the name alone)
+      ht('DWELLER', cx, Math.round(LH * (window.__logoY || 0.12)), PAL.snow, 'center', a, window.__logoSc || sc * 2);
+      return;
+    }
     const g = ctx.createLinearGradient(0, 0, 0, LH * 0.6);
     g.addColorStop(0, 'rgba(3,4,8,' + (0.55 * a).toFixed(3) + ')'); g.addColorStop(1, 'rgba(3,4,8,0)');
     ctx.fillStyle = g; ctx.fillRect(0, 0, LW, LH * 0.6);
@@ -904,7 +910,7 @@
       get state() { return S; }, get world() { return world; }, get mode() { return mode; }, get level() { return cur; }, get progress() { return P; },
       start(fresh) { startLevel(cur < 0 ? 0 : cur, !!fresh); },
       startLevel(i, fresh) { startLevel(i, fresh === undefined ? true : !!fresh); },
-      map() { toTown(); }, town(f) { toTown(f); }, get townState() { return tS; }, get near() { return near; }, interact(f) { townInteract(!!f); }, teleportTown(x, y) { tS.x = x; tS.y = y; snapTown(); },
+      map() { toTown(); }, title() { toTitle(); }, town(f) { toTown(f); }, get townState() { return tS; }, get near() { return near; }, interact(f) { townInteract(!!f); }, teleportTown(x, y) { tS.x = x; tS.y = y; snapTown(); },
       setProgress(o) { Object.assign(P, o); saveProgress(); },
       replay(inputs, speed) { replay = inputs; replayI = 0; speedMul = speed || 1; },
       setSpeed(v) { speedMul = v; },

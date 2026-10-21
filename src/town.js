@@ -515,24 +515,31 @@
   }
 
   /* the watching eyes in the near wood: only there when you stand perfectly still, and they blink */
-  const EYES = [[180, 168], [520, 150], [860, 172], [1210, 160], [1500, 175]];
+  // one face only, deep in the wood behind the first half of town
+  // one face only. It drifts with you through the wood unseen; when it shows, it settles near you and stays put
+  const FACE = { ex: null, ey: 158 };
   function drawEyes(ctx, L, camX, dy, LW, still, time, px) {
     const k = Math.max(0, Math.min(1, (still - 6) / 2));
-    if (k <= 0) return;
+    if (k <= 0) { FACE.ex = null; return; }
     const orb = R.IMG.g255_orb, eyes = R.IMG.g255_eyes, body = R.IMG.g255_body;
-    for (const [ex, ey] of EYES) {
+    if (FACE.ex === null) {
+      // a little to one side of the Dweller, toward the middle of the view so the whole face is on screen
+      const X = Math.max(34, Math.min(LW - 34, px + (px < LW / 2 ? 1 : -1) * (60 + Math.random() * 40)));
+      FACE.ex = X + camX * L.p;
+    }
+    for (const [ex, ey] of [[FACE.ex, FACE.ey]]) {
       const X = Math.round(ex - camX * L.p), Y = Math.round(ey + dy);
       if (X < -40 || X > LW + 40) continue;
       const cyc = (time + ex * 0.01) % 4.2, shut = cyc < 0.14 || (cyc > 0.4 && cyc < 0.5);
       // the Guardian's own face, half hidden among the trunks: its dark orb, a ghost of its shields, its two crescents
-      ctx.globalAlpha = k * 0.22; if (body) ctx.drawImage(body, X - 27, Y - 27);
-      ctx.globalAlpha = k * 0.9; if (orb) ctx.drawImage(orb, X - 27, Y - 27);
+      ctx.globalAlpha = k * 0.14; if (body) ctx.drawImage(body, X - 27, Y - 27);
+      ctx.globalAlpha = k * 0.7; if (orb) ctx.drawImage(orb, X - 27, Y - 27);
       ctx.globalCompositeOperation = 'lighter';
-      glow(ctx, X - 5, Y, 16, '#dfe8f0', 0.16 * k);
+      glow(ctx, X - 5, Y, 16, '#dfe8f0', 0.10 * k);
       ctx.globalCompositeOperation = 'source-over';
       // it glances toward the Dweller
       const look = Math.max(-2, Math.min(2, Math.round((px - X) / 60)));
-      ctx.globalAlpha = k;
+      ctx.globalAlpha = k * 0.8;
       if (eyes) {
         if (shut) ctx.drawImage(eyes, 18, 27, 8, 1, X - 9 + look, Y, 8, 1);       // a thin line while it blinks
         else ctx.drawImage(eyes, X - 27 + look, Y - 27);
