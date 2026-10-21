@@ -3615,24 +3615,31 @@ body.cmp #tbE{display:flex}
   }
 
   /* the watching eyes in the near wood: only there when you stand perfectly still, and they blink */
-  const EYES = [[180, 168], [520, 150], [860, 172], [1210, 160], [1500, 175]];
+  // one face only, deep in the wood behind the first half of town
+  // one face only. It drifts with you through the wood unseen; when it shows, it settles near you and stays put
+  const FACE = { ex: null, ey: 158 };
   function drawEyes(ctx, L, camX, dy, LW, still, time, px) {
     const k = Math.max(0, Math.min(1, (still - 6) / 2));
-    if (k <= 0) return;
+    if (k <= 0) { FACE.ex = null; return; }
     const orb = R.IMG.g255_orb, eyes = R.IMG.g255_eyes, body = R.IMG.g255_body;
-    for (const [ex, ey] of EYES) {
+    if (FACE.ex === null) {
+      // a little to one side of the Dweller, toward the middle of the view so the whole face is on screen
+      const X = Math.max(34, Math.min(LW - 34, px + (px < LW / 2 ? 1 : -1) * (60 + Math.random() * 40)));
+      FACE.ex = X + camX * L.p;
+    }
+    for (const [ex, ey] of [[FACE.ex, FACE.ey]]) {
       const X = Math.round(ex - camX * L.p), Y = Math.round(ey + dy);
       if (X < -40 || X > LW + 40) continue;
       const cyc = (time + ex * 0.01) % 4.2, shut = cyc < 0.14 || (cyc > 0.4 && cyc < 0.5);
       // the Guardian's own face, half hidden among the trunks: its dark orb, a ghost of its shields, its two crescents
-      ctx.globalAlpha = k * 0.22; if (body) ctx.drawImage(body, X - 27, Y - 27);
-      ctx.globalAlpha = k * 0.9; if (orb) ctx.drawImage(orb, X - 27, Y - 27);
+      ctx.globalAlpha = k * 0.14; if (body) ctx.drawImage(body, X - 27, Y - 27);
+      ctx.globalAlpha = k * 0.7; if (orb) ctx.drawImage(orb, X - 27, Y - 27);
       ctx.globalCompositeOperation = 'lighter';
-      glow(ctx, X - 5, Y, 16, '#dfe8f0', 0.16 * k);
+      glow(ctx, X - 5, Y, 16, '#dfe8f0', 0.10 * k);
       ctx.globalCompositeOperation = 'source-over';
       // it glances toward the Dweller
       const look = Math.max(-2, Math.min(2, Math.round((px - X) / 60)));
-      ctx.globalAlpha = k;
+      ctx.globalAlpha = k * 0.8;
       if (eyes) {
         if (shut) ctx.drawImage(eyes, 18, 27, 8, 1, X - 9 + look, Y, 8, 1);       // a thin line while it blinks
         else ctx.drawImage(eyes, X - 27 + look, Y - 27);
@@ -4107,7 +4114,7 @@ body.cmp #tbE{display:flex}
     const cw = Math.max(2, Math.round(innerWidth * DPR)), ch = Math.max(2, Math.round(innerHeight * DPR));
     canvas.width = cw; canvas.height = ch;
     canvas.style.width = innerWidth + 'px'; canvas.style.height = innerHeight + 'px';
-    SC = Math.max(1, Math.round(ch / (cur === CORE && mode !== 'town' && mode !== 'title' ? 360 : 230)));   // the Guardian's arena is seen from further back
+    SC = Math.max(1, Math.round(ch / (cur === CORE && mode !== 'town' && mode !== 'title' ? 360 : (window.__viewH || 230))));   // the Guardian's arena is seen from further back
     LW = Math.ceil(cw / SC) + 1; LH = Math.ceil(ch / SC) + 1;
     off.width = LW; off.height = LH;
     octx.imageSmoothingEnabled = false; gctx.imageSmoothingEnabled = false;
@@ -4284,6 +4291,7 @@ body.cmp #tbE{display:flex}
     if (n >= 12) tAcc = 0;
     R.updateParticles(dt);
     const t = townCamTarget(), kx = 1 - Math.exp(-dt * 5.5), ky = 1 - Math.exp(-dt * 4.5);
+    if (window.__townCam !== undefined) { t[0] = Math.max(0, Math.min(T.WPX - LW, window.__townCam - LW / 2)); }   // (for pictures of the town)
     tcamX += (t[0] - tcamX) * kx; tcamY += (t[1] - tcamY) * ky;
     const nn = townNear(), key = nn ? nn.k + (nn.i !== undefined ? nn.i : nn.q ? nn.q.id : '') : '';
     if (key !== nearKey) {
@@ -4393,6 +4401,7 @@ body.cmp #tbE{display:flex}
       }
     }
     if (townMsgT < 3) lines.push([townMsg, '#d6b98a']);
+    if (window.__clean) lines.length = 0;                // (for pictures of the town)
     if (lines.length && near) {
       let y = Math.round(near.y + 8 - cy - lines.length * LH7);
       y = Math.max(4, y);
@@ -4403,7 +4412,7 @@ body.cmp #tbE{display:flex}
       }
     } else if (townMsgT < 3) ht(townMsg, LW >> 1, LH - 14, '#d6b98a', 'center', Math.min(1, (3 - townMsgT) * 2));
     // a small count in the corner
-    if (mode === 'town') {
+    if (mode === 'town' && !window.__clean) {
       ctx.globalAlpha = Math.min(1, Math.max(0, titleOut - 0.4)) * 0.8;
       R.drawGem(ctx, LW - 12, 11, 0.25, P.beaten, gameTime, count() >= NL);
       ht(count() + '/6', LW - 19, 9, '#6b7280', 'right', ctx.globalAlpha);
@@ -4431,6 +4440,10 @@ body.cmp #tbE{display:flex}
   function drawTitleText(ctx, a) {
     const cx = LW >> 1; let y = Math.round(LH * 0.16);
     const sc = Math.max(1, Math.min(3, Math.floor(LH / 90), Math.floor((LW - 12) / (R.textWidth('DWELLER') * 2))));
+    if (window.__clean) {                               // (for pictures of the town: the name alone)
+      ht('DWELLER', cx, Math.round(LH * (window.__logoY || 0.12)), PAL.snow, 'center', a, window.__logoSc || sc * 2);
+      return;
+    }
     const g = ctx.createLinearGradient(0, 0, 0, LH * 0.6);
     g.addColorStop(0, 'rgba(3,4,8,' + (0.55 * a).toFixed(3) + ')'); g.addColorStop(1, 'rgba(3,4,8,0)');
     ctx.fillStyle = g; ctx.fillRect(0, 0, LW, LH * 0.6);
@@ -4806,7 +4819,7 @@ body.cmp #tbE{display:flex}
       get state() { return S; }, get world() { return world; }, get mode() { return mode; }, get level() { return cur; }, get progress() { return P; },
       start(fresh) { startLevel(cur < 0 ? 0 : cur, !!fresh); },
       startLevel(i, fresh) { startLevel(i, fresh === undefined ? true : !!fresh); },
-      map() { toTown(); }, town(f) { toTown(f); }, get townState() { return tS; }, get near() { return near; }, interact(f) { townInteract(!!f); }, teleportTown(x, y) { tS.x = x; tS.y = y; snapTown(); },
+      map() { toTown(); }, title() { toTitle(); }, town(f) { toTown(f); }, get townState() { return tS; }, get near() { return near; }, interact(f) { townInteract(!!f); }, teleportTown(x, y) { tS.x = x; tS.y = y; snapTown(); },
       setProgress(o) { Object.assign(P, o); saveProgress(); },
       replay(inputs, speed) { replay = inputs; replayI = 0; speedMul = speed || 1; },
       setSpeed(v) { speedMul = v; },
