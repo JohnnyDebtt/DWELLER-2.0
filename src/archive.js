@@ -18,7 +18,7 @@
 
   /* the towers, built once into one picture */
   function towersOf(L) {
-    const sh = (L.tiles && L.tiles.oneway) || [];
+    const sh = ((L.tiles && L.tiles.oneway) || []).filter(s => s[1] < 90);   // (the bridge over the hole is not a balcony)
     const side = (f) => { const q = sh.filter(f); return { x0: Math.min(...q.map(s => s[0])) * TS, x1: Math.max(...q.map(s => s[0] + s[2])) * TS, rows: [...new Set(q.map(s => s[1]))].sort((a, b) => a - b).map(r => r * TS) }; };
     return [Object.assign(side(s => s[0] < 140), { inner: 'right' }), Object.assign(side(s => s[0] > 140), { inner: 'left' })];
   }

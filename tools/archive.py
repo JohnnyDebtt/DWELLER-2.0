@@ -106,6 +106,10 @@ else:
              (170.5, 85), (182, 92), (192, 92), (85, 85)]
     alcoves = fight_alcoves
 
+# a glass bridge over the Guardian's hole: walk across it, press down to drop through into The Deep
+if VARIANT == 'balconies':
+    oneway.append([134, FLOOR_ROW, 11])
+
 # the pedestal for the newest find, at the edge of the hole
 rock(127, 91, 4, 1)
 ow = set((x, y) for (x0, y, w) in oneway for x in range(x0, x0 + w))

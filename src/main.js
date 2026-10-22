@@ -852,16 +852,34 @@
     if (ARCH.focus && ARCH.iris > 0.2) {
       const id = ARCH.focus;
       ctx.globalAlpha = Math.min(1, ARCH.iris * 1.4); Rr.drawPortrait(ctx, bx, by - 1, 0.9, ctx.globalAlpha, id); ctx.globalAlpha = 1;
-      const tr = Rr.seekerTraits(id) || {}, gd = gradeOf(id);
+      const tr = Rr.seekerTraits(id) || {}, gd = gradeOf(id), mine = P.seekerId, cmp = id !== mine && mine >= 1;
+      const myAb = cmp ? DP.abilities(Rr.seekerTraits(mine)) : [], theirAb = DP.abilities(tr);
+      const myWords = new Set(myAb.map(a => a[1])), theirWords = new Set(theirAb.map(a => a[1]));
+      // how it measures against the seeker you have now
+      let verdict = null;
+      if (cmp) { const d = scoreOf(id) - scoreOf(mine); verdict = d > 0.5 ? ['STRONGER THAN YOURS', '#9fe0a8'] : d < -0.5 ? ['WEAKER THAN YOURS', '#c99a9a'] : ['AS STRONG AS YOURS', '#a9b4bf']; }
       const lines = [['SEEKER NET  #' + id + '  -  ' + ((tr.Base || '') + '  ' + (tr.Colorway || '')).toUpperCase(), '#e6f2f0'], [gradeLine(id), DP.GRADE_COL[gd]]]
-        .concat(DP.abilities(tr).map(a => [a[1], '#bfe3dc']))
-        .concat([id === P.seekerId ? ['YOUR COMPANION', '#9fd3c7'] : [(touchMode ? 'ENTER' : 'E') + '  TAKE IT WITH YOU', PAL.gold]]);
-      const tw = Math.max(...lines.map(l => R.textWidth(l[0]))) * HS + 14, th = lines.length * L7 + 6, tx = bx - tw / 2;
-      const ty = S.y + S.h < A0.core[1] - 20 ? by - 58 - th : by + 58;        // above the ring when you are above it
+        .concat(verdict ? [verdict] : [])
+        .concat(theirAb.map(a => cmp && !myWords.has(a[1]) ? ['+ ' + a[1], '#c8f2d2'] : [a[1], '#bfe3dc']))      // what it would bring
+        .concat([id === mine ? ['YOUR COMPANION', '#9fd3c7'] : [(touchMode ? 'ENTER' : 'E') + '  TAKE IT WITH YOU', PAL.gold]]);
+      // the seeker you have now, in a smaller, quieter box beneath: no picture, its tier and what it does
+      const cur = cmp ? [['CURRENT SEEKER  #' + mine, '#7f9aa6'], [gradeLine(mine), DP.GRADE_COL[gradeOf(mine)]]]
+        .concat(myAb.map(a => theirWords.has(a[1]) ? [a[1], '#7f8e96'] : ['- ' + a[1], '#c4a3a3'])) : [];   // what you would give up
+      const tw = Math.max(...lines.map(l => R.textWidth(l[0]))) * HS + 14, th = lines.length * L7 + 6;
+      const cw = cur.length ? Math.max(...cur.map(l => R.textWidth(l[0]))) * HS + 12 : 0, chh = cur.length ? cur.length * L7 + 5 : 0, gap = cur.length ? 4 : 0;
+      const above = S.y + S.h < A0.core[1] - 20;
+      const ty = above ? by - 90 - th - gap - chh : by + 88;                   // clear of the Prime: above it when you are above it
+      const cy2 = ty + th + gap, tx = bx - tw / 2, cx2 = bx - cw / 2;
       ctx.globalCompositeOperation = 'lighter'; g(bx, ty + th / 2, tw * 0.7, '90,170,160', 0.12); ctx.globalCompositeOperation = 'source-over';
       ctx.fillStyle = 'rgba(8,20,22,0.82)'; ctx.fillRect(Math.round(tx), ty, Math.round(tw), th);
       ctx.fillStyle = 'rgba(150,230,215,0.5)'; ctx.fillRect(Math.round(tx), ty, Math.round(tw), 1); ctx.fillRect(Math.round(tx), ty + th - 1, Math.round(tw), 1);
-      lines.forEach((l, k) => ht(l[0], bx, ty + 4 + k * L7, l[1], 'center', k === lines.length - 1 && id !== P.seekerId ? 0.65 + 0.35 * Math.sin(time * 4) : 1));
+      lines.forEach((l, k) => ht(l[0], bx, ty + 4 + k * L7, l[1], 'center', k === lines.length - 1 && id !== mine ? 0.65 + 0.35 * Math.sin(time * 4) : 1));
+      if (cur.length) {
+        ctx.fillStyle = 'rgba(6,14,16,0.72)'; ctx.fillRect(Math.round(cx2), cy2, Math.round(cw), chh);
+        ctx.fillStyle = 'rgba(150,230,215,0.22)'; ctx.fillRect(Math.round(cx2), cy2, Math.round(cw), 1); ctx.fillRect(Math.round(cx2), cy2 + chh - 1, Math.round(cw), 1);
+        ctx.fillStyle = 'rgba(150,230,215,0.35)'; ctx.fillRect(Math.round(bx), cy2 - gap, 1, gap);                       // a thread joining the two
+        cur.forEach((l, k) => ht(l[0], bx, cy2 + 3 + k * L7, l[1], 'center', 0.9));
+      }
     } else {
       ht('THE', bx, by - 12, '#9fd3c7', 'center', 1);
       ht('CODEX', bx, by - 4, '#e6f2f0', 'center', 1, 2);
@@ -873,7 +891,7 @@
     ht('THE DEEP', hx, hy + 20, '#c9d6f0', 'center', 0.85);
     const RM = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
     if (P.deepBest) ht('DEEPEST  ' + RM[Math.min(8, P.deepBest)] + ' OF VIII', hx, hy + 20 + L7, '#6f7f9c', 'center', 0.7);
-    if (Math.abs(S.x + 2.5 - (A0.hole[0] + A0.hole[1]) / 2) < 40 && S.y + S.h <= A0.hole[2] + 2) ht('DROP IN TO DESCEND', hx, hy - 34, '#d6b98a', 'center', 0.6 + 0.4 * Math.sin(time * 3));
+    if (Math.abs(S.x + 2.5 - (A0.hole[0] + A0.hole[1]) / 2) < 40 && S.y + S.h <= A0.hole[2] + 2) ht((touchMode ? 'ROLL' : 'S') + '  DROP IN TO DESCEND', hx, hy - 34, '#d6b98a', 'center', 0.6 + 0.4 * Math.sin(time * 3));
   }
 
   /* ---- what is drawn over a Deep room: where you are, your wards, the upgrade choice, the end of a run */
