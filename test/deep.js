@@ -43,7 +43,14 @@ const path = require('path');
   // a run that ends in the light
   await page.evaluate(() => { const A0 = window.__dweller.world.level.archive; window.__dweller.teleport((A0.hole[0] + A0.hole[1]) / 2 - 2.5, A0.hole[2] + 10); });
   await page.waitForTimeout(3000);
+  await page.screenshot({ path: out + '/d10_lives.png' });
+  // the first death spends the spare life: the last tether takes you back
   await page.evaluate(() => { const s = window.__dweller.state; s.ex = 1.2; });
+  await page.waitForTimeout(2600);
+  console.log('after the first death', await st(), await page.evaluate(() => window.__dweller.state.dead));
+  await page.screenshot({ path: out + '/d11_spared.png' });
+  // the second ends the run
+  await page.evaluate(() => { const s = window.__dweller.state; s.grace = 0; s.ex = 1.2; });
   await page.waitForTimeout(2500);
   console.log('died', await st(), await page.evaluate(() => window.__dweller.progress.deepBest));
   await page.screenshot({ path: out + '/d10_over.png' });

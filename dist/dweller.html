@@ -3544,6 +3544,8 @@ body.cmp #tbE{display:flex}
     { id: 'ward', name: 'WARD', text: 'THE NEXT FULL BURN IS TAKEN FROM YOU', m: { shield: 1 }, max: 3 },
     { id: 'still', name: 'STILLNESS', text: 'A SAFE BREATH AT THE START OF EVERY ROOM', m: { grace: 2.5 }, max: 1 },
     { id: 'feather', name: 'FEATHER', text: 'YOU FALL MORE SLOWLY', m: { fall: 0.8 }, max: 2 },
+    // very rare: it turns up in about one offer in twenty, once a run
+    { id: 'life', name: 'ANOTHER LIFE', text: 'ONE MORE SPARE LIFE FOR THIS RUN', m: {}, max: 1, rare: 0.05 },
   ];
 
   const ADD = { shield: 1, air: 1, rare: 1 };
@@ -3572,7 +3574,7 @@ body.cmp #tbE{display:flex}
   /* three different upgrades you can still take */
   function offer(rand, picks) {
     const count = (id) => (picks || []).filter(p => p === id).length;
-    const pool = UPGRADES.filter(u => count(u.id) < u.max);
+    const pool = UPGRADES.filter(u => count(u.id) < u.max && (!u.rare || rand() < u.rare));
     const out = [];
     while (out.length < 3 && pool.length) out.push(pool.splice(Math.floor(rand() * pool.length), 1)[0]);
     return out;
@@ -3597,14 +3599,38 @@ body.cmp #tbE{display:flex}
   function tierFor(n) { return n < 5 ? 0 : n < 10 ? 1 : n < 20 ? 2 : n < 35 ? 3 : 4; }
   const TIER_NAMES = ['GENTLE', 'DEEPENING', 'HARSH', 'CRUEL', 'THE CEILING'];
 
-  /* a run: two strata, one after the other going down, four rooms from each, in a random order */
+  /* a run: two strata, one after the other going down, four rooms from each. Never the same room twice, and the
+     four from a stratum are the ones least alike, in the order that keeps neighbours apart: a stratum has only five
+     kinds of stretch, so rooms must share some, but two rooms in a row never open with the same one and share as
+     few as they can */
+  const piecesOf = (r) => (r.sections || []).map(q => q.title).filter(t => t !== 'IN' && t !== 'DOWN');
+  function bestFour(rand, list, n) {
+    if (list.length <= n) return list.slice();
+    const P = list.map(piecesOf);
+    let best = null, bestS = Infinity;
+    const idx = list.map((_, i) => i);
+    const combos = []; (function go(a, k, cur) { if (cur.length === n) { combos.push(cur.slice()); return; } for (let i = a; i < idx.length; i++) { cur.push(i); go(i + 1, k, cur); cur.pop(); } })(0, n, []);
+    const perms = (a) => a.length <= 1 ? [a] : a.flatMap((x, i) => perms(a.slice(0, i).concat(a.slice(i + 1))).map(p => [x].concat(p)));
+    for (const c of combos) for (const o of perms(c)) {
+      let sc = rand() * 4;                                    // (a little chance in it, so runs still differ)
+      for (let i = 1; i < o.length; i++) {
+        const A = P[o[i - 1]], B = P[o[i]];
+        sc += A.filter(x => B.includes(x)).length * 2;        // shared stretches between neighbours
+        if (A[0] === B[0]) sc += 6;                           // the same opening
+        if (A[A.length - 1] === B[0]) sc += 4;                // one room ends as the next begins
+        for (let k = 0; k < Math.min(A.length, B.length); k++) if (A[k] === B[k]) sc += 1;
+      }
+      if (sc < bestS) { bestS = sc; best = o; }
+    }
+    return best.map(i => list[i]);
+  }
   function planRun(rand, rooms) {
     const by = STRATA.map(st => rooms.filter(r => r.theme === st));
     const ok = STRATA.map((_, i) => i).filter(i => i + 1 < STRATA.length && by[i].length >= 4 && by[i + 1].length >= 4);
     const s0 = ok.length ? ok[Math.floor(rand() * ok.length)] : 0;
-    const take = (list, n) => { const a = list.slice(); const out = []; while (out.length < n && a.length) out.push(a.splice(Math.floor(rand() * a.length), 1)[0]); return out; };
     const half = ROOMS_PER_RUN / 2;
-    return take(by[s0], half).concat(take(by[Math.min(STRATA.length - 1, s0 + 1)], half)).map(r => r.id);
+    const out = bestFour(rand, by[s0], half).concat(bestFour(rand, by[Math.min(STRATA.length - 1, s0 + 1)], half)).map(r => r.id);
+    return out.filter((id, i) => out.indexOf(id) === i);
   }
 
   /* the seeker sleeping at the bottom: one you have not found yet. Harder runs (and a Signal Mast) make a strong one
@@ -5393,7 +5419,7 @@ body.cmp #tbE{display:flex}
     const tier = DP.tierFor(P.codex.length);
     const m0 = DP.modsFor(tr, []);
     RUN = { rooms: DP.planRun(Math.random, DEEPROOMS), i: 0, picks: [], tier, ticks: 0, traits: tr, shields: m0.shield || 0, rare: m0.rare || 0,
-      music: 1 + Math.floor(Math.random() * 1e9), keys: deepKeys() };   // each descent its own music, and its own order of keys
+      music: 1 + Math.floor(Math.random() * 1e9), keys: deepKeys(), lives: 1, livesMax: 1, spared: false };   // one spare life a run: the last tether catches you once   // each descent its own music, and its own order of keys
     P.deepRuns++; saveProgress();
     A.Live.setTheme(7); A.Live.deep = { k: 0, seed: RUN.music };
     loadDeepRoom(0);
@@ -5430,6 +5456,7 @@ body.cmp #tbE{display:flex}
   function deepTake() {
     const u = deepOffer[deepSel]; if (!u) return;
     RUN.picks.push(u.id); if (u.m.shield) RUN.shields += u.m.shield;
+    if (u.id === 'life') { RUN.lives++; RUN.livesMax++; }
     A.Live.sfx('check');
     loadDeepRoom(RUN.i + 1);
   }
@@ -5667,7 +5694,21 @@ body.cmp #tbE{display:flex}
       const base = DEEPROOMS.find(r => r.id === RUN.rooms[RUN.i]) || {};
       const hy = Math.round(44 / SC) + 14;
       ht(DP.STRATUM_NAMES[base.stratum || 0] + '   ' + (RUN.i + 1) + ' / ' + RUN.rooms.length, 8, hy, '#9fb8bc', 'left', 0.8);
-      if (RUN.shields > 0) ht('WARD x' + RUN.shields, 8, hy + L7, '#d6b98a', 'left', 0.8);
+      // lives: a little hood for each, hollow once spent; then the wards
+      {
+        const n = 1 + RUN.livesMax, have = 1 + RUN.lives, ly = hy + L7 + 1;
+        for (let i = 0; i < n; i++) {
+          const x = 8 + i * 7, full = i < have;
+          ctx.globalAlpha = 0.85;
+          ctx.fillStyle = full ? '#b9a87b' : 'rgba(185,168,123,0.25)';
+          ctx.fillRect(x + 1, ly, 3, 1); ctx.fillRect(x, ly + 1, 5, 4);
+          ctx.fillStyle = full ? '#6b6258' : 'rgba(0,0,0,0)'; if (full) ctx.fillRect(x + 4, ly + 1, 1, 4);
+          ctx.fillStyle = full ? '#f0f2f0' : 'rgba(240,242,240,0.25)'; ctx.fillRect(x + 1, ly + 2, 2, 1);        // the visor
+          ctx.globalAlpha = 1;
+        }
+        ht(RUN.lives > 1 ? 'SPARE LIVES' : RUN.lives > 0 ? 'SPARE LIFE' : 'LAST LIFE', 8 + n * 7 + 2, ly, RUN.lives > 0 ? '#9fb8bc' : '#d08a8a', 'left', 0.8);
+      }
+      if (RUN.shields > 0) ht('WARD x' + RUN.shields, 8, hy + L7 * 2 + 2, '#d6b98a', 'left', 0.8);
       const ch = world.level.chest;
       if (ch && ch.near && ch.T < 0) ht((touchMode ? 'SEEK' : 'E') + '  OPEN', Math.round(ch.x - camX), Math.round(ch.y - camY) - 28, PAL.gold, 'center', 0.65 + 0.35 * Math.sin(gameTime * 4));
       if (deepMsgT < 2.5) { deepMsgT += frameDt; ht(deepMsgS, LW >> 1, Math.round(LH * 0.3), '#d6b98a', 'center', Math.min(1, (2.5 - deepMsgT) * 2)); }
@@ -5683,6 +5724,11 @@ body.cmp #tbE{display:flex}
         ctx.globalAlpha = a; ctx.fillStyle = sel ? 'rgba(185,168,123,0.18)' : 'rgba(22,30,38,0.9)'; ctx.fillRect(c.x, c.y, c.w, c.h);
         ctx.fillStyle = sel ? PAL.gold : '#33434c'; ctx.fillRect(c.x, c.y, c.w, 1); ctx.fillRect(c.x, c.y + c.h - 1, c.w, 1); ctx.fillRect(c.x, c.y, 1, c.h); ctx.fillRect(c.x + c.w - 1, c.y, 1, c.h);
         ctx.globalAlpha = 1;
+        if (c.u.rare) {     // a rare gift glows, and says so
+          const pul = 0.5 + 0.5 * Math.sin(deepT * 3);
+          ctx.globalAlpha = a * (0.35 + 0.35 * pul); ctx.fillStyle = '#d6b98a'; ctx.fillRect(c.x - 1, c.y - 1, c.w + 2, 1); ctx.fillRect(c.x - 1, c.y + c.h, c.w + 2, 1); ctx.fillRect(c.x - 1, c.y, 1, c.h); ctx.fillRect(c.x + c.w, c.y, 1, c.h); ctx.globalAlpha = 1;
+          ht('RARE', c.x + c.w / 2, c.y + c.h - 4 - L7, '#d6b98a', 'center', a * (0.6 + 0.4 * pul));
+        }
         ht(c.u.name, c.x + c.w / 2, c.y + 6, sel ? PAL.gold : PAL.snow, 'center', a);
         wrap(c.u.text, (c.w - 8) / HS).forEach((l, k) => ht(l, c.x + c.w / 2, c.y + 8 + L7 * (k + 1.3), '#aab4c0', 'center', a));
       }
@@ -5764,11 +5810,14 @@ body.cmp #tbE{display:flex}
     if (ev & EV.ROLL) { L.sfx('roll'); puff(st, 4, 0.8); }
     if (ev & EV.DEATH) {
       L.sfx('death'); shake = 3; flash = 1; deathFade = 1;
+      // The Deep: the spare life is spent and the last tether takes you back; with none left, the run ends
+      if (RUN) { RUN.spared = RUN.lives > 0; if (RUN.spared) { RUN.lives--; deepMsg('THE TETHER CATCHES YOU  -  ' + (RUN.lives > 0 ? RUN.lives + ' SPARE LEFT' : 'LAST LIFE')); } }
       for (let i = 0; i < 46; i++) {
         const a = Math.random() * 6.283, sp = 20 + Math.random() * 70;
         R.spawn(st.deathX, st.deathY - 5, Math.cos(a) * sp, Math.sin(a) * sp - 20, 0.5 + Math.random() * 0.9, i % 3 ? PAL.gold : PAL.snow, 1, 90, false);
       }
     }
+    if (ev & EV.RESPAWN && RUN) RUN.spared = false;
     if (ev & EV.RESPAWN) { L.sfx('respawn'); deathFade = 0; for (let i = 0; i < 18; i++) R.spawn(st.x + 2.5 + (Math.random() - 0.5) * 8, st.y + 10 - Math.random() * 10, (Math.random() - 0.5) * 12, -20 - Math.random() * 30, 0.8, th.lamp[2], 1, -10, true); }
     if (ev & EV.CHECK) {
       L.sfx('check'); R.markTether(st.cp, performance.now() / 1000);
@@ -5872,7 +5921,7 @@ body.cmp #tbE{display:flex}
     }
     if (S.won && !RUN && !ARCH) { if (mode === 'play') { mode = 'win'; winT = 0; syncTouchUI(); } }
     // one life in The Deep: when the light finds you, the run is over
-    if (RUN && S.dead && S.deadT > 70 && mode === 'play') deepOver(false);
+    if (RUN && S.dead && S.deadT > 70 && mode === 'play' && !RUN.spared) deepOver(false);
   }
 
   function frame(now) {

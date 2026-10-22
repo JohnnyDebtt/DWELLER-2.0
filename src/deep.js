@@ -76,6 +76,8 @@
     { id: 'ward', name: 'WARD', text: 'THE NEXT FULL BURN IS TAKEN FROM YOU', m: { shield: 1 }, max: 3 },
     { id: 'still', name: 'STILLNESS', text: 'A SAFE BREATH AT THE START OF EVERY ROOM', m: { grace: 2.5 }, max: 1 },
     { id: 'feather', name: 'FEATHER', text: 'YOU FALL MORE SLOWLY', m: { fall: 0.8 }, max: 2 },
+    // very rare: it turns up in about one offer in twenty, once a run
+    { id: 'life', name: 'ANOTHER LIFE', text: 'ONE MORE SPARE LIFE FOR THIS RUN', m: {}, max: 1, rare: 0.05 },
   ];
 
   const ADD = { shield: 1, air: 1, rare: 1 };
@@ -104,7 +106,7 @@
   /* three different upgrades you can still take */
   function offer(rand, picks) {
     const count = (id) => (picks || []).filter(p => p === id).length;
-    const pool = UPGRADES.filter(u => count(u.id) < u.max);
+    const pool = UPGRADES.filter(u => count(u.id) < u.max && (!u.rare || rand() < u.rare));
     const out = [];
     while (out.length < 3 && pool.length) out.push(pool.splice(Math.floor(rand() * pool.length), 1)[0]);
     return out;
@@ -129,14 +131,38 @@
   function tierFor(n) { return n < 5 ? 0 : n < 10 ? 1 : n < 20 ? 2 : n < 35 ? 3 : 4; }
   const TIER_NAMES = ['GENTLE', 'DEEPENING', 'HARSH', 'CRUEL', 'THE CEILING'];
 
-  /* a run: two strata, one after the other going down, four rooms from each, in a random order */
+  /* a run: two strata, one after the other going down, four rooms from each. Never the same room twice, and the
+     four from a stratum are the ones least alike, in the order that keeps neighbours apart: a stratum has only five
+     kinds of stretch, so rooms must share some, but two rooms in a row never open with the same one and share as
+     few as they can */
+  const piecesOf = (r) => (r.sections || []).map(q => q.title).filter(t => t !== 'IN' && t !== 'DOWN');
+  function bestFour(rand, list, n) {
+    if (list.length <= n) return list.slice();
+    const P = list.map(piecesOf);
+    let best = null, bestS = Infinity;
+    const idx = list.map((_, i) => i);
+    const combos = []; (function go(a, k, cur) { if (cur.length === n) { combos.push(cur.slice()); return; } for (let i = a; i < idx.length; i++) { cur.push(i); go(i + 1, k, cur); cur.pop(); } })(0, n, []);
+    const perms = (a) => a.length <= 1 ? [a] : a.flatMap((x, i) => perms(a.slice(0, i).concat(a.slice(i + 1))).map(p => [x].concat(p)));
+    for (const c of combos) for (const o of perms(c)) {
+      let sc = rand() * 4;                                    // (a little chance in it, so runs still differ)
+      for (let i = 1; i < o.length; i++) {
+        const A = P[o[i - 1]], B = P[o[i]];
+        sc += A.filter(x => B.includes(x)).length * 2;        // shared stretches between neighbours
+        if (A[0] === B[0]) sc += 6;                           // the same opening
+        if (A[A.length - 1] === B[0]) sc += 4;                // one room ends as the next begins
+        for (let k = 0; k < Math.min(A.length, B.length); k++) if (A[k] === B[k]) sc += 1;
+      }
+      if (sc < bestS) { bestS = sc; best = o; }
+    }
+    return best.map(i => list[i]);
+  }
   function planRun(rand, rooms) {
     const by = STRATA.map(st => rooms.filter(r => r.theme === st));
     const ok = STRATA.map((_, i) => i).filter(i => i + 1 < STRATA.length && by[i].length >= 4 && by[i + 1].length >= 4);
     const s0 = ok.length ? ok[Math.floor(rand() * ok.length)] : 0;
-    const take = (list, n) => { const a = list.slice(); const out = []; while (out.length < n && a.length) out.push(a.splice(Math.floor(rand() * a.length), 1)[0]); return out; };
     const half = ROOMS_PER_RUN / 2;
-    return take(by[s0], half).concat(take(by[Math.min(STRATA.length - 1, s0 + 1)], half)).map(r => r.id);
+    const out = bestFour(rand, by[s0], half).concat(bestFour(rand, by[Math.min(STRATA.length - 1, s0 + 1)], half)).map(r => r.id);
+    return out.filter((id, i) => out.indexOf(id) === i);
   }
 
   /* the seeker sleeping at the bottom: one you have not found yet. Harder runs (and a Signal Mast) make a strong one

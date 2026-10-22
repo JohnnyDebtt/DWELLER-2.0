@@ -627,7 +627,7 @@
     const tier = DP.tierFor(P.codex.length);
     const m0 = DP.modsFor(tr, []);
     RUN = { rooms: DP.planRun(Math.random, DEEPROOMS), i: 0, picks: [], tier, ticks: 0, traits: tr, shields: m0.shield || 0, rare: m0.rare || 0,
-      music: 1 + Math.floor(Math.random() * 1e9), keys: deepKeys() };   // each descent its own music, and its own order of keys
+      music: 1 + Math.floor(Math.random() * 1e9), keys: deepKeys(), lives: 1, livesMax: 1, spared: false };   // one spare life a run: the last tether catches you once   // each descent its own music, and its own order of keys
     P.deepRuns++; saveProgress();
     A.Live.setTheme(7); A.Live.deep = { k: 0, seed: RUN.music };
     loadDeepRoom(0);
@@ -664,6 +664,7 @@
   function deepTake() {
     const u = deepOffer[deepSel]; if (!u) return;
     RUN.picks.push(u.id); if (u.m.shield) RUN.shields += u.m.shield;
+    if (u.id === 'life') { RUN.lives++; RUN.livesMax++; }
     A.Live.sfx('check');
     loadDeepRoom(RUN.i + 1);
   }
@@ -901,7 +902,21 @@
       const base = DEEPROOMS.find(r => r.id === RUN.rooms[RUN.i]) || {};
       const hy = Math.round(44 / SC) + 14;
       ht(DP.STRATUM_NAMES[base.stratum || 0] + '   ' + (RUN.i + 1) + ' / ' + RUN.rooms.length, 8, hy, '#9fb8bc', 'left', 0.8);
-      if (RUN.shields > 0) ht('WARD x' + RUN.shields, 8, hy + L7, '#d6b98a', 'left', 0.8);
+      // lives: a little hood for each, hollow once spent; then the wards
+      {
+        const n = 1 + RUN.livesMax, have = 1 + RUN.lives, ly = hy + L7 + 1;
+        for (let i = 0; i < n; i++) {
+          const x = 8 + i * 7, full = i < have;
+          ctx.globalAlpha = 0.85;
+          ctx.fillStyle = full ? '#b9a87b' : 'rgba(185,168,123,0.25)';
+          ctx.fillRect(x + 1, ly, 3, 1); ctx.fillRect(x, ly + 1, 5, 4);
+          ctx.fillStyle = full ? '#6b6258' : 'rgba(0,0,0,0)'; if (full) ctx.fillRect(x + 4, ly + 1, 1, 4);
+          ctx.fillStyle = full ? '#f0f2f0' : 'rgba(240,242,240,0.25)'; ctx.fillRect(x + 1, ly + 2, 2, 1);        // the visor
+          ctx.globalAlpha = 1;
+        }
+        ht(RUN.lives > 1 ? 'SPARE LIVES' : RUN.lives > 0 ? 'SPARE LIFE' : 'LAST LIFE', 8 + n * 7 + 2, ly, RUN.lives > 0 ? '#9fb8bc' : '#d08a8a', 'left', 0.8);
+      }
+      if (RUN.shields > 0) ht('WARD x' + RUN.shields, 8, hy + L7 * 2 + 2, '#d6b98a', 'left', 0.8);
       const ch = world.level.chest;
       if (ch && ch.near && ch.T < 0) ht((touchMode ? 'SEEK' : 'E') + '  OPEN', Math.round(ch.x - camX), Math.round(ch.y - camY) - 28, PAL.gold, 'center', 0.65 + 0.35 * Math.sin(gameTime * 4));
       if (deepMsgT < 2.5) { deepMsgT += frameDt; ht(deepMsgS, LW >> 1, Math.round(LH * 0.3), '#d6b98a', 'center', Math.min(1, (2.5 - deepMsgT) * 2)); }
@@ -917,6 +932,11 @@
         ctx.globalAlpha = a; ctx.fillStyle = sel ? 'rgba(185,168,123,0.18)' : 'rgba(22,30,38,0.9)'; ctx.fillRect(c.x, c.y, c.w, c.h);
         ctx.fillStyle = sel ? PAL.gold : '#33434c'; ctx.fillRect(c.x, c.y, c.w, 1); ctx.fillRect(c.x, c.y + c.h - 1, c.w, 1); ctx.fillRect(c.x, c.y, 1, c.h); ctx.fillRect(c.x + c.w - 1, c.y, 1, c.h);
         ctx.globalAlpha = 1;
+        if (c.u.rare) {     // a rare gift glows, and says so
+          const pul = 0.5 + 0.5 * Math.sin(deepT * 3);
+          ctx.globalAlpha = a * (0.35 + 0.35 * pul); ctx.fillStyle = '#d6b98a'; ctx.fillRect(c.x - 1, c.y - 1, c.w + 2, 1); ctx.fillRect(c.x - 1, c.y + c.h, c.w + 2, 1); ctx.fillRect(c.x - 1, c.y, 1, c.h); ctx.fillRect(c.x + c.w, c.y, 1, c.h); ctx.globalAlpha = 1;
+          ht('RARE', c.x + c.w / 2, c.y + c.h - 4 - L7, '#d6b98a', 'center', a * (0.6 + 0.4 * pul));
+        }
         ht(c.u.name, c.x + c.w / 2, c.y + 6, sel ? PAL.gold : PAL.snow, 'center', a);
         wrap(c.u.text, (c.w - 8) / HS).forEach((l, k) => ht(l, c.x + c.w / 2, c.y + 8 + L7 * (k + 1.3), '#aab4c0', 'center', a));
       }
@@ -998,11 +1018,14 @@
     if (ev & EV.ROLL) { L.sfx('roll'); puff(st, 4, 0.8); }
     if (ev & EV.DEATH) {
       L.sfx('death'); shake = 3; flash = 1; deathFade = 1;
+      // The Deep: the spare life is spent and the last tether takes you back; with none left, the run ends
+      if (RUN) { RUN.spared = RUN.lives > 0; if (RUN.spared) { RUN.lives--; deepMsg('THE TETHER CATCHES YOU  -  ' + (RUN.lives > 0 ? RUN.lives + ' SPARE LEFT' : 'LAST LIFE')); } }
       for (let i = 0; i < 46; i++) {
         const a = Math.random() * 6.283, sp = 20 + Math.random() * 70;
         R.spawn(st.deathX, st.deathY - 5, Math.cos(a) * sp, Math.sin(a) * sp - 20, 0.5 + Math.random() * 0.9, i % 3 ? PAL.gold : PAL.snow, 1, 90, false);
       }
     }
+    if (ev & EV.RESPAWN && RUN) RUN.spared = false;
     if (ev & EV.RESPAWN) { L.sfx('respawn'); deathFade = 0; for (let i = 0; i < 18; i++) R.spawn(st.x + 2.5 + (Math.random() - 0.5) * 8, st.y + 10 - Math.random() * 10, (Math.random() - 0.5) * 12, -20 - Math.random() * 30, 0.8, th.lamp[2], 1, -10, true); }
     if (ev & EV.CHECK) {
       L.sfx('check'); R.markTether(st.cp, performance.now() / 1000);
@@ -1106,7 +1129,7 @@
     }
     if (S.won && !RUN && !ARCH) { if (mode === 'play') { mode = 'win'; winT = 0; syncTouchUI(); } }
     // one life in The Deep: when the light finds you, the run is over
-    if (RUN && S.dead && S.deadT > 70 && mode === 'play') deepOver(false);
+    if (RUN && S.dead && S.deadT > 70 && mode === 'play' && !RUN.spared) deepOver(false);
   }
 
   function frame(now) {
