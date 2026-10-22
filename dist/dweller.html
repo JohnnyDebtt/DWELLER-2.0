@@ -4833,6 +4833,7 @@ body.cmp #tbE{display:flex}
       if (j && Array.isArray(j.beaten)) {
         for (let i = 0; i < NL; i++) { P.beaten[i] = !!j.beaten[i]; P.best[i] = +(j.best && j.best[i]) || 0; }
         P.comp = !!j.comp; P.cp = j.cp && typeof j.cp === 'object' ? j.cp : {}; P.fused = !!j.fused; P.seekerId = j.seekerId; P.core = !!j.core; P.coreBest = +j.coreBest || 0; P.seen = j.seen && typeof j.seen === 'object' ? j.seen : {}; P.snv = j.snv; P.codex = Array.isArray(j.codex) ? j.codex.filter(x => x >= 1) : []; P.deepBest = +j.deepBest || 0; P.deepRuns = +j.deepRuns || 0; P.deepWins = +j.deepWins || 0; P.archSeen = !!j.archSeen; P.archNew = !!j.archNew; P.coat = typeof j.coat === 'string' ? j.coat : 'sand'; P.coatsSeen = +j.coatsSeen || 1;
+        P.wellUsed = !!j.wellUsed; P.rareId = +j.rareId || 0; P.wellOld = +j.wellOld || 0;   // the well wakes only once, ever
         return;
       }
     } catch (e) { }
