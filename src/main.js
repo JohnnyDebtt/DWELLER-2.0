@@ -34,13 +34,13 @@
   /* ------------------------------------------------------------ progress */
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
-  const P = { beaten: [false, false, false, false, false, false], best: [0, 0, 0, 0, 0, 0], comp: false, cp: {}, fused: false, core: false, coreBest: 0, seen: {} };
+  const P = { beaten: [false, false, false, false, false, false], best: [0, 0, 0, 0, 0, 0], comp: false, cp: {}, fused: false, core: false, coreBest: 0, seen: {}, codex: [], deepBest: 0, deepRuns: 0, deepWins: 0, archSeen: false, archNew: false, coat: 'sand', coatsSeen: 1 };
   function loadProgress() {
     try {
       const j = JSON.parse(lsGet('dweller.v2') || 'null');
       if (j && Array.isArray(j.beaten)) {
         for (let i = 0; i < NL; i++) { P.beaten[i] = !!j.beaten[i]; P.best[i] = +(j.best && j.best[i]) || 0; }
-        P.comp = !!j.comp; P.cp = j.cp && typeof j.cp === 'object' ? j.cp : {}; P.fused = !!j.fused; P.seekerId = j.seekerId; P.core = !!j.core; P.coreBest = +j.coreBest || 0; P.seen = j.seen && typeof j.seen === 'object' ? j.seen : {}; P.snv = j.snv;
+        P.comp = !!j.comp; P.cp = j.cp && typeof j.cp === 'object' ? j.cp : {}; P.fused = !!j.fused; P.seekerId = j.seekerId; P.core = !!j.core; P.coreBest = +j.coreBest || 0; P.seen = j.seen && typeof j.seen === 'object' ? j.seen : {}; P.snv = j.snv; P.codex = Array.isArray(j.codex) ? j.codex.filter(x => x >= 1) : []; P.deepBest = +j.deepBest || 0; P.deepRuns = +j.deepRuns || 0; P.deepWins = +j.deepWins || 0; P.archSeen = !!j.archSeen; P.archNew = !!j.archNew; P.coat = typeof j.coat === 'string' ? j.coat : 'sand'; P.coatsSeen = +j.coatsSeen || 1;
         return;
       }
     } catch (e) { }
@@ -55,6 +55,29 @@
   function pickSeeker() {
     if (P.snv !== 2 || !(P.seekerId >= 1 && P.seekerId <= R.NETN)) { P.seekerId = 1 + Math.floor(Math.random() * R.NETN); P.snv = 2; saveProgress(); }
     R.setSeeker(P.seekerId);
+    codexInit();
+    wearCoat();
+  }
+  /* the coats: the weaver makes one for the Guardian, then one at 5, 10, 15, 20, 30 and 35 wins in The Deep */
+  const COATS = R.COATS;
+  function coatOpen(c) { return c.core ? P.core : c.wins ? P.deepWins >= c.wins : true; }
+  function coatsOpen() { return COATS.filter(coatOpen); }
+  function coatNeed(c) { return c.core ? 'BEAT THE GUARDIAN' : c.wins + ' WINS IN THE DEEP'; }
+  function wearCoat() { let c = COATS.find(q => q.id === P.coat); if (!c || !coatOpen(c)) { c = COATS[0]; P.coat = 'sand'; } R.setCoat(c.main ? c : null); }
+  function nextCoat() {
+    const open = coatsOpen(), i = open.findIndex(c => c.id === P.coat), c = open[(i + 1) % open.length];
+    P.coat = c.id; P.coatsSeen = open.length; saveProgress(); wearCoat();
+    A.Live.sfx('check'); flash = 0.25;
+    for (let k = 0; k < 24; k++) { const a = Math.random() * 6.283, sp = 8 + Math.random() * 22; R.spawn(tS.x + 2.5, tS.y + 4, Math.cos(a) * sp, Math.sin(a) * sp - 8, 0.5 + Math.random() * 0.6, c.glow || c.main || '#b9a87b', 1, 6, true); }
+  }
+  function coatWaiting() { return P.core && coatsOpen().length > P.coatsSeen; }
+  /* the Codex: every seeker you have found. The one from the mycelium is the first; the rare one under the well joins
+     it once; each good run through The Deep adds one more */
+  function codexInit() {
+    if (!Array.isArray(P.codex)) P.codex = [];
+    const add = (id) => { if (id >= 1 && !P.codex.includes(id)) P.codex.push(id); };
+    if (P.comp) { if (P.wellUsed && P.wellOld) add(P.wellOld); add(P.seekerId); }
+    saveProgress();
   }
   function unlocked(i) { return i === 0 || (i < NL && P.beaten[i - 1]); }
   function built(i) { return i < LEVELS.length && !!LEVELS[i]; }
@@ -100,6 +123,7 @@
     audioInit();
     if (mode === 'title') {
       if (['Space', 'Enter', 'ArrowUp', 'KeyW', 'ArrowRight', 'KeyD', 'ArrowLeft', 'KeyA', 'KeyZ', 'KeyK', 'ArrowDown', 'KeyS', 'KeyE'].includes(e.code)) beginTown();
+    } else if (mode === 'deepPick' || mode === 'deepOver' || mode === 'deepWin') { deepKey(e.code); return;
     } else if (mode === 'town') {
       if (e.code === 'Enter') townInteract(false);
       if (e.code === 'KeyN') townInteract(true);
@@ -112,8 +136,9 @@
       if (e.code === 'Escape' || e.code === 'KeyP') setPause(true);
       if (e.code === 'KeyR' && !S.dead && !S.won) { S.ex = 1; S.grace = 0; }   // give up: let the light take you back to the tether
     } else if (mode === 'pause') {
-      if (e.code === 'KeyN') { A.Live.setPaused(false); startLevel(cur, true); return; }
-      if (e.code === 'KeyQ' || e.code === 'Backspace') { A.Live.setPaused(false); toTown(cur); return; }
+      if (RUN) { if (e.code === 'KeyQ' || e.code === 'Backspace') { A.Live.setPaused(false); mode = 'play'; deepOver(true); return; } }
+      else if (e.code === 'KeyN') { A.Live.setPaused(false); startLevel(cur, true); return; }
+      else if (e.code === 'KeyQ' || e.code === 'Backspace') { A.Live.setPaused(false); toTown(cur); return; }
       if (e.code === 'Escape' || e.code === 'KeyP' || e.code === 'Enter' || e.code === 'Space') setPause(false);
     }
     if (e.code === 'KeyM') A.Live.toggleMute();
@@ -169,10 +194,11 @@
     const r = canvas.getBoundingClientRect();
     const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
     if (mode === 'title') beginTown();
+    else if (mode === 'deepPick' || mode === 'deepOver' || mode === 'deepWin') deepTap(fx * LW, fy * LH);
     else if (mode === 'pause') {
       if (e.pointerType !== 'touch') { setPause(false); return; }
-      if (fy < 0.3) { A.Live.setPaused(false); toTown(cur); }
-      else if (fy > 0.68) { A.Live.setPaused(false); startLevel(cur, true); }
+      if (fy < 0.3) { A.Live.setPaused(false); if (RUN) { mode = 'play'; deepOver(true); } else toTown(cur); }
+      else if (fy > 0.68 && !RUN) { A.Live.setPaused(false); startLevel(cur, true); }
       else setPause(false);
     }
     else if (mode === 'win' && winT > 2.5) toTown(cur);
@@ -194,6 +220,15 @@
       const edge = (name, v) => { const was = padPrev[name]; padPrev[name] = v; return v && !was; };
       if (edge('start', b(9))) { if (mode === 'play') setPause(true); else if (mode === 'pause') setPause(false); else if (mode === 'title') beginTown(); else if (mode === 'town') toTitle(); else if (mode === 'win' && winT > 2.5) toTown(cur); }
       if (mode === 'title' && edge('a', b(0))) beginTown();
+      else if (mode === 'deepPick' || mode === 'deepOver' || mode === 'deepWin') {
+        const key = deepKey;
+        if (edge('a', b(0))) key('Enter');
+        if (edge('b', b(1))) key('Escape');
+        if (edge('pl', b(14) || ax < -0.6)) key('ArrowLeft');
+        if (edge('pr', b(15) || ax > 0.6)) key('ArrowRight');
+        if (edge('pu', b(12) || ay < -0.6)) key('ArrowUp');
+        if (edge('pd', b(13) || ay > 0.6)) key('ArrowDown');
+      }
       else edge('a', b(0));
       if (mode === 'win' && winT > 2.5 && edge('a2', b(0))) toTown(cur);
     }
@@ -205,7 +240,7 @@
     const cw = Math.max(2, Math.round(innerWidth * DPR)), ch = Math.max(2, Math.round(innerHeight * DPR));
     canvas.width = cw; canvas.height = ch;
     canvas.style.width = innerWidth + 'px'; canvas.style.height = innerHeight + 'px';
-    SC = Math.max(1, Math.round(ch / (cur === CORE && mode !== 'town' && mode !== 'title' ? 360 : (window.__viewH || 230))));   // the Guardian's arena is seen from further back
+    SC = Math.max(1, Math.round(ch / (window.__viewH || ((cur === CORE || cur === 7) && mode !== 'town' && mode !== 'title' ? (cur === 7 ? 320 : 360) : 230))));   // the Guardian's arena is seen from further back
     LW = Math.ceil(cw / SC) + 1; LH = Math.ceil(ch / SC) + 1;
     off.width = LW; off.height = LH;
     octx.imageSmoothingEnabled = false; gctx.imageSmoothingEnabled = false;
@@ -221,9 +256,9 @@
     cur = i;
   }
   let scFor = -1;
-  function fitView() { const k = cur === CORE && mode !== 'town' && mode !== 'title' ? 1 : 0; if (k !== scFor) { scFor = k; resize(); } }
+  function fitView() { const k = (cur === CORE || cur === 7) && mode !== 'town' && mode !== 'title' ? (cur === 7 ? 2 : 1) : 0; if (k !== scFor) { scFor = k; resize(); } }
   function startLevel(i, fresh) {
-    audioInit();
+    audioInit(); ARCH = null;
     loadLevel(i);
     if (fresh) { delete P.cp[i]; saveProgress(); }
     S = D.newState(world, { companion: P.comp }); runTicks = 0; R.parts.length = 0; R.clearGuardian(); A.Live.boss = null; R.resetTethers(); beamPrev = {}; deathFade = 0; flash = 0; shake = 0;
@@ -249,6 +284,7 @@
   }
   function updateSection() {
     const i = sectionAt((S.x + 2.5) / TS);
+    if (i !== sectionIdx && RUN) { sectionIdx = i; return; }
     if (i !== sectionIdx) {
       sectionIdx = i;
       const sec = world.sections[i];
@@ -267,18 +303,21 @@
   let tW = null, tS = null, tcamX = 0, tcamY = 0, tAcc = 0, tPrevE = false, still = 0;
   let near = null, nearKey = '', townMsg = '', townMsgT = 99, titleOut = 99, bootFade = 0, rareCardT = 99;
   const talk = {};
+  let leadX = null, leadY = null;
   const LINES = {
     collector: () => [
       'THE WELL IS DEEPER THAN IT LOOKS', 'I KEEP WHAT THE LIGHT LEAVES BEHIND', 'DONT STAND UNDER THE LAMPS TOO LONG',
-      'SOME SEEKERS SLEEP WHERE NOBODY LOOKS', 'THE ROPE IN THE WELL GOES ALL THE WAY DOWN',
+      'SOME SEEKERS SLEEP WHERE NOBODY LOOKS',
     ].concat(P.wellUsed ? ['YOU WOKE THE ONE DOWN THERE. GOOD'] : []),
+    // the weaver: coats for those who have earned one. Until the Guardian falls he has nothing for you
+    weaver: () => P.core ? (coatWaiting() ? ['FINALLY. SOMETHING WORTH WEARING. TRY IT ON'] : ['EVERY COAT I MAKE IS CUT FROM SOMEWHERE DOWN THERE', 'GO DEEPER. COME BACK. I WILL HAVE SOMETHING']) : ['NICE CLOAK. DID YOU FIND IT IN A DITCH', 'THAT RAG? I DONT DRESS NOBODIES. GO DO SOMETHING'],
     exiled: () => [
       'THEY SENT ME UP. I DONT GO DOWN ANYMORE', 'EVERY DOOR IN THIS TOWN GOES FURTHER DOWN', 'THE MOUNTAIN WAS HERE BEFORE THE TOWN. SO WAS THE DOOR',
       'IF THE TREES BLINK, STAND STILL', 'NOBODY LIGHTS THE LAMPS. NOBODY WANTS TO BE SEEN',
     ].concat(P.beaten[1] && !P.comp ? ['THE MYCELIUM HAS A FALSE WALL. SOMETHING SLEEPS BEHIND IT', 'THE MYCELIUM HAS A FALSE WALL. SOMETHING SLEEPS BEHIND IT'] : []).concat(count() >= 3 ? ['YOUR DOORS ARE BURNING NICELY'] : [])
      .concat(count() >= NL && !P.core ? ['THE GREAT DOOR IS HUMMING. GO ON'] : []),
     // the silent one speaks only once the Guardian is gone, and always in this order
-    monk: () => P.core ? ['YOU BROKE THE GUARDIAN', 'IT WAS NOT KEEPING YOU OUT', 'IT WAS KEEPING SOMETHING IN', 'GO BACK DOWN IF YOU LIKE. IT IS LISTENING NOW'] : ['...'],
+    monk: () => P.core ? (P.archSeen ? [] : ['GO BACK THROUGH THE DOOR. IT KEPT SOMETHING FOR YOU']).concat(['YOU BROKE THE GUARDIAN', 'IT WAS NOT KEEPING YOU OUT', 'IT WAS KEEPING SOMETHING IN', 'GO BACK DOWN IF YOU LIKE. IT IS LISTENING NOW', 'WHERE IT HUNG THERE IS AN ARCHIVE NOW. AND A WAY DOWN']) : ['...'],
   };
   function groundY(x) { return T.groundAt(Math.floor(x / D.TS)) * D.TS; }
   function townSpawn(x) {
@@ -289,6 +328,7 @@
   }
   function doorX(i) { return i >= NL ? T.GREAT.x : T.doorShape(T.DOORS[i]).x; }
   function toTown(focus) {
+    ARCH = null;
     if (!tW) tW = T.build();
     mode = 'town'; townMsgT = 99; R.parts.length = 0;
     townSpawn(focus === undefined ? undefined : doorX(focus) + (focus >= NL ? 0 : 0));
@@ -332,24 +372,29 @@
     } else if (near.k === 'great') {
       if (count() < NL) return say('IT WANTS THE WHOLE CRYSTAL  -  ' + count() + ' OF 6', 'nope');
       if (!P.fused) { fuseT = 0; A.Live.sfx('check'); return; }
+      if (P.core && built(ARCHL)) { A.Live.sfx('check'); startArchive(); return; }
       if (built(CORE)) startLevel(CORE, fresh);
+    } else if (near.k === 'res' && near.q.id === 'weaver' && P.core) {
+      nextCoat();
     } else if (near.k === 'res') {
       const L = LINES[near.q.id](); talk[near.q.id] = ((talk[near.q.id] || 0) + 1) % L.length; A.Live.sfx('ui');
     } else if (near.k === 'rare') wakeRare();
   }
-  /* the sleeper under the well: a rare seeker (one of the 222 rarest in SEEKER NET). Once per save, it takes your
-     seeker's place, and yours sleeps down there instead */
+  /* the sleeper under the well: a bonus seeker, any one of SEEKER NET you do not have yet. Once per save it wakes,
+     joins your Codex and follows you */
   function rareChoice() {
-    const rare = R.NET && R.NET.rare || [];
-    if (!(P.rareId >= 1) && rare.length) { let q; do { q = rare[Math.floor(Math.random() * rare.length)][0]; } while (q === P.seekerId && rare.length > 1); P.rareId = q; saveProgress(); }
+    if (!(P.rareId >= 1) && R.NETN > 1) { let q, k = 0; do { q = 1 + Math.floor(Math.random() * R.NETN); } while ((q === P.seekerId || P.codex.includes(q)) && ++k < 100); P.rareId = q; saveProgress(); }
     return P.rareId;
   }
-  function rareRank(id) { const r = (R.NET && R.NET.rare || []).find(q => q[0] === id); return r ? r[1] + 1 : 0; }
+  /* a seeker's tier in The Deep (S best .. D), from its traits */
+  const GRADE = {};
+  function gradeOf(id) { return GRADE[id] || (GRADE[id] = window.DwellerDeep.grade(R.seekerTraits(id))); }
+  function gradeLine(id) { return gradeOf(id) + ' - TIER'; }
   function wakeRare() {
-    if (P.wellUsed) return say('YOUR OLD SEEKER SLEEPS HERE NOW. LET IT REST');
+    if (P.wellUsed) return say('THE CAVE IS EMPTY NOW');
     if (!P.comp) return say('IT SLEEPS. IT WAITS FOR A SEEKER OF YOUR OWN', 'nope');
     const id = rareChoice();
-    P.wellOld = P.seekerId; P.seekerId = id; P.wellUsed = true; saveProgress();
+    P.wellOld = 0; P.seekerId = id; P.wellUsed = true; if (!P.codex.includes(id)) P.codex.push(id); if (P.core) P.archNew = true; saveProgress();
     R.setSeeker(id);
     A.Live.sfx('seeker'); flash = 0.6; rareCardT = 0;
     for (let i = 0; i < 60; i++) { const a = Math.random() * 6.283, sp = 10 + Math.random() * 45; R.spawn(T.RAREX, T.RAREY - 16, Math.cos(a) * sp, Math.sin(a) * sp - 10, 0.8 + Math.random(), i % 2 ? '#5daa99' : '#d5f8fc', 1, 10, true); }
@@ -380,6 +425,12 @@
       tAcc -= stepDt; n++;
     }
     if (n >= 12) tAcc = 0;
+    if (P.core && !P.archSeen && tS.cmp && mode === 'town') {
+      const px = tS.x + 2.5, dir = Math.sign(T.GREAT.x - px) || 1, dist = Math.abs(T.GREAT.x - px);
+      const tx = dist < 50 ? T.GREAT.x - 10 : px + dir * 46, ty = groundY(tx) - 18 + Math.sin(gameTime * 3) * 2;
+      leadX = leadX === null ? tS.cmpX : leadX + (tx - leadX) * (1 - Math.exp(-dt * 1.6)); leadY = leadY === null ? tS.cmpY : leadY + (ty - leadY) * (1 - Math.exp(-dt * 2));
+      tS.cmpX = leadX; tS.cmpY = leadY;
+    } else { leadX = leadY = null; }
     R.updateParticles(dt);
     const t = townCamTarget(), kx = 1 - Math.exp(-dt * 5.5), ky = 1 - Math.exp(-dt * 4.5);
     if (window.__townCam !== undefined) { t[0] = Math.max(0, Math.min(T.WPX - LW, window.__townCam - LW / 2)); }   // (for pictures of the town)
@@ -387,7 +438,7 @@
     const nn = townNear(), key = nn ? nn.k + (nn.i !== undefined ? nn.i : nn.q ? nn.q.id : '') : '';
     if (key !== nearKey) {
       nearKey = key; townMsgT = 99;
-      if (nn && nn.k === 'res') { const L = LINES[nn.q.id](); talk[nn.q.id] = nn.q.id === 'monk' ? (talk.monk === undefined ? 0 : (talk.monk + 1) % L.length) : Math.floor(Math.random() * L.length); }
+      if (nn && nn.k === 'res') { const L = LINES[nn.q.id](); talk[nn.q.id] = nn.q.id === 'monk' || nn.q.id === 'weaver' ? (talk[nn.q.id] === undefined ? 0 : (talk[nn.q.id] + 1) % L.length) : Math.floor(Math.random() * L.length); }
     }
     near = nn;
     // a sliver found for the first time lights its door
@@ -414,11 +465,12 @@
   let HK = 1, HS = 0.5;
   function ht(t, x, y, col, align, alpha, sc) { HT.push([t, x, y, col, align || 'left', alpha === undefined ? ctxAlpha : alpha, sc || 1]); }
   let ctxAlpha = 1;
-  function htW(t, sc) { return R.textWidth(t) * HS * (sc || 1); }
+  function htW(t, sc) { return R.textWidth(t) * (sc < 0 ? Math.max(1, HK - 1) / SC : HS * (sc || 1)); }   // sc -1: a step smaller than half size
+  function halfText() { HK = Math.max(1, Math.round(SC / 2)); HS = HK / SC; HT.length = 0; ctxAlpha = 1; }
   function flushHT() {
     for (const [t, x, y, col, al, a, sc] of HT) {
       if (a <= 0) continue;
-      const sp = R.textSprite(t, col), k = HK * sc, w = sp.width * k;
+      const sp = R.textSprite(t, col), k = sc < 0 ? Math.max(1, HK - 1) : HK * sc, w = sp.width * k;
       let X = x * SC; if (al === 'center') X -= w / 2; else if (al === 'right') X -= w;
       gctx.globalAlpha = Math.min(1, a); gctx.drawImage(sp, Math.round(X), Math.round(y * SC), w, sp.height * k);
     }
@@ -432,12 +484,12 @@
   function drawTown(ctx, dt) {
     const camY0 = T.GY - LH * 0.8;
     const sx = shake > 0 ? (Math.random() - 0.5) * shake : 0;
-    HK = Math.max(1, Math.round(SC / 2)); HS = HK / SC; HT.length = 0; ctxAlpha = 1;
+    halfText();
     const LH7 = Math.ceil(7 * HS) + 3;          // one line of half-size text, with its gap
     T.draw(ctx, {
       text: (t, x, y, c, al) => ht(t, x, y, c, al, 1), s: tS, camX: tcamX + sx, camY: tcamY, camY0, LW, LH, time: gameTime, dt, P, still, fuse: fuseT, flare,
       inRoom: tS.y + tS.h > (T.WELL.room[2] + 1) * D.TS,
-      unlocked: (i) => built(i) && unlocked(i), rareId: rareChoice(), rareUsed: !!P.wellUsed, oldId: P.wellOld,
+      unlocked: (i) => built(i) && unlocked(i), rareId: rareChoice(), rareUsed: !!P.wellUsed, coatNew: coatWaiting() ? coatsOpen()[coatsOpen().length - 1] : null, oldId: 0,
     });
     const cx = Math.round(tcamX + sx), cy = Math.round(tcamY);
     T.signText(ctx, cx, cy, touchMode, P.comp, (t, x, y, c, al) => ht(t, x, y, c, al, 1), HS);
@@ -469,24 +521,32 @@
         }
       } else if (near.k === 'great') {
         const all = count() >= NL, sv = P.cp[CORE];
-        lines.push([P.fused ? 'VII  THE CORE' : 'THE GREAT DOOR', all ? PAL.snow : '#a9b2c0']);
+        lines.push([P.core ? 'THE CODEX' : P.fused ? 'VII  THE CORE' : 'THE GREAT DOOR', P.core ? '#9fd3c7' : all ? PAL.snow : '#a9b2c0']);
         if (!all) lines.push([count() + ' OF 6 SLIVERS  -  IT WANTS THE WHOLE CRYSTAL', '#8a919e']);
         else if (!P.fused) lines.push([key + '  SET THE CRYSTAL', PAL.gold, true]);
         else {
-          lines.push([P.core ? 'THE GUARDIAN IS GONE' + (P.coreBest ? '   BEST ' + fmtTime(P.coreBest) : '') : 'A GUARDIAN WAITS BELOW', '#d6dbe4']);
-          lines.push([key + '  ' + (sv && sv.cp > 0 ? 'CONTINUE FROM THE THIRD SLIVER' : 'DESCEND'), PAL.gold, true]);
-          if (sv && sv.cp > 0 && !touchMode) lines.push(['N  FROM THE TOP', '#8a919e']);
+          if (P.core) { lines.push([P.codex.length + ' OF ' + R.NETN + ' SEEKERS  -  THE GUARDIAN IS GONE', '#d6dbe4']); lines.push([key + '  ENTER', PAL.gold, true]); if (P.archNew) lines.push(['A NEW SEEKER WAITS INSIDE', '#b4c8ff']); }
+          else {
+            lines.push(['A GUARDIAN WAITS BELOW', '#d6dbe4']);
+            lines.push([key + '  ' + (sv && sv.cp > 0 ? 'CONTINUE FROM THE THIRD SLIVER' : 'DESCEND'), PAL.gold, true]);
+            if (sv && sv.cp > 0 && !touchMode) lines.push(['N  FROM THE TOP', '#8a919e']);
+          }
         }
       } else if (near.k === 'res') {
         const L = LINES[near.q.id](), t = L[(talk[near.q.id] || 0) % L.length];
         for (const w of wrap(t, Math.min(200, LW - 24) / HS)) lines.push([w, near.q.id === 'monk' && !P.core ? '#6b7280' : '#c3cbd6']);
-        if (L.length > 1) lines.push([key + '  MORE', '#5d6474']);
+        if (near.q.id === 'weaver' && P.core) {
+          const cur = COATS.find(c => c.id === P.coat) || COATS[0], nx = COATS.find(c => !coatOpen(c)), n = coatsOpen().length;
+          lines.push(['YOU WEAR  ' + cur.name + '   -   ' + n + ' OF ' + COATS.length + ' COATS', '#d6dbe4']);
+          if (n > 1) lines.push([key + '  ANOTHER COAT', PAL.gold, true]);
+          if (nx) lines.push(['NEXT  ' + nx.name + '  -  ' + coatNeed(nx), '#6b7280']);
+        } else if (L.length > 1) lines.push([key + '  MORE', '#5d6474', false, -1]);
       } else if (near.k === 'rare') {
-        if (P.wellUsed) lines.push(['SEEKER NET #' + P.wellOld + ' SLEEPS HERE', '#7f9aa6']);
+        if (P.wellUsed) lines.push(['THE CAVE IS EMPTY NOW', '#7f9aa6']);
         else {
-          lines.push(['A RARE SEEKER SLEEPS HERE', '#9fd3c7']);
-          lines.push(['SEEKER NET #' + rareChoice() + '  -  RARITY ' + rareRank(rareChoice()) + ' OF ' + R.NETN, '#7f9aa6']);
-          if (P.comp) { lines.push([key + '  WAKE IT  -  YOURS WILL SLEEP IN ITS PLACE', PAL.gold, true]); lines.push(['IT WAKES ONLY ONCE', '#5d6474']); }
+          lines.push(['A SEEKER SLEEPS HERE', '#9fd3c7']);
+          lines.push(['SEEKER NET #' + rareChoice() + '  -  ' + gradeLine(rareChoice()), '#7f9aa6']);
+          if (P.comp) { lines.push([key + '  WAKE IT  -  IT JOINS YOUR CODEX', PAL.gold, true]); lines.push(['IT WAKES ONLY ONCE', '#5d6474']); }
           else lines.push(['IT WAITS FOR A SEEKER OF YOUR OWN', '#6b7280']);
         }
       }
@@ -496,10 +556,10 @@
     if (lines.length && near) {
       let y = Math.round(near.y + 8 - cy - lines.length * LH7);
       y = Math.max(4, y);
-      for (const [t, c, blink] of lines) {
-        const w = htW(t), x = Math.max(w / 2 + 3, Math.min(LW - w / 2 - 3, near.x - cx));
+      for (const [t, c, blink, sc] of lines) {
+        const w = htW(t, sc), x = Math.max(w / 2 + 3, Math.min(LW - w / 2 - 3, near.x - cx));
         ctx.globalAlpha = 0.6; ctx.fillStyle = '#05060a'; ctx.fillRect(Math.floor(x - w / 2) - 2, y - 1, Math.ceil(w) + 4, LH7); ctx.globalAlpha = 1;
-        ht(t, x, y + 1, c, 'center', blink ? 0.65 + 0.35 * Math.sin(mapT * 4) : 1); y += LH7;
+        ht(t, x, y + 1 + (sc < 0 ? 1 : 0), c, 'center', blink ? 0.65 + 0.35 * Math.sin(mapT * 4) : 1, sc); y += LH7;
       }
     } else if (townMsgT < 3) ht(townMsg, LW >> 1, LH - 14, '#d6b98a', 'center', Math.min(1, (3 - townMsgT) * 2));
     // a small count in the corner
@@ -511,15 +571,15 @@
       ctx.globalAlpha = 1;
     }
     if (flash > 0) { ctx.globalAlpha = Math.min(1, flash) * 0.5; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, LW, LH); ctx.globalAlpha = 1; }
-    // the rare seeker wakes
+    // the seeker under the well wakes
     if (rareCardT < 5.5) {
       const a = Math.min(1, rareCardT / 0.6) * Math.min(1, (5.5 - rareCardT) / 1.0), y0 = Math.round(LH * 0.3);
       ctx.globalAlpha = a * 0.8; ctx.fillStyle = '#05070b'; ctx.fillRect(0, y0 - 26, LW, 60); ctx.globalAlpha = a;
       R.drawPortrait(ctx, LW / 2 - 46, y0 + 4, 0.75, a);
       ctx.globalAlpha = a;
-      ht('A RARE SEEKER WAKES', LW / 2 - 20, y0 - 12, PAL.snow, 'left', a, 2);
-      ht('SEEKER NET  #' + P.seekerId + '  -  RARITY ' + rareRank(P.seekerId) + ' OF ' + R.NETN, LW / 2 - 20, y0 + 2, '#9fd3c7', 'left', a);
-      ht('#' + P.wellOld + ' SLEEPS IN ITS PLACE', LW / 2 - 20, y0 + 2 + LH7, '#8a919e', 'left', a);
+      ht('A SEEKER WAKES', LW / 2 - 20, y0 - 12, PAL.snow, 'left', a, 2);
+      ht('SEEKER NET  #' + P.seekerId + '  -  ' + gradeLine(P.seekerId), LW / 2 - 20, y0 + 2, '#9fd3c7', 'left', a);
+      ht('IT JOINS YOUR CODEX  -  AND FOLLOWS YOU NOW', LW / 2 - 20, y0 + 2 + LH7, '#8a919e', 'left', a);
       ctx.globalAlpha = 1;
     }
     // the title, over the town
@@ -548,12 +608,347 @@
       if (!touchMode) ht('ESC  TITLE     M  MUTE     F  FULLSCREEN', cx, y + 4 + L7 * 1.5, PAL.muted, 'center', a * 0.5);
     }
   }
+  /* ------------------------------------------------------------ THE DEEP and THE CODEX
+   * The Codex opens under the mountain once the Guardian is gone: every seeker you have found, the one that comes
+   * with you, and the way into The Deep. A run there is eight rooms through two strata, one life, an upgrade
+   * between rooms, and at the bottom a seeker you have not found yet. Your seeker's traits only act down there. */
+  const DP = window.DwellerDeep, DEEPROOMS = window.DWELLER_DEEP || [];
+  let RUN = null, deepSpool = null, deepT = 0, deepSel = 1, deepOffer = [], deepNew = 0, deepMsgT = 99, deepMsgS = '', deepRecord = false;
+  const ROOT_SEQ = [0, 4, 2, 5, 1, 3, 0, 4];
+  // a descent's keys: it always starts at home and ends on the dominant, the rooms between in their own order
+  function deepKeys() { const mid = [4, 2, 5, 1, 3, 0]; for (let i = mid.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [mid[i], mid[j]] = [mid[j], mid[i]]; } return [0].concat(mid, [4]); }
+  function deepMsg(t) { deepMsgS = t; deepMsgT = 0; }
+  let STRONG = null;     // every seeker of tier S or A in The Deep
+  function strongIds() { if (!STRONG) { STRONG = []; for (let id = 1; id <= R.NETN; id++) if ('SA'.includes(gradeOf(id))) STRONG.push(id); } return STRONG; }
+  function startDeep() {
+    ARCH = null;
+    if (!DEEPROOMS.length) return;
+    const tr = R.seekerTraits(P.seekerId);
+    const tier = DP.tierFor(P.codex.length);
+    const m0 = DP.modsFor(tr, []);
+    RUN = { rooms: DP.planRun(Math.random, DEEPROOMS), i: 0, picks: [], tier, ticks: 0, traits: tr, shields: m0.shield || 0, rare: m0.rare || 0,
+      music: 1 + Math.floor(Math.random() * 1e9), keys: deepKeys() };   // each descent its own music, and its own order of keys
+    P.deepRuns++; saveProgress();
+    A.Live.setTheme(7); A.Live.deep = { k: 0, seed: RUN.music };
+    loadDeepRoom(0);
+  }
+  function loadDeepRoom(i) {
+    RUN.i = i;
+    const base = DEEPROOMS.find(r => r.id === RUN.rooms[i]);
+    const L = D.deepTier(base, RUN.tier);
+    if (i === RUN.rooms.length - 1) {
+      // the bottom: a chest where the gate would be. Press E and it opens; what is inside rises out (on the wins that
+      // earn a coat, a spool of its thread instead of a seeker)
+      L.deepFinal = true;
+      const sc = COATS.find(c => c.wins === P.deepWins + 1);
+      L.chest = { x: L.goal.x, y: L.goal.y, t: 0, rise: 0, shake: 0, T: -1, near: false, ePrev: false, spool: sc || null, id: 0 };
+      L.goal = { x: -99999, y: -99999 };
+    } else {
+      // the gate glows in the colour of the room beyond
+      const nx = DEEPROOMS.find(r => r.id === RUN.rooms[i + 1]); L.nextTheme = nx ? nx.theme : L.theme;
+    }
+    world = D.makeWorld(L); R.prepare(world, L.theme, L.stratum); cur = 100 + i;
+    S = D.newState(world, { companion: true, mods: DP.modsFor(RUN.traits, RUN.picks) }); S.shields = RUN.shields;
+    runTicks = 0; R.parts.length = 0; R.clearGuardian(); A.Live.boss = null; R.resetTethers(); beamPrev = {}; deathFade = 0; flash = 0; shake = 0;
+    seekerCardT = 99; newBest = false;
+    mode = 'play'; sectionIdx = -1;
+    cardText = DP.STRATUM_NAMES[L.stratum] + '  -  ' + (i + 1) + ' OF ' + RUN.rooms.length; cardT = 0;
+    snapCamera(); A.Live.sfx('start'); A.Live.setPaused(false); syncTouchUI();
+  }
+  function deepRoomDone() {
+    RUN.ticks += runTicks;
+    if (RUN.i >= RUN.rooms.length - 1) return deepWinNow();
+    deepOffer = DP.offer(Math.random, RUN.picks); deepSel = Math.min(1, deepOffer.length - 1);
+    mode = 'deepPick'; deepT = 0; syncTouchUI();
+  }
+  function deepTake() {
+    const u = deepOffer[deepSel]; if (!u) return;
+    RUN.picks.push(u.id); if (u.m.shield) RUN.shields += u.m.shield;
+    A.Live.sfx('check');
+    loadDeepRoom(RUN.i + 1);
+  }
+  /* the chest: stand by it, press E. It shivers, the lid lifts and is thrown back, the find rises and hangs there,
+     then the run is won */
+  function chestStep(inp) {
+    const ch = world.level.chest, dt = 1 / D.TICK;
+    const e = !!(inp & IN.E);
+    ch.near = !S.dead && Math.abs(S.x + 2.5 - ch.x) < 18 && Math.abs(S.y + S.h / 2 - ch.y) < 16;
+    if (ch.T < 0) {
+      if (ch.near && e && !ch.ePrev) {
+        ch.T = 0; A.Live.sfx('check');
+        if (!ch.spool) ch.id = DP.reward(Math.random, P.codex, R.NETN, strongIds(), RUN.tier, RUN.rare);
+      }
+      ch.ePrev = e; return;
+    }
+    const was = ch.T; ch.T += dt;
+    ch.shake = ch.T < 0.45 ? (Math.floor(ch.T * 24) % 2 ? 1 : -1) : 0;
+    ch.t = Math.max(0, Math.min(1, (ch.T - 0.45) / 0.45));
+    ch.rise = Math.max(0, Math.min(1, (ch.T - 0.9) / 0.9));
+    if (was < 0.9 && ch.T >= 0.9) { A.Live.sfx('seeker'); flash = 0.35; for (let k = 0; k < 40; k++) { const a = Math.random() * 6.283, sp = 10 + Math.random() * 40; R.spawn(ch.x, ch.y - 4, Math.cos(a) * sp, Math.sin(a) * sp - 20, 0.6 + Math.random(), k % 2 ? '#d5f8fc' : '#5daa99', 1, 8, true); } }
+    if (ch.T >= 2.8 && mode === 'play') { RUN.ticks += runTicks; runTicks = 0; deepWinNow(ch.id); }
+  }
+  function deepWinNow(chestId) {
+    deepSpool = COATS.find(c => c.wins === P.deepWins + 1) || null;
+    const id = deepSpool ? 0 : chestId || DP.reward(Math.random, P.codex, R.NETN, strongIds(), RUN.tier, RUN.rare);
+    if (id) { P.codex.push(id); P.archNew = true; }
+    deepRecord = RUN.rooms.length > P.deepBest; P.deepBest = Math.max(P.deepBest, RUN.rooms.length); P.deepWins++; saveProgress();
+    deepNew = id; mode = 'deepWin'; deepT = 0; A.Live.sfx('seeker'); A.Live.sfx('win'); flash = 1;
+    syncTouchUI();
+  }
+  function deepOver(gaveUp) {
+    if (!RUN) return;
+    RUN.ticks += runTicks; RUN.gaveUp = gaveUp;
+    const reached = RUN.i + 1;
+    deepRecord = reached > P.deepBest; P.deepBest = Math.max(P.deepBest, reached); saveProgress();
+    mode = 'deepOver'; deepT = 0; syncTouchUI();
+  }
+  function deepKey(code) {
+    if (mode === 'deepPick') {
+      if (['ArrowLeft', 'KeyA'].includes(code)) { deepSel = Math.max(0, deepSel - 1); A.Live.sfx('ui'); }
+      else if (['ArrowRight', 'KeyD'].includes(code)) { deepSel = Math.min(deepOffer.length - 1, deepSel + 1); A.Live.sfx('ui'); }
+      else if (['Enter', 'Space', 'KeyE', 'KeyZ', 'KeyK'].includes(code) && deepT > 0.6) deepTake();
+      return;
+    }
+    if (['Enter', 'Space', 'KeyE', 'Escape', 'KeyZ', 'KeyK'].includes(code) && deepT > 1.5) toCodex(mode === 'deepWin' && deepNew ? deepNew : undefined);
+  }
+  function pickCards() {
+    const n = deepOffer.length, gap = 6, w = Math.min(120, Math.floor((LW - 16 - gap * (n - 1)) / n)), h = 64;
+    const x0 = Math.round((LW - (w * n + gap * (n - 1))) / 2), y0 = Math.round(LH * 0.36);
+    return deepOffer.map((u, i) => ({ x: x0 + i * (w + gap), y: y0, w, h, u }));
+  }
+  function deepTap(x, y) {
+    if (mode === 'deepPick') {
+      const c = pickCards().findIndex(c => x >= c.x && x < c.x + c.w && y >= c.y && y < c.y + c.h);
+      if (c < 0) return;
+      if (c === deepSel && deepT > 0.6) deepTake(); else { deepSel = c; A.Live.sfx('ui'); }
+      return;
+    }
+    if (deepT > 1.5) toCodex(mode === 'deepWin' && deepNew ? deepNew : undefined);
+  }
+  function setCompanion(id) { if (P.seekerId === id) return; P.seekerId = id; R.setSeeker(id); saveProgress(); A.Live.sfx('ui'); }
+
+  /* ---- THE CODEX: the Guardian's arena after the Core is won (level VIII, built from VII by tools/archive.py).
+   * Your seekers float where they rest, the strongest in The Deep highest; stand in front of one and it wakes, and the Guardian's
+   * empty shell opens like an eye to show it; press E and it comes with you. The Guardian's hole is the way into
+   * The Deep. Nothing here can hurt you. */
+  const ARCHL = 7;
+  let ARCH = null;
+  const SCORE = {};
+  function scoreOf(id) { return SCORE[id] !== undefined ? SCORE[id] : (SCORE[id] = DP.score(R.seekerTraits(id))); }
+  function archPlace() {
+    const A0 = world.level.archive, comp = P.seekerId;
+    const newest = P.codex.length ? P.codex[P.codex.length - 1] : 0;
+    const rest = P.codex.filter(id => id !== comp && id !== newest);
+    // the best at the top: tiers S and A on the two highest tiers of balconies, B in the middle, C and D below; each
+    // band in order of strength from the top down, and a full band passes its weakest down to the next
+    const best = (a, b) => scoreOf(b) - scoreOf(a) || a - b;
+    const put = (list, band, name) => band.slice(0, list.length).map((p, i) => ({ x: p[0], y: p[1], id: list[i], band: name }));
+    const g = (id) => gradeOf(id);
+    let carry = rest.filter(id => 'SA'.includes(g(id))).sort(best);
+    const high = put(carry.slice(0, A0.high.length), A0.high, 'high');
+    carry = carry.slice(A0.high.length).concat(rest.filter(id => g(id) === 'B')).sort(best);
+    const wall = put(carry.slice(0, A0.wall.length), A0.wall, 'wall');
+    carry = carry.slice(A0.wall.length).concat(rest.filter(id => 'CD'.includes(g(id)))).sort(best);
+    const floor = put(carry.slice(0, A0.floor.length), A0.floor, 'floor');
+    const over = carry.slice(A0.floor.length);
+    const empty = [];
+    for (const [band, used] of [[A0.high, high.length], [A0.wall, wall.length], [A0.floor, floor.length]]) for (let i = used; i < band.length; i++) empty.push(band[i]);
+    const slots = high.concat(wall, floor);
+    if (newest && newest !== comp) slots.push({ x: A0.pedestal[0], y: A0.pedestal[1], id: newest, band: 'new' });
+    return { slots, empty, over, key: P.codex.join(',') + '|' + comp };
+  }
+  function startArchive(returnId) {
+    RUN = null;
+    loadLevel(ARCHL);
+    S = D.newState(world, { companion: true }); runTicks = 0; R.parts.length = 0; R.clearGuardian(); A.Live.boss = null; R.resetTethers();
+    deathFade = 0; flash = 0; shake = 0; seekerCardT = 99; newBest = false;
+    const A0 = world.level.archive;
+    if (returnId !== undefined) { const x = A0.pedestal[0] - 14; S.x = x - 2.5; S.y = A0.pedestal[1] + 6 - 10; S.cmpX = x - 9; S.cmpY = S.y - 12; }
+    ARCH = { focus: 0, shut: 0, iris: 0, swap: null, place: null, cycle: 0, ovI: 0, t: 0, ePrev: false };
+    mode = 'play'; sectionIdx = -1; cardT = 99; snapCamera();
+    A.Live.setTheme(7); A.Live.deep = { k: 0 }; A.Live.setMood(0.06, 0); A.Live.setPaused(false);
+    P.archSeen = true; P.archNew = false; saveProgress();
+    syncTouchUI();
+  }
+  function toCodex(id) { startArchive(id === undefined ? 0 : id); }
+  function archFrame(dt) {
+    const A0 = world.level.archive;
+    ARCH.t += dt;
+    if (!ARCH.place || ARCH.place.key !== P.codex.join(',') + '|' + P.seekerId) ARCH.place = archPlace();
+    const px = S.x + 2.5, feet = S.y + S.h;
+    let f = null;
+    for (const sl of ARCH.place.slots) if (Math.abs(px - sl.x) < 9 && feet <= sl.y + 1 && feet > sl.y - 16) { f = sl; break; }
+    // under the shell, the seekers that have drifted back into the dark come forward one by one
+    const under = !f && ARCH.place.over.length && Math.abs(px - A0.core[0]) < 26 && feet > A0.hole[2] - 2;
+    if (under) { ARCH.cycle += dt; if (ARCH.cycle > 2.4) { ARCH.cycle = 0; ARCH.ovI = (ARCH.ovI + 1) % ARCH.place.over.length; } f = { id: ARCH.place.over[ARCH.ovI], x: A0.core[0], y: A0.core[1] + 40, band: 'over' }; }
+    const id = f ? f.id : 0;
+    if (id !== ARCH.focus) { if (id) A.Live.sfx('ui'); ARCH.focus = id; ARCH.focusSlot = f; }
+    ARCH.iris += ((id ? 1 : 0) - ARCH.iris) * (1 - Math.exp(-dt * 4));
+    if (ARCH.swap) { ARCH.swap.t += dt; if (ARCH.swap.t > 1.4) ARCH.swap = null; }
+  }
+  function archInteract() {
+    if (!ARCH || !ARCH.focus || ARCH.focus === P.seekerId) return;
+    const sl = ARCH.focusSlot, old = P.seekerId;
+    ARCH.swap = { t: 0, newId: ARCH.focus, oldId: old, x: sl.x, y: sl.y - 17, cx: S.cmpX, cy: S.cmpY };
+    setCompanion(ARCH.focus); A.Live.sfx('seeker');
+    S.cmpX = sl.x; S.cmpY = sl.y - 17;            // it leaves its place and comes to you
+  }
+  const AR = window.DwellerArchive;
+  function archSt() { return { L: world.level, time: gameTime, pl: ARCH.place || (ARCH.place = archPlace()), focus: ARCH.focus, iris: ARCH.iris, LW, LH, S, dt: frameDt }; }
+  function drawArchive(ctx, cx, cy) {
+    const A0 = world.level.archive, time = gameTime, Rr = R, SH = R.SHARDS, pl = ARCH.place || archPlace();
+    const g = (x, y, r, rgb, a) => { const gr = ctx.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(' + rgb + ',' + a + ')'); gr.addColorStop(1, 'rgba(' + rgb + ',0)'); ctx.fillStyle = gr; ctx.fillRect(x - r, y - r, r * 2, r * 2); };
+    const bx = A0.core[0] - cx, by = A0.core[1] - cy;
+    // the seekers that have drifted back into the dark: a slow field of small lights behind the room
+    pl.over.forEach((id, i) => {
+      const a = i * 2.399 + time * 0.02, rr = 80 + (i * 37) % 140, x = bx + Math.cos(a) * rr * 1.6, y = by - 40 + Math.sin(a) * rr * 0.55;
+      ctx.globalAlpha = 0.22; Rr.drawPortrait(ctx, x, y, 0.16, 0.22, id); ctx.globalAlpha = 1;
+    });
+    AR.drawFront(ctx, cx, cy, archSt());
+    // the threads from the six slivers into the shell
+    ctx.globalCompositeOperation = 'lighter';
+    A0.alcoves.forEach((a, i) => {
+      const ax = a[0] - cx, ay = a[1] - 14 - cy, n = Math.ceil(Math.hypot(bx - ax, by - ay) / 3);
+      for (let k = 0; k < n; k++) {
+        const u = k / n, pulse = Math.max(0, Math.sin((u * 6 - time * 1.2 + i) * Math.PI));
+        ctx.globalAlpha = 0.10 + 0.45 * Math.pow(pulse, 6); ctx.fillStyle = SH[i];
+        ctx.fillRect(Math.round(ax + (bx - ax) * u), Math.round(ay + (by - ay) * u - Math.sin(u * Math.PI) * 10), 1, 1);
+      }
+      ctx.globalAlpha = 1;
+      g(ax, ay + 4, 18, '255,255,255', 0.06);
+    });
+    ctx.globalCompositeOperation = 'source-over';
+    // the slivers, set for good
+    A0.alcoves.forEach((a, i) => Rr.drawShard(ctx, a[0] - cx, a[1] - cy - 13 + Math.sin(time * 1.7 + i) * 1.2, SH[i], time, 0, 0.55));
+    // the Prime: it breathes while it waits, and parts open when a seeker wakes; the glass at its heart grows from 20 to 28
+    const ir = ARCH.iris;
+    AR.drawPrime(ctx, bx, by, ir, time); ctx.globalAlpha = 1;   // the Prime hangs where the Guardian did
+    const rr = Math.round(20 + 8 * ir);
+    ctx.globalCompositeOperation = 'lighter'; g(bx, by, rr + 8, '120,210,195', 0.25 + 0.2 * ir); ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = 'rgba(6,18,20,0.86)'; ctx.beginPath(); ctx.arc(bx, by, rr, 0, 6.283); ctx.fill();
+    ctx.strokeStyle = 'rgba(150,230,215,' + (0.4 + 0.3 * ir).toFixed(3) + ')'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(bx + 0.5, by + 0.5, rr, 0, 6.283); ctx.stroke();
+    ctx.fillStyle = 'rgba(150,230,215,0.05)'; for (let y = -rr; y < rr; y += 2) ctx.fillRect(bx - rr, by + y, rr * 2, 1);
+    for (const sl of pl.slots) {
+      const x = sl.x - cx, y = sl.y - cy;
+      if (x < -40 || x > LW + 40 || y < -60 || y > LH + 40) continue;
+      if (ARCH.swap && ARCH.swap.newId === sl.id && ARCH.swap.t < 1.4) continue;
+      const on = sl.id === ARCH.focus, bob = Math.sin(time * 1.3 + sl.x * 0.01) * 1.5, isNew = sl.band === 'new';
+      Rr.drawPortrait(ctx, x, y - 17 + bob, on ? 0.36 : 0.28, on ? 1 : 0.72, sl.id);
+      if (isNew) ht('NEW', x, y - 34, '#b4c8ff', 'center', 0.5 + 0.4 * Math.sin(time * 3));
+      if (on) {
+        ctx.globalCompositeOperation = 'lighter';
+        const n = Math.ceil(Math.hypot(bx - x, by - (y - 17)) / 2);
+        for (let k = 0; k < n; k++) { const u = k / n; ctx.globalAlpha = 0.22 + 0.22 * Math.sin(u * 30 - time * 8); ctx.fillStyle = '#a8f0e0'; ctx.fillRect(Math.round(x + (bx - x) * u), Math.round(y - 17 + (by - y + 17) * u), 1, 1); }
+        ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+      }
+    }
+    // a seeker changing places with your companion
+    if (ARCH.swap) {
+      const w2 = ARCH.swap, u = Math.min(1, w2.t / 1.2), e = u * u * (3 - 2 * u);
+      Rr.drawPortrait(ctx, (S.cmpX - cx) + (w2.x - S.cmpX) * e, (S.cmpY - cy) + (w2.y - S.cmpY) * e - Math.sin(e * Math.PI) * 14, 0.28, 0.9, w2.oldId);
+    }
+    // what the glass shows
+    const L7 = Math.ceil(7 * HS) + 3;
+    if (ARCH.focus && ARCH.iris > 0.2) {
+      const id = ARCH.focus;
+      ctx.globalAlpha = Math.min(1, ARCH.iris * 1.4); Rr.drawPortrait(ctx, bx, by - 1, 0.9, ctx.globalAlpha, id); ctx.globalAlpha = 1;
+      const tr = Rr.seekerTraits(id) || {}, gd = gradeOf(id);
+      const lines = [['SEEKER NET  #' + id + '  -  ' + ((tr.Base || '') + '  ' + (tr.Colorway || '')).toUpperCase(), '#e6f2f0'], [gradeLine(id), DP.GRADE_COL[gd]]]
+        .concat(DP.abilities(tr).map(a => [a[1], '#bfe3dc']))
+        .concat([id === P.seekerId ? ['YOUR COMPANION', '#9fd3c7'] : [(touchMode ? 'ENTER' : 'E') + '  TAKE IT WITH YOU', PAL.gold]]);
+      const tw = Math.max(...lines.map(l => R.textWidth(l[0]))) * HS + 14, th = lines.length * L7 + 6, tx = bx - tw / 2;
+      const ty = S.y + S.h < A0.core[1] - 20 ? by - 58 - th : by + 58;        // above the ring when you are above it
+      ctx.globalCompositeOperation = 'lighter'; g(bx, ty + th / 2, tw * 0.7, '90,170,160', 0.12); ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = 'rgba(8,20,22,0.82)'; ctx.fillRect(Math.round(tx), ty, Math.round(tw), th);
+      ctx.fillStyle = 'rgba(150,230,215,0.5)'; ctx.fillRect(Math.round(tx), ty, Math.round(tw), 1); ctx.fillRect(Math.round(tx), ty + th - 1, Math.round(tw), 1);
+      lines.forEach((l, k) => ht(l[0], bx, ty + 4 + k * L7, l[1], 'center', k === lines.length - 1 && id !== P.seekerId ? 0.65 + 0.35 * Math.sin(time * 4) : 1));
+    } else {
+      ht('THE', bx, by - 12, '#9fd3c7', 'center', 1);
+      ht('CODEX', bx, by - 4, '#e6f2f0', 'center', 1, 2);
+      ht(P.codex.length + ' / ' + R.NETN, bx, by + 9, '#7f9aa6', 'center', 1);
+    }
+    // the way down, where the Guardian broke the floor, and how deep you have been
+    const hx = (A0.hole[0] + A0.hole[1]) / 2 - cx, hy = A0.hole[2] - cy;
+    ctx.globalCompositeOperation = 'lighter'; g(hx, hy + 18, 44, '120,150,230', 0.16 + 0.04 * Math.sin(time * 1.4)); ctx.globalCompositeOperation = 'source-over';
+    ht('THE DEEP', hx, hy + 20, '#c9d6f0', 'center', 0.85);
+    const RM = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
+    if (P.deepBest) ht('DEEPEST  ' + RM[Math.min(8, P.deepBest)] + ' OF VIII', hx, hy + 20 + L7, '#6f7f9c', 'center', 0.7);
+    if (Math.abs(S.x + 2.5 - (A0.hole[0] + A0.hole[1]) / 2) < 40 && S.y + S.h <= A0.hole[2] + 2) ht('DROP IN TO DESCEND', hx, hy - 34, '#d6b98a', 'center', 0.6 + 0.4 * Math.sin(time * 3));
+  }
+
+  /* ---- what is drawn over a Deep room: where you are, your wards, the upgrade choice, the end of a run */
+  function drawDeepHUD(ctx) {
+    const L7 = Math.ceil(7 * HS) + 3;
+    if (RUN && (mode === 'play' || mode === 'pause')) {
+      const base = DEEPROOMS.find(r => r.id === RUN.rooms[RUN.i]) || {};
+      const hy = Math.round(44 / SC) + 14;
+      ht(DP.STRATUM_NAMES[base.stratum || 0] + '   ' + (RUN.i + 1) + ' / ' + RUN.rooms.length, 8, hy, '#9fb8bc', 'left', 0.8);
+      if (RUN.shields > 0) ht('WARD x' + RUN.shields, 8, hy + L7, '#d6b98a', 'left', 0.8);
+      const ch = world.level.chest;
+      if (ch && ch.near && ch.T < 0) ht((touchMode ? 'SEEK' : 'E') + '  OPEN', Math.round(ch.x - camX), Math.round(ch.y - camY) - 28, PAL.gold, 'center', 0.65 + 0.35 * Math.sin(gameTime * 4));
+      if (deepMsgT < 2.5) { deepMsgT += frameDt; ht(deepMsgS, LW >> 1, Math.round(LH * 0.3), '#d6b98a', 'center', Math.min(1, (2.5 - deepMsgT) * 2)); }
+      return;
+    }
+    ctx.fillStyle = 'rgba(4,6,10,' + Math.min(0.78, deepT * 1.4).toFixed(3) + ')'; ctx.fillRect(0, 0, LW, LH);
+    const a = Math.min(1, deepT / 0.6), cx = LW >> 1;
+    if (mode === 'deepPick') {
+      ht('ROOM ' + (RUN.i + 1) + ' CLEARED', cx, Math.round(LH * 0.12), PAL.snow, 'center', a, 2);
+      ht('TAKE ONE GIFT FOR THE WAY DOWN', cx, Math.round(LH * 0.12) + Math.ceil(14 * HS) + 6, '#9fb8bc', 'center', a);
+      for (const [i, c] of pickCards().entries()) {
+        const sel = i === deepSel;
+        ctx.globalAlpha = a; ctx.fillStyle = sel ? 'rgba(185,168,123,0.18)' : 'rgba(22,30,38,0.9)'; ctx.fillRect(c.x, c.y, c.w, c.h);
+        ctx.fillStyle = sel ? PAL.gold : '#33434c'; ctx.fillRect(c.x, c.y, c.w, 1); ctx.fillRect(c.x, c.y + c.h - 1, c.w, 1); ctx.fillRect(c.x, c.y, 1, c.h); ctx.fillRect(c.x + c.w - 1, c.y, 1, c.h);
+        ctx.globalAlpha = 1;
+        ht(c.u.name, c.x + c.w / 2, c.y + 6, sel ? PAL.gold : PAL.snow, 'center', a);
+        wrap(c.u.text, (c.w - 8) / HS).forEach((l, k) => ht(l, c.x + c.w / 2, c.y + 8 + L7 * (k + 1.3), '#aab4c0', 'center', a));
+      }
+      const have = RUN.picks.map(id => DP.UPGRADES.find(u => u.id === id).name);
+      if (have.length) wrap('SO FAR  ' + have.join('  -  '), (LW - 24) / HS).forEach((l, k) => ht(l, cx, Math.round(LH * 0.36) + 72 + k * L7, '#5d6474', 'center', a));
+      ht(touchMode ? 'TAP A GIFT, TAP AGAIN TO TAKE IT' : 'ARROWS  CHOOSE     SPACE  TAKE IT', cx, LH - 14, PAL.gold, 'center', a * (0.6 + 0.4 * Math.sin(deepT * 4)));
+    } else if (mode === 'deepOver') {
+      ht(RUN && RUN.gaveUp ? 'YOU TURNED BACK' : S.why === 'void' ? 'THE DARK TOOK YOU' : 'THE LIGHT FOUND YOU', cx, Math.round(LH * 0.2), PAL.snow, 'center', a, 2);
+      const base = RUN && DEEPROOMS.find(r => r.id === RUN.rooms[RUN.i]) || {};
+      let y = Math.round(LH * 0.2) + Math.ceil(14 * HS) + 10;
+      ht('ROOM ' + (RUN ? RUN.i + 1 : 0) + ' OF ' + DP.ROOMS_PER_RUN + '   ' + DP.STRATUM_NAMES[base.stratum || 0], cx, y, '#9fb8bc', 'center', a); y += L7 * 1.5;
+      ht('DEEPEST  ROOM ' + P.deepBest + (deepRecord ? '   A NEW RECORD' : ''), cx, y, deepRecord ? '#d6b98a' : '#7f8a96', 'center', a); y += L7 * 1.5;
+      ht('NO SEEKER WAKES THIS TIME', cx, y, '#5d6474', 'center', a);
+      if (deepT > 1.5) ht(touchMode ? 'TAP  -  BACK TO THE CODEX' : 'SPACE  BACK TO THE CODEX', cx, LH - 16, PAL.gold, 'center', 0.6 + 0.4 * Math.sin(deepT * 4));
+    } else if (mode === 'deepWin' && deepSpool) {
+      // a spool of thread, for the weaver
+      const y0 = Math.round(LH * 0.16), c = deepSpool;
+      ht('A SPOOL OF THREAD', cx, y0, PAL.snow, 'center', a, 2);
+      ctx.globalAlpha = a; R.drawSpool(ctx, cx, y0 + 62 + Math.round(Math.sin(deepT * 1.6) * 2), 3, c, deepT); ctx.globalAlpha = 1;
+      let y = y0 + 80;
+      ht(c.name, cx, y, c.glow || c.main, 'center', a, 2); y += L7 * 2;
+      ht(c.wins + ' WINS IN THE DEEP', cx, y, '#7f9aa6', 'center', a); y += L7 * 1.4;
+      ht('TAKE IT TO THE WEAVER', cx, y, '#c3cbd6', 'center', a * (0.75 + 0.25 * Math.sin(deepT * 3)));
+      if (deepT > 1.5) ht(touchMode ? 'TAP  -  BACK TO THE CODEX' : 'SPACE  BACK TO THE CODEX', cx, LH - 16, PAL.gold, 'center', 0.6 + 0.4 * Math.sin(deepT * 4));
+    } else if (mode === 'deepWin') {
+      const y0 = Math.round(LH * 0.14);
+      ht('A SEEKER WAKES IN THE DEEP', cx, y0, PAL.snow, 'center', a, 2);
+      R.drawPortrait(ctx, cx, y0 + 50, 1, a, deepNew);
+      let y = y0 + 82;
+      ht('SEEKER NET  #' + deepNew + '   ' + gradeLine(deepNew), cx, y, DP.GRADE_COL[gradeOf(deepNew)], 'center', a); y += L7 * 1.4;
+      for (const [src, words] of DP.abilities(R.seekerTraits(deepNew)).slice(0, 4)) { ht(words, cx, y, '#aab4c0', 'center', a); y += L7; }
+      y += 4;
+      ht('ADDED TO YOUR CODEX  -  ' + P.codex.length + ' OF ' + R.NETN, cx, y, '#7f9aa6', 'center', a);
+      if (deepT > 1.5) ht(touchMode ? 'TAP  -  BACK TO THE CODEX' : 'SPACE  BACK TO THE CODEX', cx, LH - 16, PAL.gold, 'center', 0.6 + 0.4 * Math.sin(deepT * 4));
+    }
+  }
+
   /* ------------------------------------------------------------ camera */
   function camTarget() {
+    if (window.__cam) return [window.__cam[0] - LW / 2, window.__cam[1] - LH / 2];   // (for mock-ups)
     const px = S.x + 2.5, py = S.y + S.h * 0.5;
     const look = Math.max(-1, Math.min(1, S.vx / 72)) * 26;
     let tx = px - LW / 2 + look;
     let ty = py - LH * 0.56 + (S.vy > 120 ? 22 : 0) + (S.wallDir ? -6 : 0);
+    if (ARCH && world.level.archive) {
+      // in the Codex the view leans toward the shell, more so while a seeker is awake, so its words are in view
+      const c = world.level.archive.core, k = 0.45 + 0.35 * ARCH.iris, mx = LW * 0.36, my = LH * 0.34;
+      tx = Math.max(px - LW / 2 - mx, Math.min(px - LW / 2 + mx, tx + (c[0] - LW / 2 - tx) * k));
+      ty = Math.max(py - LH / 2 - my, Math.min(py - LH / 2 + my, ty + (c[1] + 30 - LH / 2 - ty) * k));
+    }
     const B = world.boss;
     if (B && !S.bBurst) {
       // lean the view toward the Guardian, as far as keeps the Dweller well inside the frame
@@ -593,12 +988,12 @@
     if (ev & EV.RESPAWN) { L.sfx('respawn'); deathFade = 0; for (let i = 0; i < 18; i++) R.spawn(st.x + 2.5 + (Math.random() - 0.5) * 8, st.y + 10 - Math.random() * 10, (Math.random() - 0.5) * 12, -20 - Math.random() * 30, 0.8, th.lamp[2], 1, -10, true); }
     if (ev & EV.CHECK) {
       L.sfx('check'); R.markTether(st.cp, performance.now() / 1000);
-      writeTether();
+      if (!RUN) writeTether();
       for (let i = 0; i < 40; i++) { const a = Math.random() * 6.283, sp = 10 + Math.random() * 40; R.spawn(st.cpX, st.cpY - 12, Math.cos(a) * sp, Math.sin(a) * sp - 25, 1 + Math.random(), i % 2 ? th.lamp[1] : th.lamp[2], 1, 20, true); }
     }
     if (ev & EV.SEEKER) {
       L.sfx('seeker'); flash = 0.6; seekerCardT = 0;
-      if (!P.comp) { P.comp = true; saveProgress(); }
+      if (!P.comp) { P.comp = true; codexInit(); }
       for (let i = 0; i < 50; i++) { const a = Math.random() * 6.283, sp = 10 + Math.random() * 45; R.spawn(st.cmpX, st.cmpY, Math.cos(a) * sp, Math.sin(a) * sp - 10, 0.8 + Math.random(), i % 2 ? '#5daa99' : '#d5f8fc', 1, 10, true); }
       syncTouchUI();
     }
@@ -615,7 +1010,9 @@
     }
     if (ev & EV.THROES) { L.sfx('caught', { v: 1.4 }); shake = 4; }
     if (ev & EV.BURST) { R.guardianBurst(world, st); L.sfx('win'); L.sfx('death'); flash = 2; shake = 6; cardText = 'THE GUARDIAN IS GONE  -  FALL'; cardT = 0; }
-    if (ev & EV.WIN && cur === CORE) {
+    if (ev & EV.SHIELD) { L.sfx('hush'); flash = 0.8; shake = 1.2; if (RUN) RUN.shields = st.shields; deepMsg('THE WARD TAKES THE BURN'); }
+    if (ev & EV.WIN && RUN) { deepRoomDone(); }
+    else if (ev & EV.WIN && cur === CORE) {
       L.sfx('win'); flash = 2; shake = 2;
       const t = runTicks / D.TICK; winTime = t;
       newBest = !P.coreBest || t < P.coreBest; if (newBest) P.coreBest = t;
@@ -669,6 +1066,11 @@
     let inp;
     if (replay) { inp = replayI < replay.length ? replay[replayI++] : 0; }
     else { inp = inputMask(); latch = 0; }
+    if (ARCH) { const e = !!(inp & IN.E); if (e && !ARCH.ePrev) archInteract(); ARCH.ePrev = e; inp &= ~IN.E; }
+    if (RUN && world.level.chest && mode === 'play') chestStep(inp);
+    const ch0 = RUN && world.level.chest;
+    if (ch0 && (ch0.near || ch0.T >= 0)) inp &= ~IN.E;               // by the chest, E opens it (and does not call the eclipse)
+    if (ch0 && ch0.T >= 0) inp = 0;                                  // and while it opens, you stand and watch
     D.step(world, S, inp);
     runTicks++;
     if (S.ev) handleEvents(S.ev, S);
@@ -679,7 +1081,14 @@
     if ((S.t & 7) === 0) beamSounds();
     if ((S.t & 3) === 0) watcherSounds();
     if (S.roll && (S.t & 3) === 0) puff(S, 1, 0.3);
-    if (S.won) { if (mode === 'play') { mode = 'win'; winT = 0; syncTouchUI(); } }
+    if (ARCH && mode === 'play') {
+      const A0 = world.level.archive;
+      if (S.y > A0.hole[2] + 70) { ARCH = null; startDeep(); return; }
+      if (S.x < A0.exit) { ARCH = null; toTown(NL); return; }
+    }
+    if (S.won && !RUN && !ARCH) { if (mode === 'play') { mode = 'win'; winT = 0; syncTouchUI(); } }
+    // one life in The Deep: when the light finds you, the run is over
+    if (RUN && S.dead && S.deadT > 70 && mode === 'play') deepOver(false);
   }
 
   function frame(now) {
@@ -703,12 +1112,17 @@
         R.updateParticles(dt);
         updateCamera(dt);
         if (mode === 'play') updateSection();
+        if (ARCH && mode === 'play') archFrame(dt);
         if (mode === 'win') winT += dt;
         cardT += dt; seekerCardT += dt;
         shake = Math.max(0, shake - dt * 6); flash = Math.max(0, flash - dt * 1.6);
         const fear = Math.min(1, Math.max(S.ex * 1.15, S.lit * 0.55));
         A.Live.update(S.dead ? 0.1 : fear, mode === 'win' ? 0.7 : 1);
         if (world.boss) A.Live.boss = { p: S.bP || 0, wake: !!S.bWake, die: S.bDie || 0, burst: !!S.bBurst, warn: S.bFlareWarn };
+        if (RUN) { const k = (RUN.i + Math.max(0, Math.min(1, (S.x + 2.5) / (world.W * D.TS)))) / RUN.rooms.length; A.Live.deep = { k, seed: RUN.music }; A.Live.setMood(0.25 + 0.7 * k, RUN.keys[RUN.i % 8]); }
+      } else if (mode === 'deepPick' || mode === 'deepOver' || mode === 'deepWin') {
+        R.updateParticles(dt); deepT += dt; flash = Math.max(0, flash - dt * 1.6); shake = Math.max(0, shake - dt * 6);
+        A.Live.update(0, 0.8);
       } else if (mode === 'pause') {
         R.updateParticles(0);
       } else if (mode === 'title' || mode === 'town') {
@@ -757,14 +1171,18 @@
       const cxp = camX + sx, cyp = camY + sy;
       const fx = Math.floor(cxp), fy = Math.floor(cyp);
       ox = (cxp - fx) * SC; oy = (cyp - fy) * SC;
-      R.drawScene(ctx, { w: world, s: S, time: gameTime, dt: mode === 'pause' ? 0 : dt }, fx, fy, LW, LH);
+      R.drawScene(ctx, { w: world, s: S, time: gameTime, dt: mode === 'pause' || mode === 'deepPick' ? 0 : dt, back: ARCH ? (c, x, y) => AR.drawBack(c, x, y, archSt()) : null, lift: ARCH ? (c, x, y, disc) => AR.lift(c, x, y, disc, archSt()) : null }, fx, fy, LW, LH);
+      if (window.__overlay) window.__overlay(ctx, fx, fy, LW, LH, gameTime);   // (for mock-ups)
+      halfText();
+      if (ARCH) drawArchive(ctx, fx, fy);
       drawHUD(ctx);
+      if (RUN || mode === 'deepOver' || mode === 'deepWin') drawDeepHUD(ctx);
     }
     gctx.imageSmoothingEnabled = false;
     gctx.fillStyle = '#000'; gctx.fillRect(0, 0, canvas.width, canvas.height);
     gctx.drawImage(off, 0, 0, LW, LH, Math.round(-ox), Math.round(-oy), LW * SC, LH * SC);
+    flushHT();
     if (mode === 'title' || mode === 'town') {
-      flushHT();
       if (bootFade < 2.5) { gctx.globalAlpha = 1 - bootFade / 2.5; gctx.fillStyle = '#000'; gctx.fillRect(0, 0, canvas.width, canvas.height); gctx.globalAlpha = 1; }
     }
     drawCard();
@@ -794,13 +1212,13 @@
     if (S_.dead) {
       const k = Math.min(1, S_.deadT / 60) * (S_.deadT > D.C.DEADT - 30 ? Math.max(0, (D.C.DEADT - S_.deadT) / 30) : 1);
       ctx.globalAlpha = k * 0.85; ctx.fillStyle = '#05050a'; ctx.fillRect(0, 0, LW, LH); ctx.globalAlpha = 1;
-      if (S_.deadT > 20) { ctx.globalAlpha = Math.min(1, (S_.deadT - 20) / 20) * k; R.drawText(ctx, S_.why === 'void' ? 'THE DARK TOOK YOU' : 'THE LIGHT FOUND YOU', LW >> 1, (LH >> 1) - 4, PAL.muted, 1, 'center'); ctx.globalAlpha = 1; }
+      if (S_.deadT > 20 && !RUN && mode !== 'deepOver') { ctx.globalAlpha = Math.min(1, (S_.deadT - 20) / 20) * k; R.drawText(ctx, S_.why === 'void' ? 'THE DARK TOOK YOU' : 'THE LIGHT FOUND YOU', LW >> 1, (LH >> 1) - 4, PAL.muted, 1, 'center'); ctx.globalAlpha = 1; }
     }
     if (S_.ex > 0.04 && !S_.dead) {
       const px = Math.round(S_.x + 2.5 - camX), py = Math.round(S_.y - 7 - camY);
       drawBar(ctx, px - 8, py, 16, 2, Math.min(1, S_.ex), S_.ex > 0.7 ? '#e8e0d0' : '#a9c4d2');
     }
-    if (world.boss && (mode === 'play' || mode === 'pause')) {
+    if (world.boss && (mode === 'play' || mode === 'pause') && !window.__clean) {
       // the six slivers: set ones burn in their colour, the next one pulses
       const n = S_.bP || 0, x0 = (LW >> 1) - 5 * 9;
       for (let i = 0; i < 6; i++) {
@@ -818,7 +1236,7 @@
     }
     // the section's name is drawn on the full-resolution screen after the upscale (see drawCard)
     // the companion's charge (top left)
-    if (S_.cmp && mode !== 'win') {
+    if (S_.cmp && mode !== 'win' && !window.__clean) {
       const x = 12, y = Math.round(44 / SC) + 3;
       const ready = S_.cmp === 1 && S_.cmpCD === 0;
       ctx.globalAlpha = ready ? 0.9 : 0.55;
@@ -838,7 +1256,7 @@
       R.drawText(ctx, 'FOR A FEW BEATS', LW / 2 - 20, cy + 28, '#8a919e', 1, 'left');
       ctx.globalAlpha = 1;
     }
-    if (mode === 'play') {
+    if (mode === 'play' && !window.__clean && !ARCH) {
       ctx.globalAlpha = 0.5;
       if (touchMode) R.drawText(ctx, fmtTime(runTicks / D.TICK), LW >> 1, Math.round(44 / SC), PAL.muted, 1, 'center');
       else R.drawText(ctx, fmtTime(runTicks / D.TICK), LW - 6, Math.round(44 / SC), PAL.muted, 1, 'right');
@@ -863,9 +1281,9 @@
         R.drawText(ctx, 'THE GUARDIAN IS GONE, AND THE DARK BELOW IS YOURS', LW >> 1, y0 + 22, PAL.gold, 1, 'center');
         R.drawText(ctx, 'TIME  ' + fmtTime(winTime) + (newBest ? '  NEW BEST' : '') + '     LIGHT FOUND YOU  ' + S_.deaths + ' TIMES', LW >> 1, y0 + 36, PAL.snow, 1, 'center');
         R.drawGem(ctx, LW >> 1, y0 + 70, 0.9, P.beaten, gameTime, true);
-        const cr = ['DWELLER', 'A GAME IN THE SEEKER UNIVERSE  -  OPEN ART, MUSIC AND LORE', 'THE GUARDIAN  -  PLANETARY GUARDIAN #255', 'YOUR COMPANION  -  SEEKER NET #' + R.seekerId, 'THANK YOU FOR DESCENDING'];
-        cr.forEach((c, i) => R.drawText(ctx, c, LW >> 1, y0 + 96 + i * 12, i ? '#a9b2c0' : PAL.gold, 1, 'center'));
-        if (winT > 2.5) { ctx.globalAlpha = a * (0.55 + 0.45 * Math.sin(winT * 3)); R.drawText(ctx, touchMode ? 'TAP FOR THE TOWN' : 'ENTER  TOWN     N  AGAIN', LW >> 1, y0 + 162, PAL.gold, 1, 'center'); }
+        const cr = ['DWELLER', 'A GAME IN THE SEEKER UNIVERSE  -  OPEN ART, MUSIC AND LORE', 'THE GUARDIAN  -  PLANETARY GUARDIAN #255', 'YOUR COMPANION  -  SEEKER NET #' + R.seekerId, 'THANK YOU FOR DESCENDING', '', 'SOMETHING STIRS BEHIND THE GREAT DOOR'];
+        cr.forEach((c, i) => R.drawText(ctx, c, LW >> 1, y0 + 96 + i * 12, i === 6 ? '#9fd3c7' : i ? '#a9b2c0' : PAL.gold, 1, 'center'));
+        if (winT > 2.5) { ctx.globalAlpha = a * (0.55 + 0.45 * Math.sin(winT * 3)); R.drawText(ctx, touchMode ? 'TAP FOR THE TOWN' : 'ENTER  TOWN', LW >> 1, y0 + 186, PAL.gold, 1, 'center'); }
         ctx.globalAlpha = 1;
         return;
       }
@@ -917,6 +1335,7 @@
       teleport(x, y) { S.x = x; S.y = y; snapCamera(); },
       shot() { return canvas.toDataURL('image/png'); },
       get ticks() { return runTicks; },
+      deepRoom(id, tier) { startDeep(); RUN.rooms = [id, id]; RUN.tier = tier || 0; loadDeepRoom(0); },   // (for checking the rooms)
     };
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();

@@ -1,4 +1,4 @@
-import base64, json, os, sys
+import base64, json, os, re, sys, glob
 import subprocess
 root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 A = os.path.join(root, 'assets')
@@ -19,6 +19,7 @@ assets = {
  'collector': 'animations/collector/Idle__r1c24__48x48.png',
  'exiled': 'animations/exiled1/Idle__r1c24__48x48.png',
  'monk': 'animations/monk/Idle__r1c24__48x48.png',
+ 'weaver': 'animations/weaver/Idle__r1c24__48x48.png',
  'g255_orb': 'guardian/g255_orb.png',
  'g255_body': 'guardian/g255_body.png',
  'g255_eyes': 'guardian/g255_eyes.png',
@@ -35,6 +36,17 @@ for n in range(1, 10):
     tp = os.path.join(root, 'build/terrain%d.png' % n)
     if os.path.exists(tp):
         data['terrain%d' % n] = 'data:image/png;base64,' + base64.b64encode(open(tp, 'rb').read()).decode()
+# THE DEEP: every room (tools/deep.py) and its baked terrain
+deep_rooms = []
+for p in sorted(glob.glob(os.path.join(root, 'build/deep/*.json'))):
+    nm = os.path.basename(p)[:-5]
+    if not re.match(r'^[a-z]+\d$', nm):
+        continue
+    L = json.load(open(p))
+    L['id'] = nm; L['terrainKey'] = 'tdeep_' + nm
+    deep_rooms.append(L)
+    data['tdeep_' + nm] = 'data:image/png;base64,' + base64.b64encode(open(os.path.join(root, 'build/deep/terrain_%s.png' % nm), 'rb').read()).decode()
+print('deep rooms', len(deep_rooms))
 rd = lambda p: open(os.path.join(root, p), encoding='utf-8').read()
 import glob
 lv_files = sorted(glob.glob(os.path.join(root, 'build/level[0-9].json')), key=lambda p: int(os.path.basename(p)[5:-5]))
@@ -48,11 +60,11 @@ html = '''<!doctype html>
 <meta property="og:type" content="website">
 <meta property="og:title" content="Dweller">
 <meta property="og:description" content="Stay in the shadow. Reach the rainbow crystal. A dark side-scroller set in The Seeker universe.">
-<meta property="og:image" content="https://johnnydebtt.github.io/DWELLER-2.0/dist/preview.png">
+<meta property="og:image" content="https://johnnydebtt.github.io/DWELLER-2.0/dist/preview-town.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://johnnydebtt.github.io/DWELLER-2.0/dist/preview.png">
+<meta name="twitter:image" content="https://johnnydebtt.github.io/DWELLER-2.0/dist/preview-town.png">
 <style>
 :root{color-scheme:dark}
 html,body{margin:0;height:100%;background:#07070c;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior:none}
@@ -85,16 +97,18 @@ body.cmp #tbE{display:flex}
 <div id="touch"></div>
 <div id="loading">loading</div>
 <div id="err"></div>
-<script>window.DWELLER_ASSETS=%ASSETS%;window.DWELLER_LEVELS=%LEVELS%;window.DWELLER_SEEKERS=%SEEKERS%;</script>
+<script>window.DWELLER_ASSETS=%ASSETS%;window.DWELLER_LEVELS=%LEVELS%;window.DWELLER_SEEKERS=%SEEKERS%;window.DWELLER_DEEP=%DEEP%;</script>
 <script>%SIM%</script>
 <script>%RENDER%</script>
 <script>%AUDIO%</script>
+<script>%DEEPJS%</script>
+<script>%ARCHJS%</script>
 <script>%TOWN%</script>
 <script>%MAIN%</script>
 </body></html>'''
-out = (html.replace('%ASSETS%', json.dumps(data)).replace('%LEVELS%', levels).replace('%SEEKERS%', seekernet)
+out = (html.replace('%ASSETS%', json.dumps(data)).replace('%LEVELS%', levels).replace('%SEEKERS%', seekernet).replace('%DEEP%', json.dumps(deep_rooms, separators=(',', ':')))
        .replace('%SIM%', rd('src/sim.js')).replace('%RENDER%', rd('src/render.js'))
-       .replace('%AUDIO%', rd('src/audio.js')).replace('%TOWN%', rd('src/town.js')).replace('%MAIN%', rd('src/main.js')))
+       .replace('%AUDIO%', rd('src/audio.js')).replace('%DEEPJS%', rd('src/deep.js')).replace('%ARCHJS%', rd('src/archive.js')).replace('%TOWN%', rd('src/town.js')).replace('%MAIN%', rd('src/main.js')))
 p = os.path.join(root, 'dist/dweller.html')
 open(p, 'w', encoding='utf-8').write(out)
 print('wrote', p, len(out) // 1024, 'KB')

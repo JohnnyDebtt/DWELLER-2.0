@@ -7,7 +7,9 @@ const D = require('../src/sim.js');
 const levelPath = process.argv[2] || path.join(__dirname, '../build/level.json');
 const outPath = process.argv[3] || path.join(__dirname, '../build/solution.json');
 const onlySeg = process.argv[4] !== undefined ? parseInt(process.argv[4], 10) : -1;
-const level = JSON.parse(fs.readFileSync(levelPath, 'utf8'));
+let level = JSON.parse(fs.readFileSync(levelPath, 'utf8'));
+// a Deep room is proven at a tier: DEEPTIER=0..4
+if (process.env.DEEPTIER !== undefined) level = D.deepTier(level, +process.env.DEEPTIER);
 const w = D.makeWorld(level);
 const { IN } = D;
 const MACRO = 8;

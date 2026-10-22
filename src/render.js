@@ -202,6 +202,7 @@
       const s = SHEETS[k];
       sheet(k + 'V', whiteOnly(s.cv), s.cols, s.rows, s.w, s.h, s.ax, s.ay);
     }
+    for (const k of COAT_SHEETS) COAT_SRC[k] = SHEETS[k].cv;
     // Tether (checkpoint), watcher eye + roots, orb
     P('tether', 24, 1, 48, 48, 24, 47);
     P('voidBody', 1, 1, 48, 48, 24, 24);
@@ -431,7 +432,7 @@
   function prepare(w, themeName, idx) {
     TH = THEMES[themeName] || THEMES.descent; levelIdx = idx || 0; shardCol = SHARDS[levelIdx] || SHARDS[0];
     tileFlip = themeTiles(TH); SHEETS.orbT = themeOrb(TH);
-    const baked = IMG['terrain' + (levelIdx + 1)];
+    const baked = IMG[(w.level && w.level.terrainKey) || ('terrain' + (levelIdx + 1))];
     if (!baked || baked.width !== w.W || baked.height !== w.H) throw new Error('the baked terrain is for another level: run tools/bake_levels.cjs');
     cellsW = baked.width; cellsH = baked.height;
     cells = baked.getContext('2d').getImageData(0, 0, cellsW, cellsH).data;
@@ -588,12 +589,13 @@
     }
     // gentle lifts: the Dweller sees a little in the dark; tethers and the crystal glow without hurting
     const px = s.x + 2.5, py = s.y + s.h * 0.5;
-    softDisc(lctx, px - camX, py - camY, 26, 0.30);
+    softDisc(lctx, px - camX, py - camY, COAT && COAT.glow ? 32 : 26, COAT && COAT.glow ? 0.30 + COAT.glowA * 0.4 : 0.30);
     for (const c of w.checks) {
       if (c.x < camX - 30 || c.x > camX + W + 30) continue;
       softDisc(lctx, c.x - camX, c.y - 12 - camY, c.i <= s.cp ? 30 : 14, c.i <= s.cp ? 0.42 : 0.16);
     }
     const g = w.goal;
+    if (w.level.chest) { const ch = w.level.chest; softDisc(lctx, ch.x - camX, ch.y - camY, 70, 0.5); }
     if (g.x > camX - 140 && g.x < camX + W + 140) softDisc(lctx, g.x - camX, g.y - camY, 110, 0.8);
     for (const l of lights) if (!l.hazard && l.col !== 'rainbow' && l.col !== 'shard') { if (l.x > camX - l.r && l.x < camX + W + l.r) softDisc(lctx, l.x - camX, l.y - camY, l.r, 0.5 * l.k); }
     // the hidden seeker leaks a little light through its false wall; the companion glows softly
@@ -601,6 +603,7 @@
     if (s.cmp) softDisc(lctx, s.cmpX - camX, s.cmpY - camY, 14, 0.18);
     if (w.boss && !s.bBurst && s.bWake) { const B = w.boss, ecl = s.cmpL >= 0 && w.lights[s.cmpL] && w.lights[s.cmpL].boss && s.cmpK > 0; softDisc(lctx, B.x - camX, B.y - camY, 70, ecl ? 0.12 : 0.34); }
     else if (w.boss && !s.bBurst) softDisc(lctx, w.boss.x - camX, w.boss.y - camY, 50, 0.12);
+    if (Gm.lift) Gm.lift(lctx, camX, camY, softDisc);   // a room that lights itself (the Codex)
     // quantize
     const darkBGR = (TH.dark[2] << 16) | (TH.dark[1] << 8) | TH.dark[0];
     const id = lctx.getImageData(0, 0, W, H); const d = id.data;
@@ -656,7 +659,204 @@
   }
 
   let sceneTime = 0;
+  /* the Dweller's coat: the cloak's two colours (the sand and its shadow) swapped for another pair, and for the finest
+     coats a faint glow of their own. setCoat(null) is the sand coat. */
+  const COAT_SHEETS = ['idle', 'run', 'jump', 'fall', 'roll', 'wall', 'death', 'breath'], COAT_SRC = {}, SEAM = {};
+  let COAT = null;
+  /* the coats the weaver makes: sand to begin with, Shell for the Guardian, then one for each stratum of The Deep as
+     the wins add up. The last three glow a little; the last has a seam of light where its folds meet */
+  const COATS = [
+    { id: 'sand', name: 'SAND' },
+    { id: 'shell', name: 'SHELL', main: '#cfc6ae', shade: '#6f8a86', core: true },
+    { id: 'shaft', name: 'THE SHAFT', main: '#959aa3', shade: '#585c66', wins: 5 },
+    { id: 'roots', name: 'THE ROOTS', main: '#7ea86a', shade: '#46663f', wins: 10 },
+    { id: 'geode', name: 'THE GEODE', main: '#a283c8', shade: '#5f4985', wins: 15 },
+    { id: 'workings', name: 'THE WORKINGS', main: '#b8794a', shade: '#6e452c', wins: 20, glow: '#ffb070', glowA: 0.1 },
+    { id: 'magma', name: 'THE MAGMA', main: '#b4503a', shade: '#6b2f2a', wins: 30, glow: '#ff7a3c', glowA: 0.16 },
+    { id: 'vein', name: 'THE VEIN', main: '#4c4158', shade: '#272030', wins: 35, glow: '#ff5a7a', glowA: 0.26, seam: '#ff7d98' },
+  ];
+  function hexRGB(h) { return [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); }
+  function setCoat(c) {
+    COAT = c && c.main ? c : null;
+    for (const k of COAT_SHEETS) {
+      const src = COAT_SRC[k]; if (!src) continue;
+      if (!COAT) { SHEETS[k].cv = src; continue; }
+      const cv = document.createElement('canvas'); cv.width = src.width; cv.height = src.height;
+      const x = cv.getContext('2d'); x.drawImage(src, 0, 0);
+      const id = x.getImageData(0, 0, cv.width, cv.height), d = id.data, M = hexRGB(COAT.main), Sh = hexRGB(COAT.shade);
+      for (let i = 0; i < d.length; i += 4) {
+        if (!d[i + 3]) continue;
+        const r = d[i], g = d[i + 1], b = d[i + 2];
+        const to = r === 185 && g === 168 && b === 123 ? M : r === 107 && g === 98 && b === 88 ? Sh : null;
+        if (to) { d[i] = to[0]; d[i + 1] = to[1]; d[i + 2] = to[2]; }
+      }
+      x.putImageData(id, 0, 0); SHEETS[k].cv = cv;
+      SEAM[k] = null;
+      if (COAT.seam) {
+        // the seam: every pixel of the coat that touches its shadow, lit on its own canvas so it can glow over the dark
+        const sc = document.createElement('canvas'); sc.width = cv.width; sc.height = cv.height;
+        const sx = sc.getContext('2d'), out = sx.createImageData(cv.width, cv.height), o = out.data, W = cv.width, H = cv.height, Se = hexRGB(COAT.seam);
+        const is = (xx, yy, c) => { if (xx < 0 || yy < 0 || xx >= W || yy >= H) return false; const j = (yy * W + xx) * 4; return d[j + 3] && d[j] === c[0] && d[j + 1] === c[1] && d[j + 2] === c[2]; };
+        for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) {
+          if (!is(xx, yy, M)) continue;
+          if ((is(xx + 1, yy, Sh) || is(xx - 1, yy, Sh)) && !is(xx, yy - 1, Sh)) { /* only where a fold runs down the coat */ const j = (yy * W + xx) * 4; o[j] = Se[0]; o[j + 1] = Se[1]; o[j + 2] = Se[2]; o[j + 3] = 255; }
+        }
+        sx.putImageData(out, 0, 0);
+        SEAM[k] = Object.assign({}, SHEETS[k], { cv: sc });
+      }
+    }
+  }
+  /* a spool of thread in a coat's colours, for the weaver: wooden ends, the thread wound between, a loose end, a glint.
+     (x, y) is the bottom middle; k scales it */
+  function drawSpool(ctx, x, y, k, c, time) {
+    const px = (X, Y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(Math.round(x + X * k), Math.round(y + Y * k), Math.ceil(w * k), Math.ceil(h * k)); };
+    const main = c.main || '#b9a87b', shade = c.shade || '#6b6258', wood = '#8a6440', woodD = '#5a3f28';
+    if (c.glow) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(x, y - 5 * k, 0, x, y - 5 * k, 14 * k); g.addColorStop(0, c.glow); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.globalAlpha = 0.25 + 0.1 * Math.sin(time * 2); ctx.fillStyle = g; ctx.fillRect(x - 14 * k, y - 19 * k, 28 * k, 28 * k); ctx.restore(); }
+    px(-4, -10, 9, 2, wood); px(-4, -9, 9, 1, woodD);            // the top end
+    px(-3, -8, 7, 6, main);                                        // the thread
+    px(2, -8, 2, 6, shade);
+    for (let i = 0; i < 3; i++) px(-3, -7 + i * 2, 7, 1, shade);   // the turns of the thread
+    if (c.seam) px(-1, -8, 1, 6, c.seam);
+    px(-4, -2, 9, 2, wood); px(-4, -1, 9, 1, woodD);               // the bottom end
+    px(4, -5, 1, 1, main); px(5, -4, 1, 2, main); px(6, -2, 1, 2, main);   // the loose end
+    if (Math.sin(time * 2.4) > 0.6) px(-2, -7, 1, 1, '#ffffff');    // a glint
+  }
+  /* The Deep's way on: a gate standing on the floor at the end of a room, glowing in the colour of the room beyond.
+     Walk through it. Drawn after the dark. */
+  const GATE_RGB = { descent: '150,200,232', mycelium: '96,200,168', glass: '176,146,236', foundry: '238,172,96', ember: '255,112,64', heart: '236,86,118' };
+  let FLOOR = null;
+  function floorUnder(w, x, y) {
+    if (FLOOR && FLOOR.w === w && FLOOR.x === x && FLOOR.y === y) return FLOOR.f;
+    const tx = Math.floor(x / TS); let ty = Math.floor(y / TS);
+    while (ty < w.H && !D.solidAt(w, tx, ty)) ty++;
+    FLOOR = { w, x, y, f: ty * TS }; return FLOOR.f;
+  }
+  function drawGate(ctx, w, camX, camY, W, H, time) {
+    const g = w.goal;
+    if (g.x < camX - 80 || g.x > camX + W + 80) return;
+    const rgb = GATE_RGB[w.level.nextTheme] || '170,235,222', fy = floorUnder(w, g.x, g.y) - camY, cx = Math.round(g.x - camX);
+    const iw = 12, ih = 20, x0 = cx - iw / 2, top = fy - ih, k = 0.82 + 0.18 * Math.sin(time * 1.7);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    // light spilling out onto the floor and up the rock around it
+    const sp = ctx.createRadialGradient(cx, fy - 8, 0, cx, fy - 8, 46);
+    sp.addColorStop(0, 'rgba(' + rgb + ',' + (0.22 * k).toFixed(3) + ')'); sp.addColorStop(1, 'rgba(' + rgb + ',0)');
+    ctx.fillStyle = sp; ctx.fillRect(cx - 46, fy - 54, 92, 60);
+    // the glowing surface inside the arch: brightest low down, slow bands rising through it
+    for (let y = 0; y < ih; y++) {
+      const u = y / ih, arch = y < 4 ? [3, 1, 1, 0][y] : 0, band = 0.5 + 0.5 * Math.sin(y * 0.9 - time * 3);
+      ctx.fillStyle = 'rgba(' + rgb + ',' + ((0.28 + 0.4 * u + 0.12 * band) * k).toFixed(3) + ')';
+      ctx.fillRect(x0 + arch, top + y, iw - 2 * arch, 1);
+    }
+    ctx.fillStyle = 'rgba(255,255,255,' + (0.25 * k).toFixed(3) + ')'; ctx.fillRect(cx - 1, top + 5, 2, ih - 6);
+    // motes drifting up out of it
+    for (let i = 0; i < 8; i++) { const u = (time * 0.3 + i / 8) % 1; ctx.fillStyle = 'rgba(' + rgb + ',' + (0.8 * (1 - u)).toFixed(3) + ')'; ctx.fillRect(x0 + 1 + ((i * 5) % (iw - 2)), Math.round(fy - 2 - u * 34), 1, 1); }
+    ctx.restore();
+    // the frame: two dark pillars and an arch of fitted stone, runes on it lit in the same colour
+    const st0 = '#1c1f28', st1 = '#2c303c', st2 = '#3d4252';
+    ctx.fillStyle = st1; ctx.fillRect(x0 - 3, top + 2, 3, ih - 2); ctx.fillRect(x0 + iw, top + 2, 3, ih - 2);
+    ctx.fillStyle = st0; ctx.fillRect(x0 + iw + 2, top + 2, 1, ih - 2);
+    ctx.fillStyle = st2; ctx.fillRect(x0 - 3, top + 2, 1, ih - 2);
+    ctx.fillStyle = st1; ctx.fillRect(x0 - 2, top - 1, iw + 4, 2); ctx.fillRect(x0 + 1, top - 2, iw - 2, 1); ctx.fillRect(x0 - 3, top + 1, 2, 1); ctx.fillRect(x0 + iw + 1, top + 1, 2, 1);
+    ctx.fillStyle = st2; ctx.fillRect(x0 + 1, top - 2, iw - 2, 1);
+    ctx.fillStyle = st0; ctx.fillRect(x0 - 4, fy - 2, 5, 2); ctx.fillRect(x0 + iw - 1, fy - 2, 5, 2);        // the feet
+    ctx.fillStyle = 'rgba(' + rgb + ',' + (0.75 * k).toFixed(3) + ')';
+    ctx.fillRect(cx - 1, top - 2, 2, 1);                                                                   // the keystone
+    for (let i = 0; i < 4; i++) { if ((Math.floor(time * 1.5) + i) % 4 === 0) continue; ctx.fillRect(x0 - 2, top + 5 + i * 4, 1, 2); ctx.fillRect(x0 + iw + 1, top + 7 + i * 4, 1, 2); }
+  }
+
+  /* the chest at the very bottom of a run: domed, iron-banded, one kind for each stratum. t: 0 shut .. 1 open (the lid
+     lifts and is thrown back on its hinges). (cx, fy) is the middle of its foot on the floor */
+  const CHESTS = {
+    theorem: { wood: '#2e3644', woodL: '#465062', woodD: '#1c202a', band: '#5daa99', bandL: '#bef6e8', inner: '#0a1618', light: '120,230,210' },
+    guardian: { wood: '#c4bca6', woodL: '#e2dcc8', woodD: '#8c8474', band: '#506064', bandL: '#82d2c4', inner: '#0e1e20', light: '140,240,220' },
+    root: { wood: '#5c402c', woodL: '#7e5a3e', woodD: '#3a281c', band: '#404246', bandL: '#6e7074', inner: '#120c08', light: '130,230,200' },
+    geode: { wood: '#3a3640', woodL: '#56505e', woodD: '#24202a', band: '#605c64', bandL: '#8c8892', inner: '#140c1e', light: '190,150,245' },
+    ember: { wood: '#282222', woodL: '#3e3634', woodD: '#181414', band: '#58504e', bandL: '#827874', inner: '#1e0804', light: '255,130,70' },
+  };
+  const CHEST_OF = { descent: 'theorem', mycelium: 'root', glass: 'geode', foundry: 'ember', ember: 'ember', heart: 'guardian' };
+  function drawChest(ctx, cx, fy, kind, t, time, shake) {
+    // 18 x 12: an 18 x 7 body under a four-row dome
+    const c = CHESTS[kind] || CHESTS.theorem, BW = 18, BH = 7, X0 = Math.round(cx - BW / 2) + (shake || 0), top = fy - BH;
+    const R = (x, y, w, h, col) => { if (w > 0 && h > 0) { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); } };
+    const light = 'rgb(' + c.light + ')';
+    if (t > 0.2) {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      const g = ctx.createRadialGradient(cx, top - 2, 0, cx, top - 2, 28); g.addColorStop(0, 'rgba(' + c.light + ',' + (0.42 * Math.min(1, t)).toFixed(3) + ')'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g; ctx.fillRect(cx - 28, top - 30, 56, 42); ctx.restore();
+    }
+    if (t >= 0.66) {
+      // the lid thrown back on its hinges
+      [4, 2, 1, 1, 1].forEach((inset, i) => R(X0 + inset, top - 6 + i, BW - 2 * inset, 1, i < 3 ? c.woodD : c.wood));
+      R(X0 + 1, top - 2, BW - 2, 1, c.band); R(X0 + 2, top - 1, BW - 4, 1, c.inner);
+      for (const bx of [X0 + 2, X0 + BW - 3]) R(bx, top - 5, 1, 3, c.band);
+    }
+    R(X0, top, BW, BH, c.wood); R(X0, top, BW, 1, c.woodL);
+    R(X0 + 1, top + 3, BW - 3, 1, c.woodD);
+    R(X0 + BW - 1, top, 1, BH, c.woodD); R(X0, fy - 1, BW, 1, c.woodD);
+    if (t > 0.2) { R(X0 + 1, top, BW - 2, 1, c.inner); R(X0 + 2, top, BW - 4, 1, light); }
+    R(X0, top + 1, BW, 1, c.band);
+    for (const bx of [X0 + 2, X0 + BW - 3]) { R(bx, top, 1, BH, c.band); R(bx, top + 2, 1, 1, c.bandL); }
+    R(X0, fy - 1, 1, 1, c.band); R(X0 + BW - 1, fy - 1, 1, 1, c.band);
+    let ly;
+    if (t < 0.66) {
+      const lift = Math.round(3 * t / 0.66), rows = t < 0.2 ? [3, 1, 0, 0] : [1, 0], y0 = top - rows.length - lift; ly = y0;
+      rows.forEach((inset, i) => { R(X0 + inset, y0 + i, BW - 2 * inset, 1, i === 0 ? c.woodL : i < rows.length - 1 ? c.wood : c.woodD); R(X0 + BW - inset - 1, y0 + i, 1, 1, c.woodD); });
+      for (const bx of [X0 + 2, X0 + BW - 3]) R(bx, y0 + (rows[0] > 1 ? 1 : 0), 1, rows.length, c.band);
+      R(X0, y0 + rows.length - 1, BW, 1, c.band);
+      const lx = X0 + BW / 2 - 1; R(lx - 1, y0 + rows.length - 1, 3, 4, c.band); R(lx, y0 + rows.length, 1, 1, c.bandL); R(lx, y0 + rows.length + 1, 1, 1, c.inner);
+    } else { const lx = X0 + BW / 2 - 1; R(lx - 1, top + 1, 3, 2, c.band); R(lx, top + 1, 1, 1, c.bandL); ly = top - 6; }
+    // each kind's own marks
+    if (kind === 'theorem') {
+      if (t < 0.66) R(X0 + 1, top - 1, BW - 2, 1, t === 0 ? '#3c786e' : light);
+      for (let k = 0; k < 2; k++) R(X0 + 5 + k * 8, top + 5, 1, 1, c.bandL);
+    } else if (kind === 'guardian') {
+      if (t < 0.66) { const gx = X0 + BW / 2; for (const dx of [-5, 4]) R(gx + dx, ly + 1, 2, 1, c.woodD); R(gx - 1, ly + 1, 2, 1, c.bandL); }
+      for (let y = top + 3; y < fy - 1; y += 2) R(X0 + BW / 2, y, 1, 1, c.bandL);
+    } else if (kind === 'root') {
+      const hold = Math.max(0, 1 - t * 2);
+      [X0 + 6, X0 + 12].forEach((x, i) => { for (let y = fy - Math.round(11 * hold); y < fy; y++) R(x + Math.round(Math.sin(y * 0.9 + i * 2)), y, 1, 1, '#5daa99'); });
+      for (const mx of [X0 + 4, X0 + 14]) { const y = t < 0.66 ? ly : top - 6; R(mx, y - 2, 1, 2, '#c8c8be'); R(mx - 1, y - 3, 3, 1, '#bef5e1'); }
+    } else if (kind === 'geode') {
+      for (const [x, h] of [[X0 + 1, 4], [X0 + BW - 3, 3]]) { R(x, ly - h + 2, 2, h, '#a283c8'); R(x, ly - h + 2, 1, 1, '#e8d6ff'); R(x + 1, ly - h + 3, 1, h - 1, '#644c8c'); }
+      R(X0 + 8, top + 4, 1, 2, '#a283c8'); R(X0 + 8, top + 4, 1, 1, '#e8d6ff');
+    } else if (kind === 'ember') {
+      const hot = t > 0 ? '#ff7a3c' : 'rgba(210,84,40,' + (0.7 + 0.3 * Math.sin(time * 2)).toFixed(2) + ')';
+      R(X0 + 4, top + 3, 3, 1, hot); R(X0 + 10, top + 5, 4, 1, hot);
+      if (t < 0.66) R(X0 + 5, ly + 1, 3, 1, hot);
+    }
+  }
+
+  /* a spool of thread in a coat's colours, for the weaver: wooden ends, the thread wound between, a loose end, a glint.
+     (x, y) is the bottom middle; k scales it */
+  function drawSpool(ctx, x, y, k, c, time) {
+    const px = (X, Y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(Math.round(x + X * k), Math.round(y + Y * k), Math.ceil(w * k), Math.ceil(h * k)); };
+    const main = c.main || '#b9a87b', shade = c.shade || '#6b6258', wood = '#8a6440', woodD = '#5a3f28';
+    if (c.glow) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(x, y - 5 * k, 0, x, y - 5 * k, 14 * k); g.addColorStop(0, c.glow); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.globalAlpha = 0.25 + 0.1 * Math.sin(time * 2); ctx.fillStyle = g; ctx.fillRect(x - 14 * k, y - 19 * k, 28 * k, 28 * k); ctx.restore(); }
+    px(-4, -10, 9, 2, wood); px(-4, -9, 9, 1, woodD);            // the top end
+    px(-3, -8, 7, 6, main);                                        // the thread
+    px(2, -8, 2, 6, shade);
+    for (let i = 0; i < 3; i++) px(-3, -7 + i * 2, 7, 1, shade);   // the turns of the thread
+    if (c.seam) px(-1, -8, 1, 6, c.seam);
+    px(-4, -2, 9, 2, wood); px(-4, -1, 9, 1, woodD);               // the bottom end
+    px(4, -5, 1, 1, main); px(5, -4, 1, 2, main); px(6, -2, 1, 2, main);   // the loose end
+    if (Math.sin(time * 2.4) > 0.6) px(-2, -7, 1, 1, '#ffffff');    // a glint
+  }
+
   function drawPlayer(ctx, s, camX, camY, pass, flash) {
+    if (pass === 'visor' && COAT && COAT.glow && !s.dead) {     // (drawn over the light pass, so the dark cannot swallow it)
+      // a faint glow of its own, breathing slowly
+      const gx = Math.round(s.x + 2.5 - camX), gy = Math.round(s.y + s.h / 2 - camY), a = COAT.glowA * (0.8 + 0.2 * Math.sin(sceneTime * 1.5));
+      const gr = ctx.createRadialGradient(gx, gy, 3, gx, gy, 18);
+      gr.addColorStop(0, COAT.glow); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = a; ctx.fillStyle = gr; ctx.fillRect(gx - 18, gy - 18, 36, 36); ctx.restore();
+    }
+    if (pass === 'visor' && COAT && COAT.seam && !s.dead) {
+      const [nm, ix] = playerFrame(s), sm = SEAM[nm];
+      if (sm) {
+        const fx2 = Math.round(s.x + 2.5 - camX), fy2 = Math.round(s.y + s.h - camY), fl = s.st === 'wall' ? s.wdir < 0 : s.st === 'climb' ? s.face > 0 : s.face < 0;
+        drawFrame(ctx, sm, ix, fx2 + (s.st === 'climb' && TH.style !== 'foundry' && TH.style !== 'ember' ? Math.round(Math.sin(sceneTime * 1.2 + (s.y + 3) * 0.09) * 1.2) : 0), fy2, fl, 0.55 + 0.25 * Math.sin(sceneTime * 2.2));
+      }
+    }
     const [name, idx] = playerFrame(s);
     const sh = SHEETS[pass === 'visor' ? name + 'V' : name];
     let fx = Math.round(s.x + 2.5 - camX); const fy = Math.round(s.y + s.h - camY);
@@ -690,13 +890,35 @@
   function tickTethers(dt) { for (const k in tetherT) if (k[0] !== '_') tetherT[k] += dt; }
 
   /* how many open tiles lie straight above / below a tile (capped) */
-  function openUp(w, tx, ty, lim) { let k = 0; while (k < lim && !D.solidAt(w, tx, ty - k - 1)) k++; return k; }
+  function rockRuns(w, r) {       // the parts of a strip that lie on rock (slick glass never spans a gap)
+    if (r.__rock) return r.__rock;
+    const out = []; let a = -1;
+    for (let c = r[0]; c <= r[0] + r[2]; c++) {
+      const ok = c < r[0] + r[2] && D.solidAt(w, c, r[1]);
+      if (ok && a < 0) a = c; else if (!ok && a >= 0) { out.push([a, r[1], c - a]); a = -1; }
+    }
+    return (r.__rock = out);
+  }
+  function airRuns(w, r) {
+    if (r.__runs) return r.__runs;
+    const out = []; let a = -1;
+    for (let c = r[0]; c <= r[0] + r[2]; c++) {
+      const ok = c < r[0] + r[2] && !D.solidAt(w, c, r[1] - 1);
+      if (ok && a < 0) a = c; else if (!ok && a >= 0) { out.push([a, r[1], c - a]); a = -1; }
+    }
+    return (r.__runs = out);
+  }
+  function shelfAt(w, tx, ty) {
+    if (!w.__shelf) { w.__shelf = new Set(); for (const r of (w.level.tiles && w.level.tiles.oneway) || []) for (let i = 0; i < r[2]; i++) w.__shelf.add((r[0] + i) + ',' + r[1]); }
+    return w.__shelf.has(tx + ',' + ty);
+  }
+  function openUp(w, tx, ty, lim) { let k = 0; while (k < lim && !D.solidAt(w, tx, ty - k - 1) && !shelfAt(w, tx, ty - k - 1)) k++; return k; }
   function openDown(w, tx, ty, lim) { let k = 0; while (k < lim && !D.solidAt(w, tx, ty + k + 1)) k++; return k; }
   /* a cord from the underside of the rock above (x, y) down to y - gap, drawn into the rock a pixel so it never floats */
   function drawCord(ctx, w, wx, wy, camX, camY, gap, lit) {
     const tx = Math.floor(wx / TS), ty = Math.floor(wy / TS), top = openUp(w, tx, ty, 90);
     if (top >= 90) return false;
-    const x = Math.round(wx - camX), y0 = Math.round((ty - top) * TS - camY) - 1, y1 = Math.round(wy - camY) - gap;
+    const x = Math.round(wx - camX), y0 = shelfAt(w, tx, ty - top - 1) ? Math.round((ty - top - 1) * TS - camY) + 2 : Math.round((ty - top) * TS - camY) - 1, y1 = Math.round(wy - camY) - gap;   // (from rock, or from under a shelf)
     if (y1 <= y0) return true;
     ctx.fillStyle = lit ? TH.stal[1] : TH.near; ctx.fillRect(x, y0, 1, y1 - y0);
     ctx.fillStyle = lit ? TH.stal[0] : TH.far[0]; ctx.fillRect(x + 1, y0, 1, Math.max(0, y1 - y0 - 1));
@@ -704,7 +926,20 @@
     return true;
   }
 
+  function underLiquid(w, x, y) { for (const k of w.kills) if (x >= k[0] && x <= k[2] && y > k[1]) return k; return null; }
   function drawLampCrystal(ctx, w, l, camX, camY, time, post) {
+    const sunk = underLiquid(w, l.x, l.y);
+    if (sunk) {
+      // something burning under the surface: the liquid glows over it
+      if (post) {
+        const sx = Math.round(l.x - camX), sy = Math.round(sunk[1] - camY), k = Math.max(0.15, l.k), r = 16 + 8 * k;
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        const g = ctx.createRadialGradient(sx, sy + 2, 0, sx, sy + 2, r); g.addColorStop(0, 'rgba(' + TH.glowRGB + ',' + (0.45 * k).toFixed(3) + ')'); g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g; ctx.fillRect(sx - r, sy + 2 - r, r * 2, r * 2);
+        ctx.restore();
+      }
+      return;
+    }
     const x = Math.round(l.x - camX), y = Math.round(l.y - camY);
     const k = Math.max(0.15, l.k);
     if (l.col === 'cap') {                       // a breathing glowcap on its stalk
@@ -1170,6 +1405,8 @@
   }
   // the burst: every pixel of the Guardian flies apart
   const gBits = [];
+  // what the Guardian breaks into: its own colours for a moment, then the greens of the Prime it was keeping
+  const PRIME_GREENS = [[64, 200, 120], [96, 224, 150], [48, 176, 96], [110, 232, 150], [80, 192, 140], [130, 250, 190], [70, 210, 110]];
   function guardianBurst(w, s) {
     const B = w.boss; if (!B) return;
     if (!guardianArt()) return;
@@ -1182,7 +1419,8 @@
         const px = B.x + (i - n / 2 + 0.5), py = B.y + (j - n / 2 + 0.5);
         const dx = px - B.x, dy = py - B.y, r = Math.hypot(dx, dy) || 1, sp = 40 + Math.random() * 160 + (li === 2 ? 120 : 0);
         gBits.push({ x: px, y: py, vx: dx / r * sp + (Math.random() - 0.5) * 40, vy: dy / r * sp + (Math.random() - 0.5) * 40 - 30,
-          life: 1.6 + Math.random() * 2.2, max: 3.8, col: 'rgb(' + d[o] + ',' + d[o + 1] + ',' + d[o + 2] + ')', hot: li === 2 || Math.random() < 0.25 });
+          life: 1.6 + Math.random() * 2.2, max: 3.8, age: 0, oc: [d[o], d[o + 1], d[o + 2]], pc: PRIME_GREENS[Math.floor(Math.random() * PRIME_GREENS.length)],
+          dash: Math.random() < 0.5, hot: li === 2 || Math.random() < 0.1 });
       }
     });
   }
@@ -1192,9 +1430,11 @@
       const p = gBits[i];
       p.vy += 60 * dt; p.vx *= 1 - 0.6 * dt; p.vy *= 1 - 0.6 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
       if (p.life <= 0) { gBits.splice(i, 1); continue; }
+      p.age += dt;
+      const u = Math.min(1, Math.max(0, (p.age - 0.25) / 0.7)), c = [0, 1, 2].map(k => Math.round(p.oc[k] + (p.pc[k] - p.oc[k]) * u));
       ctx.globalAlpha = Math.min(1, p.life / 1.2);
-      ctx.fillStyle = p.hot && p.life > p.max - 1.0 ? '#ffffff' : p.col;
-      ctx.fillRect(Math.round(p.x - camX), Math.round(p.y - camY), 1, 1);
+      ctx.fillStyle = p.hot && p.age < 0.5 ? '#ffffff' : 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')';
+      ctx.fillRect(Math.round(p.x - camX), Math.round(p.y - camY), 1, p.dash && u > 0.6 ? 2 : 1);   // turning into the Prime's strokes
     }
     ctx.globalAlpha = 1;
   }
@@ -1376,7 +1616,7 @@
         }
       }
       // slick glass
-      for (const r of T.ice || []) {
+      for (const r0 of T.ice || []) for (const r of rockRuns(w, r0)) {
         const x0 = r[0] * TS, y0 = r[1] * TS, ww = r[2] * TS;
         if (!vis(x0, y0, ww, TS)) continue;
         const x = Math.round(x0 - camX), y = Math.round(y0 - camY);
@@ -1387,8 +1627,11 @@
         const x0 = v[0] * TS, y0 = v[1] * TS, ww = v[2] * TS, hh = v[3] * TS;
         if (!vis(x0, y0, ww, hh)) continue;
         const x = Math.round(x0 - camX), yb = Math.round(y0 + hh - camY);
-        ctx.fillStyle = TH.stal[1]; ctx.fillRect(x, yb - 1, ww, 1);
-        ctx.fillStyle = dk; for (let i = 1; i < ww; i += 2) ctx.fillRect(x + i, yb - 1, 1, 1);
+        for (let c = 0; c < v[2]; c++) {
+          if (!D.solidAt(w, v[0] + c, v[1] + v[3])) continue;          // (rising out of open air or liquid: no grate)
+          ctx.fillStyle = TH.stal[1]; ctx.fillRect(x + c * TS, yb - 1, TS, 1);
+          ctx.fillStyle = dk; for (let i = 1; i < TS; i += 2) ctx.fillRect(x + c * TS + i, yb - 1, 1, 1);
+        }
       }
       // hush stones
       for (const q of w.switches) {
@@ -1400,7 +1643,7 @@
       return;
     }
     // ---- emissive parts, above the dark
-    for (const r of T.bounce || []) {
+    for (const r0 of T.bounce || []) for (const r of airRuns(w, r0)) {
       const x0 = r[0] * TS, y0 = r[1] * TS, ww = r[2] * TS;
       if (!vis(x0, y0 - 6, ww, TS + 6)) continue;
       let sq = 0;
@@ -1505,7 +1748,20 @@
   }
 
   // black tar that fills every killing pit: slow swells, a glossy rim and bubbles that rise and pop
+  function pitMouth(w, k) {
+    if (k.__mouth !== undefined) return k.__mouth;
+    const a = Math.floor(k[0] / TS), b = Math.ceil(k[2] / TS) - 1; let ty = Math.floor(k[1] / TS);
+    while (ty > 0 && D.solidAt(w, a - 1, ty - 1) && D.solidAt(w, b + 1, ty - 1) && !D.solidAt(w, a, ty - 1)) ty--;
+    return (k.__mouth = ty * TS);
+  }
   function drawGoo(ctx, w, camX, camY, W, H, time, post) {
+    if (!post) for (const k of w.kills) {
+      const top = pitMouth(w, k);
+      if (top >= k[1] - 1 || k[2] < camX || k[0] > camX + W) continue;
+      const g = ctx.createLinearGradient(0, top - camY, 0, k[1] - camY);
+      g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.35, 'rgba(0,0,0,0.35)'); g.addColorStop(1, 'rgba(0,0,0,0.8)');
+      ctx.fillStyle = g; ctx.fillRect(Math.round(k[0] - camX), Math.round(top - camY), Math.round(k[2] - k[0]), Math.round(k[1] - top) + 2);
+    }
     for (const k of w.kills) {
       const x0 = Math.max(Math.floor(k[0] - camX), 0), x1 = Math.min(Math.ceil(k[2] - camX), W);
       if (x1 <= x0) continue;
@@ -1550,6 +1806,7 @@
     const w = Gm.w, s = Gm.s, time = Gm.time; sceneTime = time;
     drawBackground(ctx, w, camX, camY, W, H, time);
     drawDecorBack(ctx, w, camX, camY, W, H, time);
+    if (Gm.back) Gm.back(ctx, camX, camY);          // a room's own backdrop (the Codex), behind the player and the rock
     // objects behind the player
     for (const l of w.lights) {
       if (l.boss || l.x < camX - 60 || l.x > camX + W + 60 || l.y < camY - 60 || l.y > camY + H + 60) continue;
@@ -1573,6 +1830,21 @@
     drawAlcoves(ctx, w, s, camX, camY, time, false);
     if (w.boss) drawGuardian(ctx, w, s, camX, camY, time, false);
     drawDecorFront(ctx, w, camX, camY, W, H, time);
+    // The Deep's gate and chest stand behind the Dweller
+    if (w.level.deep && !w.level.deepFinal) drawGate(ctx, w, camX, camY, W, H, time);
+    if (w.level.deep && w.level.deepFinal && w.level.chest) {
+      // the chest at the bottom, and what rises out of it
+      const ch = w.level.chest, fy = floorUnder(w, ch.x, ch.y) - camY, cx = Math.round(ch.x - camX);
+      drawChest(ctx, cx, fy, CHEST_OF[w.level.theme] || 'theorem', ch.t, time, ch.shake);
+      if (ch.rise > 0) {
+        const y = fy - 9 - Math.round(ch.rise * 16) + (ch.rise >= 1 ? Math.round(Math.sin(time * 3)) : 0);
+        if (ch.spool) drawSpool(ctx, cx, y + 6, 1, ch.spool, time); else drawPortrait(ctx, cx, y, 0.3, Math.min(1, ch.rise * 2), ch.id);
+      }
+      if (ch.near && ch.t === 0) {
+        ctx.fillStyle = 'rgba(214,185,138,' + (0.6 + 0.4 * Math.sin(time * 4)).toFixed(2) + ')';
+        ctx.fillRect(cx - 1, fy - 19 - Math.round(Math.sin(time * 3)), 2, 2);
+      }
+    }
     if (!s.won || s.wonT < 30) drawPlayer(ctx, s, camX, camY, 'body', s.burn > 0.02 && !s.dead ? 0.15 + s.burn * 0.6 : 0);
     drawParticles(ctx, camX, camY);
     lightPass(ctx, Gm, camX, camY, W, H);
@@ -1611,7 +1883,9 @@
     drawMotes(ctx, camX, camY, W, H, time);
     // the sliver of the crystal and its light
     const g = w.goal;
-    if (g.x > camX - 150 && g.x < camX + W + 150) {
+    if (w.level.deep) {
+      // (The Deep has gates and a chest instead, drawn after the dark)
+    } else if (g.x > camX - 150 && g.x < camX + W + 150) {
       const rgb = hexRGB(shardCol);
       ctx.globalCompositeOperation = 'lighter';
       for (let i = 0; i < 4; i++) {
@@ -1642,6 +1916,7 @@
   }
 
   global.DwellerRender = {
+    setCoat, COATS, drawSpool, drawChest,
     PAL, load, prepare, drawScene, drawText, textWidth, textSprite, spawn, updateParticles, markTether, tickTethers,
     SHEETS, IMG, parts, hsl, hash2, SHARDS, THEMES, drawGem, drawShard, drawMini, drawPortrait, shade,
     get theme() { return TH; }, NETN, NET, seekerTraits, setSeeker, drawFrame, drawPlayer, drawParticles, BREATH, get seekerId() { return seekerId; }, resetTethers() { tetherT = {}; }, noteBounce, guardianBurst, clearGuardian() { gBits.length = 0; },

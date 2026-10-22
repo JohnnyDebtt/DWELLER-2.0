@@ -28,6 +28,9 @@
     { tr: 7 / 8, score: 'heart', gain: 1.1, pad: 'choir', drone: 0.8, wind: 0.35, windF: 420, echo: [1.0, 0.3, 1500] },
     // VII the core: every level's voice returns, one with each sliver set, over the Guardian's turning drone
     { tr: 1, score: 'core', pad: 'glass', drone: 1.2, wind: 0.5, windF: 600, echo: [0.75, 0.4, 2000], gain: 1.0 },
+    // THE DEEP: one score for the whole run, low and descending in nines and elevens; it gathers a layer for every
+    // stretch of the way down and its heart beats faster the nearer you are to the bottom (Live.deep.k, 0..1)
+    { tr: 9 / 16, score: 'deep', pad: 'choir', drone: 1.15, wind: 0.55, windF: 340, echo: [1.0, 0.46, 1600], gain: 1.1 },
   ];
 
   function hz(ratio, oct) { return F0 * ratio * Math.pow(2, oct); }
@@ -498,6 +501,57 @@
       if (b.warn >= 0 && b.warn < 32 && n % 2 === 0) this.noiseHit(t, BEAT * 1.5, 'bandpass', 400, 3200, 0.08, 1.2, BEAT);
       // V/VI: the reed over the top
       if (P >= 5 && n % 16 === 0) this.reed(t, fold(F0 * this.pick([0, 4, 2, 5][Math.floor(n / 16) % 4]) * 4, 150, 300), 0.08, BEAT * 4, 4.6);
+    }
+
+    /* THE DEEP: the whole run is one piece. k is how far down the run you are (0 at the first room, 1 at the bottom) */
+    /* each descent plays the Deep's score its own way: its own falling bell line, bass in nines, glass in elevens and
+       reed phrases, chosen from the run's seed. The layers still arrive in the same order, so every run builds */
+    deepVariant(seed) {
+      if (this._dv && this._dv.seed === seed) return this._dv;
+      const r = mulberry((seed || 1) * 7919 + 13), pick = (a) => a[Math.floor(r() * a.length)];
+      const jit = () => (r() - 0.5) * 0.04;
+      return (this._dv = {
+        seed,
+        fall: pick([[5, 4, 2, 1, 0, 5, 4, 2, 0], [4, 2, 1, 0, 5, 4, 1, 0, 0], [5, 5, 4, 2, 4, 2, 1, 0, 0], [2, 1, 0, 5, 4, 2, 4, 1, 0], [5, 4, 4, 2, 1, 1, 0, 2, 0]]),
+        bellEvery: pick([6, 6, 4, 8]),
+        os: pick([[0, 0, 4, 0, 2, 0, 5, 4, 1], [0, 4, 0, 5, 0, 2, 0, 1, 4], [0, 0, 2, 0, 4, 5, 0, 4, 2], [0, 5, 4, 0, 0, 2, 1, 0, 4]]),
+        ar: pick([[0, 2, 4, 5, 4, 2, 1, 0, 4, 5, 2], [5, 4, 2, 0, 2, 4, 5, 1, 0, 2, 4], [0, 4, 2, 5, 1, 4, 0, 2, 5, 4, 1], [2, 4, 5, 4, 2, 0, 1, 2, 4, 0, 5]]),
+        reed: pick([[[0, 4], [2, 1], [5, 4], [4, 0]], [[4, 5], [2, 0], [1, 2], [4, 0]], [[5, 4], [4, 2], [2, 1], [1, 0]]]),
+        mach: pick([[0, 0, 4, 0, 5, 0, 4, 2], [0, 4, 0, 0, 2, 0, 5, 0], [0, 0, 5, 4, 0, 0, 2, 4]]),
+        oct: pick([16, 16, 8]),
+        // when each layer arrives: the same order every run, the moments shift a little
+        th: [0.08 + jit(), 0.18 + jit(), 0.32 + jit(), 0.46 + jit(), 0.58 + jit(), 0.7 + jit(), 0.84 + jit() * 0.5],
+      });
+    }
+    score_deep(t, n, e) {
+      const D = Live.deep || { k: 0 }, k = D.k, r = this.rnd, s8 = n % 8, V = this.deepVariant(D.seed), th = V.th;
+      const v = 0.6 + 0.4 * e;
+      // the heart: slow at the top, faster and harder the deeper you are
+      const hb = k < 0.3 ? 8 : k < 0.75 ? 4 : 2;
+      if (n % hb === 0) { const hv = 0.26 + 0.3 * k; this.thump(t, 44, hv, 0.5); if (hb > 2) this.thump(t + 0.19, 44, hv * 0.55, 0.3); }
+      // always: a bell line falling through the palette, one note every six steps, in a phrase of nine
+      const fall = V.fall, be = V.bellEvery;
+      if (n % be === 0) { const i = Math.floor(n / be) % 9; this.bell(t, fold(F0 * this.pick(fall[i]) * (i < 5 ? V.oct : V.oct / 2), 220, 1200), 0.4 + 0.2 * k, 3.4); }
+      // the floor of the sound: a slow swell every two bars
+      if (k > th[0] && n % 16 === 0) this.noiseHit(t, BEAT * 7, 'lowpass', 120, 420 + 500 * k, 0.05 + 0.05 * k, 0.9, BEAT * 3);
+      // a low ostinato in nines
+      if (k > th[1] && n % 2 === 0) { const os = V.os; this.pluckBass(t, fold(F0 * this.pick(os[(n / 2) % 9]) * 2, 40, 90), 0.45 * v, STEP * 1.8); }
+      // glass, in elevens, on the off-steps
+      if (k > th[2] && n % 2 === 1) { const ar = V.ar; if (r() < 0.55 + 0.4 * k) this.glassPing(t, fold(F0 * this.pick(ar[((n - 1) / 2) % 11]) * 16, 500, 1800), 0.35 + 0.3 * k, 1.3); }
+      // the great drums
+      if (k > th[3]) { if (s8 === 0) this.taiko(t, 0.45 + 0.35 * k, 34); if (s8 === 6 && k > th[4]) this.taiko(t, 0.3, 40); }
+      // the machine underneath
+      if (k > th[4]) this.machine(t, fold(F0 * this.pick(V.mach[s8]) * 2, 46, 100), s8 === 0 ? 0.7 : 0.4, STEP * 0.6);
+      // a reed over the top: four long phrases
+      if (k > th[5] && n % 16 === 0) { const ph = V.reed[Math.floor(n / 64) % 4 % V.reed.length]; this.reed(t, fold(F0 * this.pick(ph[(n / 16) % 2]) * 4, 130, 270), 0.07 + 0.03 * k, BEAT * 7, 4.4); }
+      // nearly there: racing ticks, rising air, the nerve chord
+      if (k > th[6]) {
+        if (n % 1 === 0 && r() < 0.6) this.tick(t, 0.25 + 0.2 * k, 1800 + 1400 * r());
+        if (n % 32 === 24) this.noiseHit(t, BEAT * 4, 'bandpass', 300, 4200, 0.06, 1.1, BEAT * 3.5);
+        if (n % 32 === 16) { this.bell(t, fold(F0 * 19 * this.fl.tr, 700, 1500), 0.3, 3); this.bell(t + 0.04, fold(F0 * 21 * this.fl.tr, 700, 1500), 0.3, 3); }
+      }
+      // the bottom: a chord at every bar
+      if (k >= 0.97 && s8 === 0) [0, 4, 5].forEach((d, j) => this.bell(t + j * 0.05, fold(F0 * this.pick(d) * 8, 280, 900), 0.45, 4.5));
     }
 
     /* ----------------------------------------------------------- sound effects */

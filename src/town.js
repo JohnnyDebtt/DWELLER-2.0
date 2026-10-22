@@ -57,6 +57,7 @@
     { id: 'collector', x: 99 * TS, face: -1 },
     { id: 'exiled', x: 132 * TS, face: 1 },
     { id: 'monk', x: 202 * TS, face: 1 },
+    { id: 'weaver', x: 158 * TS, face: 1 },
   ];
   const SIGNS = [
     { x: 9 * TS, lines: () => [['A D', 'MOVE'], ['SPACE', 'JUMP'], ['S', 'ROLL']], touch: () => [['< >', 'MOVE'], ['JUMP', ''], ['ROLL', '']] },
@@ -413,7 +414,7 @@
   }
   function drawShrineStones(x, r) {
     // a few standing stones around the silent one
-    for (const [dx, h] of [[-30, 14], [-24, 9], [28, 12]]) { const X = RES[2].x + dx; rect(x, PALT.st1, X, GY - h, 5, h); rect(x, PALT.st2, X, GY - h, 5, 1); rect(x, PALT.st0, X + 4, GY - h, 1, h); }
+    for (const [dx, h] of [[-30, 14], [-24, 9]]) { const X = RES[2].x + dx; rect(x, PALT.st1, X, GY - h, 5, h); rect(x, PALT.st2, X, GY - h, 5, 1); rect(x, PALT.st0, X + 4, GY - h, 1, h); }
   }
   function fence(x, r, a, b, by) {
     for (let X = a; X <= b; X += 7) { const h = 9 + Math.floor(r() * 3), lean = Math.round((r() - 0.5) * 2); line(x, PALT.wood1, X, by, X + lean, by - h, 2); rect(x, PALT.woodH, X + lean, by - h, 1, 1); }
@@ -462,7 +463,7 @@
   /* ------------------------------------------------------------ residents */
   const RSHEET = {};
   function npcSheets() {
-    for (const n of ['collector', 'exiled', 'monk']) {
+    for (const n of ['collector', 'exiled', 'monk', 'weaver']) {
       const im = R.IMG[n]; if (!im || RSHEET[n]) continue;
       // the night takes the warmth out of them a little
       const [c, x] = canvas(im.width, im.height);
@@ -703,6 +704,8 @@
       const sh = RSHEET[q.id]; if (!sh) continue;
       const f = Math.floor(time * 12 + q.x) % 24;
       R.drawFrame(ctx, sh, f, q.x - camX, GY - camY, q.face < 0);
+      // a new coat is ready: the spool you brought floats above the weaver
+      if (q.id === 'weaver' && st.coatNew) { glow(ctx, q.x - camX, GY - camY - 27, 7, st.coatNew.glow || st.coatNew.main || '#b9a87b', 0.22 + 0.08 * Math.sin(time * 3)); R.drawSpool(ctx, q.x - camX, GY - camY - 22 + Math.round(Math.sin(time * 2)), 1, st.coatNew, time); }
     }
     // the great door's sockets: six around a seventh; filled once the crystal is set
     {
@@ -720,7 +723,7 @@
       if (P.fused || (fu >= 0 && fu > 2.6)) {
         const k = P.fused ? 1 : Math.min(1, (fu - 2.6) / 1.2);
         const sh = { x: GREAT.x, y: GREAT.y, w: 40, h: 34, arch: 0 };
-        fillDoor(ctx, sh, camX, camY, (u) => 'rgba(' + Math.round(200 + 40 * u) + ',' + Math.round(196 + 30 * u) + ',' + Math.round(230 + 20 * u) + ',' + (k * (0.55 + 0.25 * Math.sin(time * 2 + u * 7))).toFixed(3) + ')');
+        fillDoor(ctx, sh, camX, camY, P.core ? (u) => 'rgba(' + Math.round(90 + 40 * u) + ',' + Math.round(190 + 30 * u) + ',' + Math.round(175 + 20 * u) + ',' + (k * (0.5 + 0.25 * Math.sin(time * 2 + u * 7))).toFixed(3) + ')' : (u) => 'rgba(' + Math.round(200 + 40 * u) + ',' + Math.round(196 + 30 * u) + ',' + Math.round(230 + 20 * u) + ',' + (k * (0.55 + 0.25 * Math.sin(time * 2 + u * 7))).toFixed(3) + ')');
       }
     }
     // the sleeper at the bottom of the well
@@ -729,7 +732,7 @@
       if (Y > -20 && Y < st.LH + 20) {
         ctx.fillStyle = PALT.st1; ctx.fillRect(Math.round(X - 6), Math.round(Y - 4), 13, 4); ctx.fillStyle = PALT.st2; ctx.fillRect(Math.round(X - 6), Math.round(Y - 4), 13, 1);
         if (!st.rareUsed) {
-          // a dormant seeker of a rare kind; its screen beats slowly
+          // a dormant seeker, a bonus one; its screen beats slowly
           ctx.globalAlpha = 0.85; R.drawPortrait(ctx, X, Y - 16, 0.33, 0.9, st.rareId); ctx.globalAlpha = 1;
         } else if (st.oldId) {
           ctx.globalAlpha = 0.7; R.drawPortrait(ctx, X, Y - 16, 0.33, 0.55, st.oldId); ctx.globalAlpha = 1;
@@ -762,7 +765,8 @@
     // the great door
     {
       const X = GREAT.x - camX, Y = GREAT.y - camY - 30;
-      if (P.fused || st.fuse > 2.6) glow(ctx, X, Y, 90, '#d8d4ff', 0.20 + 0.05 * Math.sin(time * 1.3));
+      if (P.core) { glow(ctx, X, Y, 90, '#7fd6c4', 0.18 + 0.05 * Math.sin(time * 1.3)); if (P.archNew) glow(ctx, X, Y - 28, 14 + 4 * Math.sin(time * 4), '#c8d8ff', 0.35 + 0.2 * Math.sin(time * 4)); }
+      else if (P.fused || st.fuse > 2.6) glow(ctx, X, Y, 90, '#d8d4ff', 0.20 + 0.05 * Math.sin(time * 1.3));
       else if (P.beaten.every(Boolean)) glow(ctx, X, Y - 28, 22, '#ffffff', 0.06 + 0.04 * Math.sin(time * 3));
     }
     // the ember hut's coals and the forge

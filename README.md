@@ -37,14 +37,28 @@ keeps three quiet secrets.
 and it follows you; press E and it flies to the nearest light and covers it for a few beats (an
 eclipse), then needs a moment to recharge. Every level can be beaten without it.
 
+**The Codex and The Deep.** Once the Guardian is gone, the great door opens on what is left of its arena: the Codex,
+an archive of every seeker you have found (tools/archive.py builds it from level VII, which is never changed). Your
+seekers float where they rest, 35 of them in three bands, the rarest highest (the high bridge holds only the 222 rarest
+in SEEKER NET); stand in front of one and it wakes, and the Guardian's empty shell opens like an eye to show it and what
+it does; press E and it comes with you. Your newest find waits on a pedestal by the hole the Guardian tore in the floor,
+and that hole is the way into The Deep: eight rooms through two strata in a row (48 rooms in all, eight for each world,
+picked and shuffled for every run), one life, and a gift to choose between rooms. Reach the bottom and a seeker you
+have not found yet wakes and joins your Codex. Down there (and only there) a seeker's real SEEKER NET traits matter:
+its base shapes its eclipse, its eyes how far it reaches, and a head, side or back add-on brings a gift of its own.
+The Deep grows harsher as your Codex grows, up to a ceiling at 35. It has its own score, one piece for the whole run
+that gathers layers and quickens as you near the bottom.
+
 ## Source
 
 - `src/` — the game: `sim.js` (deterministic 96 Hz simulation, also runs in Node), `render.js`,
-  `audio.js` (Web Audio, Seeker 48 Hz tuning), `main.js` (menus, input, flow), `town.js` (the town above the descent).
+  `audio.js` (Web Audio, Seeker 48 Hz tuning), `main.js` (menus, input, flow), `town.js` (the town above the descent), `deep.js` (the rules of The Deep).
 - `tools/` — `level1.py` … `level6.py` build the levels with `levelkit.py`; `bot.js` is a search bot
   that proves every level can be beaten; `build.py` bundles everything into `dist/dweller.html`;
   `seekernet.py` draws all 2,222 SEEKER NET seekers from the collection's layers into `assets/seeker/net.png`
-  (with their traits in `net.json`, and in `net_lids.png` the pixels that change when each one shuts its eyes).
+  (with their traits in `net.json`, and in `net_lids.png` the pixels that change when each one shuts its eyes);
+  `deep.py` builds The Deep's rooms and `deepcheck.js` proves every one of them with the bot at the gentlest and the
+  harshest tier.
 - `test/` — browser checks with Playwright (replays of the bot's solutions, the town, the companion).
 
 Build: `python3 tools/levelN.py` for each level (writes `build/levelN.json`), then

@@ -46,5 +46,6 @@ q.putdata([li[c] for c in lp]); q.save(os.path.join(OUT, 'net_lids.png'), optimi
 print('lids colours', len(lc))
 cw = json.load(open('layers/colorways.json'))['colorways']
 rare = sorted(([int(r['token']), int(r['charge_rank'])] for r in rows if int(r['charge_rank']) < 222), key=lambda q: q[1])
-json.dump({'cols': COLS, 'rare': rare, 'keys': KEYS, 'names': names, 'cw': cw, 't': codes}, open(os.path.join(OUT, 'net.json'), 'w'), separators=(',', ':'))
+ranks = [int(r['charge_rank']) for r in rows]
+json.dump({'cols': COLS, 'rare': rare, 'rank': ranks, 'keys': KEYS, 'names': names, 'cw': cw, 't': codes}, open(os.path.join(OUT, 'net.json'), 'w'), separators=(',', ':'))
 print(len(rows), 'seekers,', len(cs), 'colours')

@@ -12,7 +12,7 @@
   const DT = 1 / TICK;
   const BEAT = 64;              // ticks per beat at 90 BPM
   const IN = { L: 1, R: 2, J: 4, D: 8, E: 16 };
-  const EV = { JUMP: 1, LAND: 2, ROLL: 4, WJUMP: 8, DEATH: 16, RESPAWN: 32, CHECK: 64, WIN: 128, HARDLAND: 256, SEEKER: 512, ECLIPSE: 1024, ECLFAIL: 2048, ECLEND: 4096, BOUNCE: 8192, HUSH: 16384, GRAB: 32768, SLIVER: 65536, BURST: 131072, THROES: 262144 };
+  const EV = { SHIELD: 524288, JUMP: 1, LAND: 2, ROLL: 4, WJUMP: 8, DEATH: 16, RESPAWN: 32, CHECK: 64, WIN: 128, HARDLAND: 256, SEEKER: 512, ECLIPSE: 1024, ECLFAIL: 2048, ECLEND: 4096, BOUNCE: 8192, HUSH: 16384, GRAB: 32768, SLIVER: 65536, BURST: 131072, THROES: 262144 };
 
   const C = {
     W: 5, H: 10, HR: 5,                      // hitbox: standing 5x10, rolling 5x5
@@ -374,16 +374,22 @@
 
   /* ------------------------------------------------------------- state */
 
+  /* run modifiers for The Deep (the seeker's traits and the upgrades picked on the way down). Every value defaults
+     to no change, so the story levels play exactly as they always have. Read-only; the counters live on the state. */
+  const MOD0 = Object.freeze({ burn: 1, regen: 1, run: 1, jump: 1, fall: 1, hold: 1, cd: 1, reach: 1, grace: 1, shield: 0, air: 0 });
+  function mods(o) { return Object.freeze(Object.assign({}, MOD0, o || {})); }
   function newState(w, opts) {
     const sp = w.spawn;
     const cmp = opts && opts.companion ? 1 : 0;
+    const M = opts && opts.mods ? mods(opts.mods) : MOD0;
     return {
+      M, shields: M.shield, airUsed: 0,
       cmp, cmpX: sp.x - 9, cmpY: sp.y - 22, cmpL: -1, cmpT: 0, cmpCD: 0, cmpK: 0,
       t: 0, ticks: 0,
       x: sp.x - C.W / 2, y: sp.y - C.H, h: C.H, vx: 0, vy: 0,
       onG: false, face: 1, coy: 0, buf: 0, wallDir: 0, wcoy: 0, wlock: 0, wdir: 0,
       roll: 0, rollDir: 1, rollCD: 0, crawl: false, prev: 0,
-      ex: 0, lit: 0, deadT: 0, dead: false, grace: C.GRACE, deathX: 0, deathY: 0,
+      ex: 0, lit: 0, deadT: 0, dead: false, grace: Math.round(C.GRACE * M.grace), deathX: 0, deathY: 0,
       cp: -1, cpX: sp.x, cpY: sp.y,
       won: false, wonT: 0, deaths: 0, ev: 0, anim: 0, st: 'idle', airT: 0, landV: 0, why: '',
       fromSt: 'idle', faceT: 0, ajump: false, climb: false, drop: 0, vineCD: 0,
@@ -484,7 +490,7 @@
   /* ---- the companion: pick the light that is hurting the most, else the nearest one */
   function pickEclipse(w, s) {
     const cx = s.x + C.W / 2, cy = s.y + s.h / 2;
-    let best = -1, bv = 0, near = -1, nd = C.CMPR;
+    let best = -1, bv = 0, near = -1, nd = C.CMPR * (s.M ? s.M.reach : 1);
     const hz = w.hazards;
     for (let i = 0; i < hz.length; i++) {
       const l = hz[i];
@@ -520,12 +526,12 @@
       }
     } else if (s.cmp === 2) {
       const l = w.lights[s.cmpL];
-      if (fly(l.x, l.y)) { s.cmp = 3; s.cmpT = C.CMPHOLD; }
+      if (fly(l.x, l.y)) { s.cmp = 3; s.cmpT = Math.round(C.CMPHOLD * (s.M ? s.M.hold : 1)); }
     } else if (s.cmp === 3) {
       const l = w.lights[s.cmpL];
       s.cmpX = l.x; s.cmpY = l.y;
       s.cmpK = Math.min(1, s.cmpK + 1 / 6);
-      if (--s.cmpT <= 0) { s.cmp = 4; s.cmpCD = C.CMPCD; s.ev |= EV.ECLEND; }
+      if (--s.cmpT <= 0) { s.cmp = 4; s.cmpCD = Math.round(C.CMPCD * (s.M ? s.M.cd : 1)); s.ev |= EV.ECLEND; }
     } else if (s.cmp === 4) {
       if (s.cmpK > 0) s.cmpK = Math.max(0, s.cmpK - 0.125);
       const h = home();
@@ -537,6 +543,7 @@
   /* One simulation tick. inp is a bitmask of IN flags. Returns the state (mutated). */
   function step(w, s, inp) {
     s.ev = 0;
+    const M = s.M || MOD0;
     if (s.won) { s.wonT++; s.t++; updateLights(w, s.t); stepSwitches(w, s); stepCompanion(w, s, 0); stepBoss(w, s); s.prev = inp; return s; }
     s.t++; s.ticks++;
     updateLights(w, s.t);
@@ -621,7 +628,7 @@
       // keep wall-jump impulse, allow small steering
       s.vx += dirIn * C.AACC * 0.25 * DT;
     } else {
-      const target = dirIn * C.RUN;
+      const target = dirIn * C.RUN * M.run;
       let acc = grounded ? (dirIn ? C.GACC : C.GFRIC) : (dirIn ? C.AACC : C.AFRIC);
       if (grounded && w.hasTT && floorType(w, s) === TT.ICE) acc *= dirIn ? C.ICEACC : C.ICEFRIC;
       if (s.vx < target) s.vx = Math.min(target, s.vx + acc * DT);
@@ -642,7 +649,7 @@
     // ---- jump
     if (s.climb) {
       // leaping off a vine sideways
-      if (jumpPress && dirIn !== 0) { s.climb = false; s.vineCD = 18; s.vy = -C.JUMPV * 0.85; s.vx = dirIn * C.RUN; s.buf = 0; s.ev |= EV.JUMP; s.airT = 0; }
+      if (jumpPress && dirIn !== 0) { s.climb = false; s.vineCD = 18; s.vy = -C.JUMPV * 0.85 * M.jump; s.vx = dirIn * C.RUN * M.run; s.buf = 0; s.ev |= EV.JUMP; s.airT = 0; }
       else if (dirIn !== 0 && ledgeBeside(w, s, dirIn)) { s.climb = false; s.vineCD = 18; s.vx = dirIn * C.RUN * 0.7; s.vy = 0; s.buf = 0; }   // step off onto a ledge
       else s.buf = 0;
     }
@@ -651,11 +658,14 @@
         if (low && !canStand(w, s)) { /* cannot jump out of a low tunnel */ }
         else {
           if (low) { s.roll = 0; s.crawl = false; setH(s, C.H); }
-          s.vy = -C.JUMPV; s.buf = 0; s.coy = 0; s.onG = false; s.ev |= EV.JUMP; s.airT = 0;
+          s.vy = -C.JUMPV * M.jump; s.buf = 0; s.coy = 0; s.onG = false; s.ev |= EV.JUMP; s.airT = 0;
         }
       } else if (s.wcoy > 0 && !grounded) {
         s.vy = -C.WJY; s.vx = -s.wdir * C.WJX; s.face = -s.wdir; s.wlock = C.WLOCK; s.ajump = true;
         s.buf = 0; s.wcoy = 0; s.ev |= EV.WJUMP;
+      } else if (!grounded && !low && s.airUsed < M.air) {
+        // a jump in mid-air (an upgrade or a seeker's gift in The Deep)
+        s.vy = -C.JUMPV * 0.85 * M.jump; s.buf = 0; s.airUsed++; s.ev |= EV.JUMP; s.airT = 0;
       }
     }
 
@@ -668,7 +678,7 @@
       if (Math.abs(s.vy) < C.APEXV && jumpHeld) g *= C.APEXG;
       s.vy += g * DT;
       if (wallDir !== 0 && s.vy > C.WSLIDE) s.vy = Math.max(C.WSLIDE, s.vy - 1400 * DT);
-      if (s.vy > C.MAXFALL) s.vy = C.MAXFALL;
+      if (s.vy > C.MAXFALL * M.fall) s.vy = C.MAXFALL * M.fall;
     }
     // vents blow upward
     if (w.hasVent && !s.climb && inMask(w, w.vent, s)) {
@@ -694,7 +704,7 @@
     // ---- animation state
     const prevSt = s.st;
     if (s.face !== s.lastFace) { s.faceT = s.t; s.lastFace = s.face; }
-    if (s.onG || wallDir !== 0) s.ajump = false;
+    if (s.onG || wallDir !== 0) { s.ajump = false; s.airUsed = 0; }
     if (low) s.st = 'roll';
     else if (s.climb) s.st = 'climb';
     else if (!s.onG && wallDir !== 0 && s.vy > 0) s.st = 'wall';
@@ -713,11 +723,15 @@
     s.lit = playerLit(w, s);
     let b = (s.lit - C.LITLO) / (C.LITHI - C.LITLO); b = b < 0 ? 0 : b > 1 ? 1 : b; b = b * b * (3 - 2 * b);
     s.burn = b;
-    if (s.grace > 0) { s.ex = Math.max(0, s.ex - C.REGEN * DT); }
-    else if (b > 0) s.ex += b * C.BURN * (w.lastBM || 1) * DT - (1 - b) * C.REGEN * DT * 0.35;
-    else s.ex -= C.REGEN * DT;
+    if (s.grace > 0) { s.ex = Math.max(0, s.ex - C.REGEN * M.regen * DT); }
+    else if (b > 0) s.ex += b * C.BURN * M.burn * (w.lastBM || 1) * DT - (1 - b) * C.REGEN * M.regen * DT * 0.35;
+    else s.ex -= C.REGEN * M.regen * DT;
     if (s.ex < 0) s.ex = 0;
-    if (s.ex >= 1) { s.ex = 1; killPlayer(s, 'seen'); }
+    if (s.ex >= 1) {
+      // a shield (The Deep) takes the burn once instead of you
+      if (s.shields > 0) { s.shields--; s.ex = 0.25; s.grace = C.GRACE; s.ev |= EV.SHIELD; }
+      else { s.ex = 1; killPlayer(s, 'seen'); }
+    }
     if (s.y > w.killY) killPlayer(s, 'void');
     else {
       const kx = s.x + C.W / 2, ky = s.y + s.h;
@@ -747,10 +761,35 @@
     return s;
   }
 
+  /* THE DEEP: a room's lights at a difficulty tier (0 gentle .. 4 the ceiling). The game and the bot both use this,
+     so every room is proven at the tier it is played at. Warnings get shorter, burns longer, eyes and pendulums
+     quicker, reach a little wider, and everything burns hotter. Periods only shrink by eighths, so lights that
+     shared a beat still share one. */
+  const TIERF = [1, 1, 7 / 8, 7 / 8, 7 / 8];
+  function deepTier(level, tier) {
+    const t = Math.max(0, Math.min(4, tier | 0)), k = t / 4, f = TIERF[t];
+    const L = JSON.parse(JSON.stringify(level));
+    const q8 = (v) => Math.max(8, Math.round(v / 8) * 8);
+    for (const l of L.lights) {
+      if (l.t === 'gcore' || l.t === 'alcove' || l.hazard === false) continue;
+      l.burnMul = (l.burnMul || 1) * (1 + 0.25 * k);
+      if (l.sched) {
+        const sc = l.sched;
+        sc.warn = Math.max(8, q8(sc.warn * (1 - 0.45 * k)));
+        sc.len = Math.min(sc.per - sc.warn - 32, q8(sc.len * (1 + 0.2 * k)));
+      }
+      if (l.t === 'watch') { l.per = q8(l.per * f); l.r = l.r * (1 + 0.06 * k); }
+      else if (l.t === 'orb') { l.move.per = q8(l.move.per * f); l.r = l.r * (1 + 0.04 * k); }
+      else if (l.t === 'lamp') l.r = l.r * (1 + 0.06 * k);
+    }
+    L.tier = t;
+    return L;
+  }
+
   global.Dweller = global.Dweller || {};
   Object.assign(global.Dweller, {
     TS, TICK, DT, BEAT, IN, EV, C, smooth,
-    makeWorld, newState, cloneState, step, solidAt, rectSolid, castRay, rayClear, TT, ttAt, onOneway,
+    MOD0, mods, deepTier, makeWorld, newState, cloneState, step, solidAt, rectSolid, castRay, rayClear, TT, ttAt, onOneway,
     lightAt, updateLights, schedGain, playerLit, GB,
   });
   if (typeof module !== 'undefined' && module.exports) module.exports = global.Dweller;
