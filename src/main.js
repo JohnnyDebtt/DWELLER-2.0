@@ -653,7 +653,7 @@
     runTicks = 0; R.parts.length = 0; R.clearGuardian(); A.Live.boss = null; R.resetTethers(); beamPrev = {}; deathFade = 0; flash = 0; shake = 0;
     seekerCardT = 99; newBest = false;
     mode = 'play'; sectionIdx = -1;
-    cardText = DP.STRATUM_NAMES[L.stratum] + '  -  ' + (i + 1) + ' OF ' + RUN.rooms.length; cardT = 0;
+    cardText = DP.roomName(RUN.rooms[i]) + '  -  ' + (i + 1) + ' OF ' + RUN.rooms.length; cardT = 0;   // the room's own name
     snapCamera(); A.Live.sfx('start'); A.Live.setPaused(false); syncTouchUI();
   }
   function deepRoomDone() {
@@ -892,7 +892,11 @@
     ctx.globalCompositeOperation = 'lighter'; g(hx, hy + 18, 44, '120,150,230', 0.16 + 0.04 * Math.sin(time * 1.4)); ctx.globalCompositeOperation = 'source-over';
     ht('THE DEEP', hx, hy + 20, '#c9d6f0', 'center', 0.85);
     const RM = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
-    if (P.deepBest) ht('DEEPEST  ' + RM[Math.min(8, P.deepBest)] + ' OF VIII', hx, hy + 20 + L7, '#6f7f9c', 'center', 0.7);
+    // your record: how many descents, how many reached the bottom (and, until one has, the deepest room)
+    if (P.deepRuns) {
+      ht('RUNS  ' + P.deepRuns + '   -   BOTTOM REACHED  ' + P.deepWins, hx, hy + 20 + L7, '#6f7f9c', 'center', 0.75);
+      if (!P.deepWins && P.deepBest) ht('DEEPEST  ' + RM[Math.min(8, P.deepBest)] + ' OF VIII', hx, hy + 20 + L7 * 2, '#5d6a84', 'center', 0.65);
+    }
     if (Math.abs(S.x + 2.5 - (A0.hole[0] + A0.hole[1]) / 2) < 40 && S.y + S.h <= A0.hole[2] + 2) ht((touchMode ? 'ROLL' : 'S') + '  DROP IN TO DESCEND', hx, hy - 34, '#d6b98a', 'center', 0.6 + 0.4 * Math.sin(time * 3));
   }
 
@@ -902,7 +906,7 @@
     if (RUN && (mode === 'play' || mode === 'pause')) {
       const base = DEEPROOMS.find(r => r.id === RUN.rooms[RUN.i]) || {};
       const hy = Math.round(44 / SC) + 14;
-      ht(DP.STRATUM_NAMES[base.stratum || 0] + '   ' + (RUN.i + 1) + ' / ' + RUN.rooms.length, 8, hy, '#9fb8bc', 'left', 0.8);
+      ht(DP.roomName(base.id) + '   ' + (RUN.i + 1) + ' / ' + RUN.rooms.length + '   -   ' + DP.STRATUM_NAMES[base.stratum || 0], 8, hy, '#9fb8bc', 'left', 0.8);
       // lives: a little hood for each, hollow once spent; then the wards
       {
         const n = 1 + RUN.livesMax, have = 1 + RUN.lives, ly = hy + L7 + 1;
@@ -933,7 +937,7 @@
         ctx.globalAlpha = a; ctx.fillStyle = sel ? 'rgba(185,168,123,0.18)' : 'rgba(22,30,38,0.9)'; ctx.fillRect(c.x, c.y, c.w, c.h);
         ctx.fillStyle = sel ? PAL.gold : '#33434c'; ctx.fillRect(c.x, c.y, c.w, 1); ctx.fillRect(c.x, c.y + c.h - 1, c.w, 1); ctx.fillRect(c.x, c.y, 1, c.h); ctx.fillRect(c.x + c.w - 1, c.y, 1, c.h);
         ctx.globalAlpha = 1;
-        if (c.u.rare) {     // a rare gift glows, and says so
+        if (c.u.rare && c.u.rare < 0.1) {     // a truly rare gift glows, and says so
           const pul = 0.5 + 0.5 * Math.sin(deepT * 3);
           ctx.globalAlpha = a * (0.35 + 0.35 * pul); ctx.fillStyle = '#d6b98a'; ctx.fillRect(c.x - 1, c.y - 1, c.w + 2, 1); ctx.fillRect(c.x - 1, c.y + c.h, c.w + 2, 1); ctx.fillRect(c.x - 1, c.y, 1, c.h); ctx.fillRect(c.x + c.w, c.y, 1, c.h); ctx.globalAlpha = 1;
           ht('RARE', c.x + c.w / 2, c.y + c.h - 4 - L7, '#d6b98a', 'center', a * (0.6 + 0.4 * pul));
@@ -948,7 +952,7 @@
       ht(RUN && RUN.gaveUp ? 'YOU TURNED BACK' : S.why === 'void' ? 'THE DARK TOOK YOU' : 'THE LIGHT FOUND YOU', cx, Math.round(LH * 0.2), PAL.snow, 'center', a, 2);
       const base = RUN && DEEPROOMS.find(r => r.id === RUN.rooms[RUN.i]) || {};
       let y = Math.round(LH * 0.2) + Math.ceil(14 * HS) + 10;
-      ht('ROOM ' + (RUN ? RUN.i + 1 : 0) + ' OF ' + DP.ROOMS_PER_RUN + '   ' + DP.STRATUM_NAMES[base.stratum || 0], cx, y, '#9fb8bc', 'center', a); y += L7 * 1.5;
+      ht('ROOM ' + (RUN ? RUN.i + 1 : 0) + ' OF ' + DP.ROOMS_PER_RUN + '   ' + DP.roomName(base.id) + '   -   ' + DP.STRATUM_NAMES[base.stratum || 0], cx, y, '#9fb8bc', 'center', a); y += L7 * 1.5;
       ht('DEEPEST  ROOM ' + P.deepBest + (deepRecord ? '   A NEW RECORD' : ''), cx, y, deepRecord ? '#d6b98a' : '#7f8a96', 'center', a); y += L7 * 1.5;
       ht('NO SEEKER WAKES THIS TIME', cx, y, '#5d6474', 'center', a);
       if (deepT > 1.5) ht(touchMode ? 'TAP  -  BACK TO THE CODEX' : 'SPACE  BACK TO THE CODEX', cx, LH - 16, PAL.gold, 'center', 0.6 + 0.4 * Math.sin(deepT * 4));

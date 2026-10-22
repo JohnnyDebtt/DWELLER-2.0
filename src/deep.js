@@ -7,6 +7,16 @@
   const STRATA = ['descent', 'mycelium', 'glass', 'foundry', 'ember', 'heart'];
   const STRATUM_NAMES = ['THE SHAFT', 'THE ROOTS', 'THE GEODE', 'THE WORKINGS', 'THE MAGMA', 'THE VEIN'];
   const ROOMS_PER_RUN = 8;
+  // every room of The Deep has its own name (rooms 0..7 of each stratum)
+  const ROOM_NAMES = {
+    descent: ['THE LONG DROP', 'LANTERN STAIR', 'THE QUIET RUNGS', 'PALE GALLERY', 'THE EYELESS HALL', 'HANGING LIGHTS', 'THE NARROWS', 'LAST ROPE'],
+    mycelium: ['SPOREFALL HOLLOW', 'THE CAP GARDEN', 'HYPHAE WALK', 'THE SOFT DARK', 'ROOTBRIDGE', 'GLOWCAP TERRACE', 'THE BREATHING FLOOR', 'THE OLD GROWTH'],
+    glass: ['PRISM HALL', 'THE CUT ROOM', 'SHARDLIGHT', 'THE VIOLET NAVE', 'MIRROR STEPS', 'THE COLD FACETS', 'LENS GARDEN', 'THE SPLIT BEAM'],
+    foundry: ['THE BELLOWS', 'SLAG GALLERY', 'THE CRUCIBLE', 'HAMMER HALL', 'THE COOLING YARD', 'GEARWELL', 'THE ASH LINE', 'OLD FORGE'],
+    ember: ['THE RED HOLLOW', 'CINDER STAIR', 'THE BURNING CHOIR', 'ASHEN REACH', 'THE SLOW FIRE', 'EMBER NAVE', 'THE MOLTEN GATE', 'SCALD HALL'],
+    heart: ['THE PULSE HALL', 'VALVE GALLERY', 'THE LONG BEAT', 'ARTERIAL', 'THE WARM DARK', 'SYSTOLE', 'DIASTOLE', 'THE LAST CHAMBER'],
+  };
+  function roomName(id) { const m = /^([a-z]+)(\d+)$/.exec(id || ''); return m && ROOM_NAMES[m[1]] ? ROOM_NAMES[m[1]][+m[2]] || '' : ''; }
 
   /* ---- what a seeker's traits do. Each entry: the modifiers it brings and the words for it in the Codex.
      Multipliers multiply, shield and air add. (Defaults in Dweller.MOD0: burn, regen, run, jump, fall, hold, cd,
@@ -73,7 +83,7 @@
     { id: 'eclipse', name: 'LONG ECLIPSE', text: 'YOUR SEEKER HOLDS THE DARK LONGER', m: { hold: 1.3 }, max: 2 },
     { id: 'charge', name: 'QUICK CHARGE', text: 'YOUR SEEKER RECHARGES FASTER', m: { cd: 0.75 }, max: 2 },
     { id: 'sight', name: 'FAR SIGHT', text: 'YOUR SEEKER REACHES FURTHER', m: { reach: 1.3 }, max: 2 },
-    { id: 'ward', name: 'WARD', text: 'THE NEXT FULL BURN IS TAKEN FROM YOU', m: { shield: 1 }, max: 3 },
+    { id: 'ward', name: 'WARD', text: 'THE NEXT FULL BURN IS TAKEN FROM YOU', m: { shield: 1 }, max: 2, rare: 0.3 },   // uncommon: in about one offer in ten
     { id: 'still', name: 'STILLNESS', text: 'A SAFE BREATH AT THE START OF EVERY ROOM', m: { grace: 2.5 }, max: 1 },
     { id: 'feather', name: 'FEATHER', text: 'YOU FALL MORE SLOWLY', m: { fall: 0.8 }, max: 2 },
     // very rare: it turns up in about one offer in twenty, once a run
@@ -131,8 +141,8 @@
   function tierFor(n) { return n < 5 ? 0 : n < 10 ? 1 : n < 20 ? 2 : n < 35 ? 3 : 4; }
   const TIER_NAMES = ['GENTLE', 'DEEPENING', 'HARSH', 'CRUEL', 'THE CEILING'];
 
-  /* a run: two strata, one after the other going down, four rooms from each. Never the same room twice, and the
-     four from a stratum are the ones least alike, in the order that keeps neighbours apart: a stratum has only five
+  /* a run: four strata going down, two rooms from each. Never the same room twice, and the
+     rooms from a stratum are the ones least alike, in the order that keeps neighbours apart: a stratum has only five
      kinds of stretch, so rooms must share some, but two rooms in a row never open with the same one and share as
      few as they can */
   const piecesOf = (r) => (r.sections || []).map(q => q.title).filter(t => t !== 'IN' && t !== 'DOWN');
@@ -157,13 +167,20 @@
     return best.map(i => list[i]);
   }
   function planRun(rand, rooms) {
-    const by = STRATA.map(st => rooms.filter(r => r.theme === st));
-    const ok = STRATA.map((_, i) => i).filter(i => i + 1 < STRATA.length && by[i].length >= 4 && by[i + 1].length >= 4);
-    const s0 = ok.length ? ok[Math.floor(rand() * ok.length)] : 0;
-    const half = ROOMS_PER_RUN / 2;
-    const out = bestFour(rand, by[s0], half).concat(bestFour(rand, by[Math.min(STRATA.length - 1, s0 + 1)], half)).map(r => r.id);
+    // four strata, always going deeper, two rooms in each: never more than two rooms of one kind in a row. The
+    // Workings and the Magma are both fire-coloured, so they are never set side by side either
+    const by = STRATA.map(st => rooms.filter(r => r.theme === st)), per = ROOMS_PER_RUN / 4, sets = [];
+    for (let a = 0; a < 6; a++) for (let b = a + 1; b < 6; b++) for (let c = b + 1; c < 6; c++) for (let d = c + 1; d < 6; d++) {
+      const q = [a, b, c, d];
+      if (q.some(i => by[i].length < per)) continue;
+      if (q.some((x, k) => k && q[k - 1] === 3 && x === 4)) continue;
+      sets.push(q);
+    }
+    const pick = sets.length ? sets[Math.floor(rand() * sets.length)] : [0, 1, 2, 3];
+    const out = [].concat(...pick.map(i => bestFour(rand, by[i], per))).map(r => r.id);
     return out.filter((id, i) => out.indexOf(id) === i);
   }
+
 
   /* the seeker sleeping at the bottom: one you have not found yet. Harder runs (and a Signal Mast) make a strong one
      likelier; strong means tier S or A in The Deep. strong: the ids of those seekers */
@@ -176,5 +193,5 @@
     return 1;
   }
 
-  global.DwellerDeep = { STRATA, STRATUM_NAMES, ROOMS_PER_RUN, UPGRADES, abilities, modsFor, offer, tierFor, TIER_NAMES, planRun, reward, score, grade, GRADE_COL };
+  global.DwellerDeep = { STRATA, STRATUM_NAMES, ROOMS_PER_RUN, UPGRADES, abilities, modsFor, offer, tierFor, TIER_NAMES, planRun, reward, score, grade, GRADE_COL, roomName };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

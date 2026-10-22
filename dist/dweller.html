@@ -3475,6 +3475,16 @@ body.cmp #tbE{display:flex}
   const STRATA = ['descent', 'mycelium', 'glass', 'foundry', 'ember', 'heart'];
   const STRATUM_NAMES = ['THE SHAFT', 'THE ROOTS', 'THE GEODE', 'THE WORKINGS', 'THE MAGMA', 'THE VEIN'];
   const ROOMS_PER_RUN = 8;
+  // every room of The Deep has its own name (rooms 0..7 of each stratum)
+  const ROOM_NAMES = {
+    descent: ['THE LONG DROP', 'LANTERN STAIR', 'THE QUIET RUNGS', 'PALE GALLERY', 'THE EYELESS HALL', 'HANGING LIGHTS', 'THE NARROWS', 'LAST ROPE'],
+    mycelium: ['SPOREFALL HOLLOW', 'THE CAP GARDEN', 'HYPHAE WALK', 'THE SOFT DARK', 'ROOTBRIDGE', 'GLOWCAP TERRACE', 'THE BREATHING FLOOR', 'THE OLD GROWTH'],
+    glass: ['PRISM HALL', 'THE CUT ROOM', 'SHARDLIGHT', 'THE VIOLET NAVE', 'MIRROR STEPS', 'THE COLD FACETS', 'LENS GARDEN', 'THE SPLIT BEAM'],
+    foundry: ['THE BELLOWS', 'SLAG GALLERY', 'THE CRUCIBLE', 'HAMMER HALL', 'THE COOLING YARD', 'GEARWELL', 'THE ASH LINE', 'OLD FORGE'],
+    ember: ['THE RED HOLLOW', 'CINDER STAIR', 'THE BURNING CHOIR', 'ASHEN REACH', 'THE SLOW FIRE', 'EMBER NAVE', 'THE MOLTEN GATE', 'SCALD HALL'],
+    heart: ['THE PULSE HALL', 'VALVE GALLERY', 'THE LONG BEAT', 'ARTERIAL', 'THE WARM DARK', 'SYSTOLE', 'DIASTOLE', 'THE LAST CHAMBER'],
+  };
+  function roomName(id) { const m = /^([a-z]+)(\d+)$/.exec(id || ''); return m && ROOM_NAMES[m[1]] ? ROOM_NAMES[m[1]][+m[2]] || '' : ''; }
 
   /* ---- what a seeker's traits do. Each entry: the modifiers it brings and the words for it in the Codex.
      Multipliers multiply, shield and air add. (Defaults in Dweller.MOD0: burn, regen, run, jump, fall, hold, cd,
@@ -3541,7 +3551,7 @@ body.cmp #tbE{display:flex}
     { id: 'eclipse', name: 'LONG ECLIPSE', text: 'YOUR SEEKER HOLDS THE DARK LONGER', m: { hold: 1.3 }, max: 2 },
     { id: 'charge', name: 'QUICK CHARGE', text: 'YOUR SEEKER RECHARGES FASTER', m: { cd: 0.75 }, max: 2 },
     { id: 'sight', name: 'FAR SIGHT', text: 'YOUR SEEKER REACHES FURTHER', m: { reach: 1.3 }, max: 2 },
-    { id: 'ward', name: 'WARD', text: 'THE NEXT FULL BURN IS TAKEN FROM YOU', m: { shield: 1 }, max: 3 },
+    { id: 'ward', name: 'WARD', text: 'THE NEXT FULL BURN IS TAKEN FROM YOU', m: { shield: 1 }, max: 2, rare: 0.3 },   // uncommon: in about one offer in ten
     { id: 'still', name: 'STILLNESS', text: 'A SAFE BREATH AT THE START OF EVERY ROOM', m: { grace: 2.5 }, max: 1 },
     { id: 'feather', name: 'FEATHER', text: 'YOU FALL MORE SLOWLY', m: { fall: 0.8 }, max: 2 },
     // very rare: it turns up in about one offer in twenty, once a run
@@ -3599,8 +3609,8 @@ body.cmp #tbE{display:flex}
   function tierFor(n) { return n < 5 ? 0 : n < 10 ? 1 : n < 20 ? 2 : n < 35 ? 3 : 4; }
   const TIER_NAMES = ['GENTLE', 'DEEPENING', 'HARSH', 'CRUEL', 'THE CEILING'];
 
-  /* a run: two strata, one after the other going down, four rooms from each. Never the same room twice, and the
-     four from a stratum are the ones least alike, in the order that keeps neighbours apart: a stratum has only five
+  /* a run: four strata going down, two rooms from each. Never the same room twice, and the
+     rooms from a stratum are the ones least alike, in the order that keeps neighbours apart: a stratum has only five
      kinds of stretch, so rooms must share some, but two rooms in a row never open with the same one and share as
      few as they can */
   const piecesOf = (r) => (r.sections || []).map(q => q.title).filter(t => t !== 'IN' && t !== 'DOWN');
@@ -3625,13 +3635,20 @@ body.cmp #tbE{display:flex}
     return best.map(i => list[i]);
   }
   function planRun(rand, rooms) {
-    const by = STRATA.map(st => rooms.filter(r => r.theme === st));
-    const ok = STRATA.map((_, i) => i).filter(i => i + 1 < STRATA.length && by[i].length >= 4 && by[i + 1].length >= 4);
-    const s0 = ok.length ? ok[Math.floor(rand() * ok.length)] : 0;
-    const half = ROOMS_PER_RUN / 2;
-    const out = bestFour(rand, by[s0], half).concat(bestFour(rand, by[Math.min(STRATA.length - 1, s0 + 1)], half)).map(r => r.id);
+    // four strata, always going deeper, two rooms in each: never more than two rooms of one kind in a row. The
+    // Workings and the Magma are both fire-coloured, so they are never set side by side either
+    const by = STRATA.map(st => rooms.filter(r => r.theme === st)), per = ROOMS_PER_RUN / 4, sets = [];
+    for (let a = 0; a < 6; a++) for (let b = a + 1; b < 6; b++) for (let c = b + 1; c < 6; c++) for (let d = c + 1; d < 6; d++) {
+      const q = [a, b, c, d];
+      if (q.some(i => by[i].length < per)) continue;
+      if (q.some((x, k) => k && q[k - 1] === 3 && x === 4)) continue;
+      sets.push(q);
+    }
+    const pick = sets.length ? sets[Math.floor(rand() * sets.length)] : [0, 1, 2, 3];
+    const out = [].concat(...pick.map(i => bestFour(rand, by[i], per))).map(r => r.id);
     return out.filter((id, i) => out.indexOf(id) === i);
   }
+
 
   /* the seeker sleeping at the bottom: one you have not found yet. Harder runs (and a Signal Mast) make a strong one
      likelier; strong means tier S or A in The Deep. strong: the ids of those seekers */
@@ -3644,7 +3661,7 @@ body.cmp #tbE{display:flex}
     return 1;
   }
 
-  global.DwellerDeep = { STRATA, STRATUM_NAMES, ROOMS_PER_RUN, UPGRADES, abilities, modsFor, offer, tierFor, TIER_NAMES, planRun, reward, score, grade, GRADE_COL };
+  global.DwellerDeep = { STRATA, STRATUM_NAMES, ROOMS_PER_RUN, UPGRADES, abilities, modsFor, offer, tierFor, TIER_NAMES, planRun, reward, score, grade, GRADE_COL, roomName };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 </script>
 <script>/* DWELLER — the art of THE CODEX, the Guardian's arena after the Core is won.
@@ -5445,7 +5462,7 @@ body.cmp #tbE{display:flex}
     runTicks = 0; R.parts.length = 0; R.clearGuardian(); A.Live.boss = null; R.resetTethers(); beamPrev = {}; deathFade = 0; flash = 0; shake = 0;
     seekerCardT = 99; newBest = false;
     mode = 'play'; sectionIdx = -1;
-    cardText = DP.STRATUM_NAMES[L.stratum] + '  -  ' + (i + 1) + ' OF ' + RUN.rooms.length; cardT = 0;
+    cardText = DP.roomName(RUN.rooms[i]) + '  -  ' + (i + 1) + ' OF ' + RUN.rooms.length; cardT = 0;   // the room's own name
     snapCamera(); A.Live.sfx('start'); A.Live.setPaused(false); syncTouchUI();
   }
   function deepRoomDone() {
@@ -5684,7 +5701,11 @@ body.cmp #tbE{display:flex}
     ctx.globalCompositeOperation = 'lighter'; g(hx, hy + 18, 44, '120,150,230', 0.16 + 0.04 * Math.sin(time * 1.4)); ctx.globalCompositeOperation = 'source-over';
     ht('THE DEEP', hx, hy + 20, '#c9d6f0', 'center', 0.85);
     const RM = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
-    if (P.deepBest) ht('DEEPEST  ' + RM[Math.min(8, P.deepBest)] + ' OF VIII', hx, hy + 20 + L7, '#6f7f9c', 'center', 0.7);
+    // your record: how many descents, how many reached the bottom (and, until one has, the deepest room)
+    if (P.deepRuns) {
+      ht('RUNS  ' + P.deepRuns + '   -   BOTTOM REACHED  ' + P.deepWins, hx, hy + 20 + L7, '#6f7f9c', 'center', 0.75);
+      if (!P.deepWins && P.deepBest) ht('DEEPEST  ' + RM[Math.min(8, P.deepBest)] + ' OF VIII', hx, hy + 20 + L7 * 2, '#5d6a84', 'center', 0.65);
+    }
     if (Math.abs(S.x + 2.5 - (A0.hole[0] + A0.hole[1]) / 2) < 40 && S.y + S.h <= A0.hole[2] + 2) ht((touchMode ? 'ROLL' : 'S') + '  DROP IN TO DESCEND', hx, hy - 34, '#d6b98a', 'center', 0.6 + 0.4 * Math.sin(time * 3));
   }
 
@@ -5694,7 +5715,7 @@ body.cmp #tbE{display:flex}
     if (RUN && (mode === 'play' || mode === 'pause')) {
       const base = DEEPROOMS.find(r => r.id === RUN.rooms[RUN.i]) || {};
       const hy = Math.round(44 / SC) + 14;
-      ht(DP.STRATUM_NAMES[base.stratum || 0] + '   ' + (RUN.i + 1) + ' / ' + RUN.rooms.length, 8, hy, '#9fb8bc', 'left', 0.8);
+      ht(DP.roomName(base.id) + '   ' + (RUN.i + 1) + ' / ' + RUN.rooms.length + '   -   ' + DP.STRATUM_NAMES[base.stratum || 0], 8, hy, '#9fb8bc', 'left', 0.8);
       // lives: a little hood for each, hollow once spent; then the wards
       {
         const n = 1 + RUN.livesMax, have = 1 + RUN.lives, ly = hy + L7 + 1;
@@ -5725,7 +5746,7 @@ body.cmp #tbE{display:flex}
         ctx.globalAlpha = a; ctx.fillStyle = sel ? 'rgba(185,168,123,0.18)' : 'rgba(22,30,38,0.9)'; ctx.fillRect(c.x, c.y, c.w, c.h);
         ctx.fillStyle = sel ? PAL.gold : '#33434c'; ctx.fillRect(c.x, c.y, c.w, 1); ctx.fillRect(c.x, c.y + c.h - 1, c.w, 1); ctx.fillRect(c.x, c.y, 1, c.h); ctx.fillRect(c.x + c.w - 1, c.y, 1, c.h);
         ctx.globalAlpha = 1;
-        if (c.u.rare) {     // a rare gift glows, and says so
+        if (c.u.rare && c.u.rare < 0.1) {     // a truly rare gift glows, and says so
           const pul = 0.5 + 0.5 * Math.sin(deepT * 3);
           ctx.globalAlpha = a * (0.35 + 0.35 * pul); ctx.fillStyle = '#d6b98a'; ctx.fillRect(c.x - 1, c.y - 1, c.w + 2, 1); ctx.fillRect(c.x - 1, c.y + c.h, c.w + 2, 1); ctx.fillRect(c.x - 1, c.y, 1, c.h); ctx.fillRect(c.x + c.w, c.y, 1, c.h); ctx.globalAlpha = 1;
           ht('RARE', c.x + c.w / 2, c.y + c.h - 4 - L7, '#d6b98a', 'center', a * (0.6 + 0.4 * pul));
@@ -5740,7 +5761,7 @@ body.cmp #tbE{display:flex}
       ht(RUN && RUN.gaveUp ? 'YOU TURNED BACK' : S.why === 'void' ? 'THE DARK TOOK YOU' : 'THE LIGHT FOUND YOU', cx, Math.round(LH * 0.2), PAL.snow, 'center', a, 2);
       const base = RUN && DEEPROOMS.find(r => r.id === RUN.rooms[RUN.i]) || {};
       let y = Math.round(LH * 0.2) + Math.ceil(14 * HS) + 10;
-      ht('ROOM ' + (RUN ? RUN.i + 1 : 0) + ' OF ' + DP.ROOMS_PER_RUN + '   ' + DP.STRATUM_NAMES[base.stratum || 0], cx, y, '#9fb8bc', 'center', a); y += L7 * 1.5;
+      ht('ROOM ' + (RUN ? RUN.i + 1 : 0) + ' OF ' + DP.ROOMS_PER_RUN + '   ' + DP.roomName(base.id) + '   -   ' + DP.STRATUM_NAMES[base.stratum || 0], cx, y, '#9fb8bc', 'center', a); y += L7 * 1.5;
       ht('DEEPEST  ROOM ' + P.deepBest + (deepRecord ? '   A NEW RECORD' : ''), cx, y, deepRecord ? '#d6b98a' : '#7f8a96', 'center', a); y += L7 * 1.5;
       ht('NO SEEKER WAKES THIS TIME', cx, y, '#5d6474', 'center', a);
       if (deepT > 1.5) ht(touchMode ? 'TAP  -  BACK TO THE CODEX' : 'SPACE  BACK TO THE CODEX', cx, LH - 16, PAL.gold, 'center', 0.6 + 0.4 * Math.sin(deepT * 4));
