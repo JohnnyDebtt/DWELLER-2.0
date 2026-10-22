@@ -1,0 +1,1922 @@
+{
+ "descent0@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 8.8s, exp 105, ex=0.00, 181ms",
+  "s": 0
+ },
+ "descent0@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 7.3s, exp 285, ex=0.00, 380ms",
+  "s": 0
+ },
+ "descent0@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 8.8s, exp 105, ex=0.00, 242ms",
+  "s": 0
+ },
+ "descent0@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 7.3s, exp 285, ex=0.00, 356ms",
+  "s": 0
+ },
+ "descent0@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 9.0s, exp 197, ex=0.02, 191ms",
+  "s": 0
+ },
+ "descent0@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 10.1s, exp 37850, ex=0.00, 16292ms",
+  "s": 16
+ },
+ "descent1@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 7.5s, exp 90, ex=0.00, 133ms",
+  "s": 0
+ },
+ "descent1@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 8.4s, exp 246, ex=0.00, 294ms",
+  "s": 0
+ },
+ "descent1@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 5.9s, exp 337, ex=0.00, 250ms",
+  "s": 0
+ },
+ "descent1@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 7.5s, exp 90, ex=0.00, 157ms",
+  "s": 0
+ },
+ "descent1@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 8.4s, exp 246, ex=0.00, 292ms",
+  "s": 0
+ },
+ "descent2@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 9.3s, exp 151, ex=0.00, 198ms",
+  "s": 0
+ },
+ "descent1@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 6.3s, exp 5003, ex=0.00, 2205ms",
+  "s": 2
+ },
+ "descent2@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 7.3s, exp 253, ex=0.00, 236ms",
+  "s": 0
+ },
+ "descent2@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 9.3s, exp 151, ex=0.00, 156ms",
+  "s": 0
+ },
+ "descent2@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 11.6s, exp 271252, ex=0.00, 114284ms",
+  "s": 114
+ },
+ "descent2@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 7.3s, exp 253, ex=0.00, 256ms",
+  "s": 0
+ },
+ "descent3@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 7.8s, exp 93, ex=0.00, 85ms",
+  "s": 0
+ },
+ "descent3@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 7.5s, exp 90, ex=0.00, 111ms",
+  "s": 0
+ },
+ "descent3@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 8.1s, exp 137, ex=0.00, 137ms",
+  "s": 0
+ },
+ "descent3@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 7.8s, exp 93, ex=0.00, 83ms",
+  "s": 0
+ },
+ "descent3@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 7.5s, exp 90, ex=0.00, 117ms",
+  "s": 0
+ },
+ "descent3@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 8.1s, exp 137, ex=0.00, 115ms",
+  "s": 0
+ },
+ "descent2@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 12.0s, exp 356386, ex=0.00, 148351ms",
+  "s": 148
+ },
+ "descent6@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 12.2s, exp 187, ex=0.00, 214ms",
+  "s": 0
+ },
+ "descent6@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 8.1s, exp 417, ex=0.00, 303ms",
+  "s": 0
+ },
+ "descent6@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 13.6s, exp 65651, ex=0.00, 25967ms",
+  "s": 26
+ },
+ "descent6@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 12.2s, exp 187, ex=0.00, 220ms",
+  "s": 0
+ },
+ "descent6@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 8.6s, exp 5060, ex=0.00, 1868ms",
+  "s": 2
+ },
+ "descent6@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 14.7s, exp 217020, ex=0.00, 107008ms",
+  "s": 107
+ },
+ "descent7@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 13.6s, exp 7443, ex=0.00, 2940ms",
+  "s": 3
+ },
+ "descent7@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 10.9s, exp 173, ex=0.00, 205ms",
+  "s": 0
+ },
+ "descent7@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 10.5s, exp 126, ex=0.00, 135ms",
+  "s": 0
+ },
+ "descent7@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 10.9s, exp 173, ex=0.00, 174ms",
+  "s": 0
+ },
+ "descent7@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 10.6s, exp 129, ex=0.00, 147ms",
+  "s": 0
+ },
+ "ember0@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 12.2s, exp 1952, ex=0.00, 867ms",
+  "s": 1
+ },
+ "descent7@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 15.1s, exp 156431, ex=0.00, 90823ms",
+  "s": 91
+ },
+ "ember0@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 7.1s, exp 9032, ex=0.00, 3621ms",
+  "s": 4
+ },
+ "ember0@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 11.9s, exp 2003, ex=0.00, 1118ms",
+  "s": 1
+ },
+ "ember0@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 6.3s, exp 7261, ex=0.00, 3043ms",
+  "s": 3
+ },
+ "ember0@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 8.0s, exp 13106, ex=0.00, 5032ms",
+  "s": 5
+ },
+ "ember0@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 7.4s, exp 105202, ex=0.10, 51738ms",
+  "s": 52
+ },
+ "ember2@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 10.8s, exp 1673, ex=0.00, 932ms",
+  "s": 1
+ },
+ "ember2@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 15.9s, exp 78258, ex=0.00, 28499ms",
+  "s": 29
+ },
+ "ember2@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 16.1s, exp 81104, ex=0.00, 30304ms",
+  "s": 30
+ },
+ "ember2@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 11.3s, exp 1799, ex=0.00, 1042ms",
+  "s": 1
+ },
+ "ember2@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 7.4s, exp 9499, ex=0.00, 3912ms",
+  "s": 4
+ },
+ "ember2@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 10.0s, exp 164167, ex=0.00, 62867ms",
+  "s": 63
+ },
+ "ember4@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 9.4s, exp 87154, ex=0.09, 32954ms",
+  "s": 33
+ },
+ "ember4@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 15.3s, exp 81604, ex=0.00, 29193ms",
+  "s": 29
+ },
+ "ember4@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 8.4s, exp 11889, ex=0.00, 4556ms",
+  "s": 5
+ },
+ "ember4@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 10.5s, exp 44470, ex=0.00, 16340ms",
+  "s": 16
+ },
+ "ember4@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 10.3s, exp 30864, ex=0.00, 11587ms",
+  "s": 12
+ },
+ "ember4@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 14.9s, exp 82936, ex=0.00, 30707ms",
+  "s": 31
+ },
+ "foundry2@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 8.5s, exp 8095, ex=0.00, 3183ms",
+  "s": 3
+ },
+ "foundry2@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 6.9s, exp 1780, ex=0.00, 887ms",
+  "s": 1
+ },
+ "foundry2@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 10.8s, exp 78409, ex=0.00, 28724ms",
+  "s": 29
+ },
+ "foundry2@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 16.8s, exp 95839, ex=0.00, 31430ms",
+  "s": 31
+ },
+ "foundry2@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 6.9s, exp 1790, ex=0.00, 895ms",
+  "s": 1
+ },
+ "foundry2@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 16.8s, exp 95840, ex=0.00, 33284ms",
+  "s": 33
+ },
+ "glass2@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 11.3s, exp 9469, ex=0.00, 4404ms",
+  "s": 4
+ },
+ "glass2@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 8.4s, exp 101, ex=0.00, 105ms",
+  "s": 0
+ },
+ "glass2@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 8.3s, exp 99, ex=0.00, 154ms",
+  "s": 0
+ },
+ "glass2@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 11.3s, exp 9469, ex=0.00, 4199ms",
+  "s": 4
+ },
+ "glass2@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 8.4s, exp 101, ex=0.00, 110ms",
+  "s": 0
+ },
+ "glass2@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 8.6s, exp 163, ex=0.00, 181ms",
+  "s": 0
+ },
+ "glass3@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 9.4s, exp 113, ex=0.00, 171ms",
+  "s": 0
+ },
+ "glass3@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 7.1s, exp 85, ex=0.00, 85ms",
+  "s": 0
+ },
+ "glass3@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 10.8s, exp 4474, ex=0.00, 1843ms",
+  "s": 2
+ },
+ "glass3@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 9.4s, exp 113, ex=0.00, 133ms",
+  "s": 0
+ },
+ "glass3@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 7.1s, exp 85, ex=0.00, 102ms",
+  "s": 0
+ },
+ "glass3@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 10.8s, exp 4474, ex=0.00, 1610ms",
+  "s": 2
+ },
+ "glass4@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 9.6s, exp 115, ex=0.00, 101ms",
+  "s": 0
+ },
+ "glass4@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 11.3s, exp 135, ex=0.00, 182ms",
+  "s": 0
+ },
+ "glass4@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 7.1s, exp 85, ex=0.00, 105ms",
+  "s": 0
+ },
+ "glass4@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 9.6s, exp 115, ex=0.00, 125ms",
+  "s": 0
+ },
+ "glass4@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 11.6s, exp 199, ex=0.00, 210ms",
+  "s": 0
+ },
+ "glass4@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 7.1s, exp 88, ex=0.12, 127ms",
+  "s": 0
+ },
+ "heart0@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 7.9s, exp 7805, ex=0.00, 3088ms",
+  "s": 3
+ },
+ "heart0@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 9.6s, exp 144, ex=0.00, 172ms",
+  "s": 0
+ },
+ "heart0@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 7.9s, exp 8940, ex=0.00, 3711ms",
+  "s": 4
+ },
+ "heart0@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 15.8s, exp 179793, ex=0.09, 67007ms",
+  "s": 67
+ },
+ "heart0@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 16.2s, exp 202621, ex=0.44, 75628ms",
+  "s": 76
+ },
+ "heart1@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 7.9s, exp 7805, ex=0.00, 2965ms",
+  "s": 3
+ },
+ "heart1@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 7.0s, exp 9436, ex=0.00, 3781ms",
+  "s": 4
+ },
+ "heart1@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 9.6s, exp 144, ex=0.00, 135ms",
+  "s": 0
+ },
+ "heart0@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 10.7s, exp 126740, ex=0.00, 47995ms",
+  "s": 48
+ },
+ "heart1@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 7.9s, exp 8940, ex=0.00, 3497ms",
+  "s": 4
+ },
+ "heart1@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 7.4s, exp 7723, ex=0.00, 2950ms",
+  "s": 3
+ },
+ "heart1@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 10.7s, exp 126740, ex=0.00, 43722ms",
+  "s": 44
+ },
+ "heart2@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 8.7s, exp 104, ex=0.00, 118ms",
+  "s": 0
+ },
+ "heart2@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 7.9s, exp 7961, ex=0.00, 3865ms",
+  "s": 4
+ },
+ "heart2@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 16.9s, exp 138817, ex=0.15, 61483ms",
+  "s": 62
+ },
+ "heart2@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 8.7s, exp 104, ex=0.00, 109ms",
+  "s": 0
+ },
+ "heart2@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 7.9s, exp 7961, ex=0.00, 3875ms",
+  "s": 4
+ },
+ "heart3@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 9.5s, exp 6910, ex=0.00, 3416ms",
+  "s": 3
+ },
+ "heart3@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 8.7s, exp 104, ex=0.00, 121ms",
+  "s": 0
+ },
+ "heart3@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 7.9s, exp 7950, ex=0.00, 4149ms",
+  "s": 4
+ },
+ "heart3@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 11.2s, exp 10332, ex=0.00, 4702ms",
+  "s": 5
+ },
+ "heart3@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 8.7s, exp 104, ex=0.00, 115ms",
+  "s": 0
+ },
+ "heart3@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 7.9s, exp 7950, ex=0.00, 3915ms",
+  "s": 4
+ },
+ "heart4@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 17.8s, exp 142030, ex=0.00, 62884ms",
+  "s": 63
+ },
+ "heart4@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 8.7s, exp 104, ex=0.00, 112ms",
+  "s": 0
+ },
+ "heart2@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 19.6s, exp 225086, ex=0.10, 103373ms",
+  "s": 103
+ },
+ "heart4@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 8.4s, exp 10462, ex=0.00, 5013ms",
+  "s": 5
+ },
+ "heart4@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 8.7s, exp 104, ex=0.00, 111ms",
+  "s": 0
+ },
+ "heart4@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 8.6s, exp 11147, ex=0.00, 5184ms",
+  "s": 5
+ },
+ "heart5@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 10.8s, exp 163, ex=0.00, 163ms",
+  "s": 0
+ },
+ "heart5@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 8.7s, exp 104, ex=0.00, 135ms",
+  "s": 0
+ },
+ "heart5@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 7.9s, exp 7961, ex=0.00, 3948ms",
+  "s": 4
+ },
+ "heart4@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 21.9s, exp 273679, ex=0.05, 122228ms",
+  "s": 122
+ },
+ "heart5@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 8.7s, exp 104, ex=0.00, 131ms",
+  "s": 0
+ },
+ "heart5@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 7.9s, exp 7961, ex=0.00, 3931ms",
+  "s": 4
+ },
+ "heart6@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 10.8s, exp 163, ex=0.00, 207ms",
+  "s": 0
+ },
+ "heart6@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 8.7s, exp 104, ex=0.00, 120ms",
+  "s": 0
+ },
+ "heart5@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 12.4s, exp 252190, ex=0.00, 119069ms",
+  "s": 119
+ },
+ "heart6@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 9.7s, exp 13813, ex=0.00, 6768ms",
+  "s": 7
+ },
+ "heart6@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 8.7s, exp 104, ex=0.00, 128ms",
+  "s": 0
+ },
+ "heart6@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 11.0s, exp 11527, ex=0.00, 5324ms",
+  "s": 5
+ },
+ "heart7@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 10.8s, exp 8133, ex=0.00, 2903ms",
+  "s": 3
+ },
+ "heart7@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 9.3s, exp 10550, ex=0.00, 3807ms",
+  "s": 4
+ },
+ "heart7@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 18.2s, exp 160189, ex=0.00, 55081ms",
+  "s": 55
+ },
+ "heart7@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 11.3s, exp 12210, ex=0.00, 4387ms",
+  "s": 4
+ },
+ "heart7@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 9.3s, exp 10550, ex=0.00, 3996ms",
+  "s": 4
+ },
+ "heart6@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 12.4s, exp 252190, ex=0.00, 116970ms",
+  "s": 117
+ },
+ "heart7@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 19.6s, exp 237431, ex=0.08, 83825ms",
+  "s": 84
+ },
+ "mycelium1@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 11.7s, exp 7587, ex=0.00, 3320ms",
+  "s": 3
+ },
+ "mycelium1@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 8.6s, exp 229409, ex=0.00, 85001ms",
+  "s": 85
+ },
+ "mycelium1@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 6.2s, exp 4233, ex=0.00, 1632ms",
+  "s": 2
+ },
+ "mycelium1@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 11.7s, exp 7493, ex=0.00, 3273ms",
+  "s": 3
+ },
+ "mycelium1@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 9.1s, exp 179021, ex=0.00, 65938ms",
+  "s": 66
+ },
+ "mycelium1@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 6.2s, exp 4233, ex=0.00, 1648ms",
+  "s": 2
+ },
+ "mycelium3@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 9.0s, exp 6759, ex=0.00, 2737ms",
+  "s": 3
+ },
+ "mycelium3@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 8.3s, exp 30890, ex=0.00, 11911ms",
+  "s": 12
+ },
+ "mycelium3@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 9.0s, exp 6759, ex=0.00, 2693ms",
+  "s": 3
+ },
+ "mycelium3@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 8.3s, exp 30901, ex=0.00, 11725ms",
+  "s": 12
+ },
+ "mycelium3@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 10.6s, exp 332203, ex=0.00, 122819ms",
+  "s": 123
+ },
+ "mycelium3@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 11.1s, exp 342195, ex=0.00, 124488ms",
+  "s": 125
+ },
+ "mycelium6@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 10.1s, exp 57809, ex=0.00, 22204ms",
+  "s": 22
+ },
+ "mycelium6@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 12.8s, exp 364350, ex=0.00, 139556ms",
+  "s": 140
+ },
+ "mycelium6@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 10.8s, exp 324653, ex=0.00, 145187ms",
+  "s": 145
+ },
+ "mycelium6@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 10.1s, exp 55910, ex=0.00, 21686ms",
+  "s": 22
+ },
+ "mycelium6@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 11.7s, exp 90089, ex=0.00, 38639ms",
+  "s": 39
+ },
+ "mycelium7@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 10.1s, exp 57809, ex=0.00, 22442ms",
+  "s": 23
+ },
+ "mycelium7@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 9.4s, exp 9078, ex=0.00, 3424ms",
+  "s": 3
+ },
+ "mycelium7@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 11.3s, exp 28405, ex=0.00, 12632ms",
+  "s": 13
+ },
+ "mycelium7@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 10.1s, exp 55910, ex=0.00, 22065ms",
+  "s": 22
+ },
+ "mycelium7@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 9.4s, exp 9078, ex=0.00, 3718ms",
+  "s": 4
+ },
+ "mycelium6@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 13.1s, exp 381241, ex=0.00, 146581ms",
+  "s": 147
+ },
+ "mycelium7@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 11.1s, exp 362519, ex=0.00, 156288ms",
+  "s": 156
+ },
+ "descent4@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 7.8s, exp 93, ex=0.00, 117ms",
+  "s": 0
+ },
+ "descent4@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 10.0s, exp 7217, ex=0.00, 3412ms",
+  "s": 3
+ },
+ "descent4@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 7.8s, exp 93, ex=0.00, 103ms",
+  "s": 0
+ },
+ "descent4@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 10.0s, exp 1308, ex=0.00, 800ms",
+  "s": 1
+ },
+ "descent4@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 12.1s, exp 660, ex=0.00, 487ms",
+  "s": 1
+ },
+ "descent5@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 12.2s, exp 187, ex=0.00, 223ms",
+  "s": 0
+ },
+ "descent5@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 6.5s, exp 78, ex=0.00, 93ms",
+  "s": 0
+ },
+ "descent5@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 10.8s, exp 9469, ex=0.00, 4578ms",
+  "s": 5
+ },
+ "descent5@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 12.2s, exp 187, ex=0.00, 199ms",
+  "s": 0
+ },
+ "descent5@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 6.6s, exp 104, ex=0.00, 127ms",
+  "s": 0
+ },
+ "descent5@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 10.8s, exp 1809, ex=0.00, 1001ms",
+  "s": 1
+ },
+ "descent4@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 13.3s, exp 73414, ex=0.00, 31223ms",
+  "s": 31
+ },
+ "foundry0@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 7.3s, exp 6697, ex=0.00, 2798ms",
+  "s": 3
+ },
+ "foundry0@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 9.8s, exp 4679, ex=0.00, 1884ms",
+  "s": 2
+ },
+ "foundry0@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 6.9s, exp 1780, ex=0.00, 895ms",
+  "s": 1
+ },
+ "foundry0@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 9.4s, exp 14193, ex=0.00, 5386ms",
+  "s": 5
+ },
+ "foundry0@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 10.3s, exp 10983, ex=0.00, 4010ms",
+  "s": 4
+ },
+ "foundry0@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 6.9s, exp 1790, ex=0.00, 849ms",
+  "s": 1
+ },
+ "foundry1@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 11.3s, exp 223546, ex=0.00, 75370ms",
+  "s": 75
+ },
+ "foundry1@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 16.8s, exp 95835, ex=0.00, 30659ms",
+  "s": 31
+ },
+ "foundry1@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 6.6s, exp 6558, ex=0.00, 2345ms",
+  "s": 2
+ },
+ "foundry1@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 16.9s, exp 96177, ex=0.09, 31228ms",
+  "s": 31
+ },
+ "foundry1@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 6.9s, exp 7606, ex=0.00, 2718ms",
+  "s": 3
+ },
+ "foundry3@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 8.5s, exp 7914, ex=0.00, 3271ms",
+  "s": 3
+ },
+ "foundry1@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 12.1s, exp 320445, ex=0.00, 114369ms",
+  "s": 114
+ },
+ "foundry3@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 11.1s, exp 18034, ex=0.00, 6689ms",
+  "s": 7
+ },
+ "foundry3@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 10.0s, exp 217939, ex=0.00, 75178ms",
+  "s": 75
+ },
+ "foundry3@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 10.8s, exp 104794, ex=0.00, 38998ms",
+  "s": 39
+ },
+ "foundry3@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 11.8s, exp 18561, ex=0.00, 7100ms",
+  "s": 7
+ },
+ "foundry4@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 18.3s, exp 99793, ex=0.00, 33639ms",
+  "s": 34
+ },
+ "foundry4@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 11.2s, exp 7500, ex=0.00, 3368ms",
+  "s": 3
+ },
+ "foundry3@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 10.0s, exp 218076, ex=0.00, 77722ms",
+  "s": 78
+ },
+ "foundry4@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 18.3s, exp 99793, ex=0.00, 33833ms",
+  "s": 34
+ },
+ "foundry4@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 11.8s, exp 19516, ex=0.00, 7559ms",
+  "s": 8
+ },
+ "foundry4@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 12.8s, exp 278753, ex=0.00, 94461ms",
+  "s": 95
+ },
+ "foundry5@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 18.3s, exp 99790, ex=0.00, 33763ms",
+  "s": 34
+ },
+ "foundry5@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 6.9s, exp 1780, ex=0.00, 1011ms",
+  "s": 1
+ },
+ "foundry4@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 12.8s, exp 279197, ex=0.00, 100667ms",
+  "s": 101
+ },
+ "foundry5@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 18.3s, exp 99790, ex=0.00, 34308ms",
+  "s": 34
+ },
+ "foundry5@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 6.9s, exp 1790, ex=0.00, 841ms",
+  "s": 1
+ },
+ "foundry5@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 12.9s, exp 281889, ex=0.00, 96725ms",
+  "s": 97
+ },
+ "foundry5@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 12.9s, exp 283636, ex=0.00, 103245ms",
+  "s": 103
+ },
+ "foundry6@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 13.2s, exp 8439, ex=0.00, 3417ms",
+  "s": 3
+ },
+ "foundry6@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 6.9s, exp 1780, ex=0.00, 909ms",
+  "s": 1
+ },
+ "foundry6@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 13.9s, exp 279982, ex=0.00, 103767ms",
+  "s": 104
+ },
+ "foundry6@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 13.7s, exp 19779, ex=0.00, 8431ms",
+  "s": 8
+ },
+ "foundry6@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 6.9s, exp 1790, ex=0.00, 1005ms",
+  "s": 1
+ },
+ "foundry7@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 18.3s, exp 99790, ex=0.00, 35022ms",
+  "s": 35
+ },
+ "foundry7@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 6.9s, exp 1780, ex=0.00, 907ms",
+  "s": 1
+ },
+ "foundry7@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 13.3s, exp 6692, ex=0.00, 3014ms",
+  "s": 3
+ },
+ "foundry7@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 18.3s, exp 99790, ex=0.00, 35527ms",
+  "s": 36
+ },
+ "foundry7@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 6.9s, exp 1790, ex=0.00, 931ms",
+  "s": 1
+ },
+ "foundry7@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 13.7s, exp 14097, ex=0.00, 6539ms",
+  "s": 7
+ },
+ "glass0@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 9.4s, exp 113, ex=0.00, 205ms",
+  "s": 0
+ },
+ "glass0@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 5.8s, exp 69, ex=0.00, 97ms",
+  "s": 0
+ },
+ "glass0@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 9.9s, exp 314, ex=0.00, 323ms",
+  "s": 0
+ },
+ "glass0@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 9.4s, exp 113, ex=0.00, 129ms",
+  "s": 0
+ },
+ "glass0@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 5.8s, exp 69, ex=0.00, 107ms",
+  "s": 0
+ },
+ "glass0@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 9.9s, exp 314, ex=0.00, 268ms",
+  "s": 0
+ },
+ "glass1@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 7.0s, exp 109, ex=0.00, 124ms",
+  "s": 0
+ },
+ "glass1@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 8.3s, exp 100, ex=0.00, 109ms",
+  "s": 0
+ },
+ "glass1@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 9.9s, exp 314, ex=0.00, 369ms",
+  "s": 0
+ },
+ "glass1@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 7.0s, exp 96, ex=0.00, 138ms",
+  "s": 0
+ },
+ "glass1@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 8.3s, exp 100, ex=0.00, 107ms",
+  "s": 0
+ },
+ "glass1@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 9.9s, exp 314, ex=0.00, 327ms",
+  "s": 0
+ },
+ "glass5@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 9.6s, exp 115, ex=0.00, 109ms",
+  "s": 0
+ },
+ "glass5@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 11.8s, exp 349, ex=0.00, 332ms",
+  "s": 0
+ },
+ "glass5@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 10.8s, exp 4474, ex=0.00, 2211ms",
+  "s": 2
+ },
+ "glass5@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 9.6s, exp 115, ex=0.00, 142ms",
+  "s": 0
+ },
+ "glass5@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 11.8s, exp 349, ex=0.00, 311ms",
+  "s": 0
+ },
+ "glass5@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 10.8s, exp 4474, ex=0.00, 2340ms",
+  "s": 2
+ },
+ "glass6@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 13.0s, exp 235, ex=0.00, 240ms",
+  "s": 0
+ },
+ "glass6@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 11.3s, exp 135, ex=0.00, 202ms",
+  "s": 0
+ },
+ "glass6@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 8.3s, exp 100, ex=0.00, 151ms",
+  "s": 0
+ },
+ "glass6@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 13.0s, exp 235, ex=0.00, 236ms",
+  "s": 0
+ },
+ "glass6@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 11.6s, exp 199, ex=0.00, 242ms",
+  "s": 0
+ },
+ "glass6@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 8.3s, exp 100, ex=0.00, 113ms",
+  "s": 0
+ },
+ "glass7@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 11.3s, exp 9469, ex=0.00, 3664ms",
+  "s": 4
+ },
+ "glass7@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 12.0s, exp 466, ex=0.00, 333ms",
+  "s": 0
+ },
+ "glass7@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 8.4s, exp 101, ex=0.00, 116ms",
+  "s": 0
+ },
+ "glass7@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 11.3s, exp 9469, ex=0.00, 3643ms",
+  "s": 4
+ },
+ "glass7@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 12.0s, exp 470, ex=0.00, 415ms",
+  "s": 0
+ },
+ "glass7@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 8.4s, exp 101, ex=0.00, 92ms",
+  "s": 0
+ },
+ "mycelium0@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 11.8s, exp 16137, ex=0.00, 6687ms",
+  "s": 7
+ },
+ "mycelium0@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 30.4s, exp 3801, ex=0.00, 1911ms",
+  "s": 2
+ },
+ "foundry6@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 14.7s, exp 374296, ex=0.00, 147876ms",
+  "s": 148
+ },
+ "mycelium0@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 12.0s, exp 47780, ex=0.00, 19748ms",
+  "s": 20
+ },
+ "mycelium0@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 8.8s, exp 249927, ex=0.00, 89752ms",
+  "s": 90
+ },
+ "mycelium0@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 31.1s, exp 216084, ex=0.00, 82607ms",
+  "s": 83
+ },
+ "mycelium2@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 9.6s, exp 29901, ex=0.00, 10716ms",
+  "s": 11
+ },
+ "mycelium0@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 9.1s, exp 217072, ex=0.00, 77257ms",
+  "s": 77
+ },
+ "mycelium2@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 30.6s, exp 9525, ex=0.00, 3844ms",
+  "s": 4
+ },
+ "mycelium2@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 9.6s, exp 30555, ex=0.00, 11648ms",
+  "s": 12
+ },
+ "mycelium2@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 10.6s, exp 333581, ex=0.00, 119667ms",
+  "s": 120
+ },
+ "mycelium2@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 11.1s, exp 342158, ex=0.00, 121899ms",
+  "s": 122
+ },
+ "mycelium4@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 9.0s, exp 6759, ex=0.00, 2523ms",
+  "s": 3
+ },
+ "mycelium4@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 11.1s, exp 246212, ex=0.00, 101432ms",
+  "s": 102
+ },
+ "mycelium2@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 32.2s, exp 509205, ex=0.00, 190619ms",
+  "s": 191
+ },
+ "mycelium4@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 30.6s, exp 47166, ex=0.00, 19435ms",
+  "s": 20
+ },
+ "mycelium4@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 9.0s, exp 6759, ex=0.00, 2865ms",
+  "s": 3
+ },
+ "mycelium4@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 10.9s, exp 64995, ex=0.00, 25889ms",
+  "s": 26
+ },
+ "mycelium5@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 32.6s, exp 190798, ex=0.00, 77057ms",
+  "s": 77
+ },
+ "mycelium5@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 7.7s, exp 5692, ex=0.00, 2244ms",
+  "s": 2
+ },
+ "mycelium5@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 8.3s, exp 30895, ex=0.00, 11929ms",
+  "s": 12
+ },
+ "mycelium4@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 32.4s, exp 747554, ex=0.00, 304268ms",
+  "s": 304
+ },
+ "mycelium5@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 7.7s, exp 5692, ex=0.00, 2092ms",
+  "s": 2
+ },
+ "mycelium5@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 8.3s, exp 30906, ex=0.00, 11113ms",
+  "s": 11
+ },
+ "mycelium5@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 32.7s, exp 703417, ex=0.00, 280039ms",
+  "s": 280
+ },
+ "ember1@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 9.7s, exp 1786, ex=0.00, 1063ms",
+  "s": 1
+ },
+ "ember1@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 10.8s, exp 1668, ex=0.00, 821ms",
+  "s": 1
+ },
+ "ember1@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 8.3s, exp 7229, ex=0.00, 3368ms",
+  "s": 3
+ },
+ "ember1@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 9.7s, exp 1787, ex=0.00, 1176ms",
+  "s": 1
+ },
+ "ember1@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 10.5s, exp 1403, ex=0.00, 754ms",
+  "s": 1
+ },
+ "ember1@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 8.9s, exp 12824, ex=0.00, 5971ms",
+  "s": 6
+ },
+ "ember3@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 15.3s, exp 81604, ex=0.00, 30305ms",
+  "s": 30
+ },
+ "ember3@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 9.7s, exp 1786, ex=0.00, 1004ms",
+  "s": 1
+ },
+ "ember3@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 9.4s, exp 87154, ex=0.09, 33916ms",
+  "s": 34
+ },
+ "ember3@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 8.4s, exp 6903, ex=0.00, 2849ms",
+  "s": 3
+ },
+ "ember3@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 9.7s, exp 1787, ex=0.00, 1127ms",
+  "s": 1
+ },
+ "ember5@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 11.3s, exp 2345, ex=0.00, 1512ms",
+  "s": 2
+ },
+ "ember3@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 14.4s, exp 61795, ex=0.00, 24867ms",
+  "s": 25
+ },
+ "ember5@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 10.8s, exp 1668, ex=0.00, 932ms",
+  "s": 1
+ },
+ "ember5@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 11.3s, exp 2347, ex=0.00, 1274ms",
+  "s": 1
+ },
+ "ember5@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 9.0s, exp 20991, ex=0.00, 7438ms",
+  "s": 7
+ },
+ "ember5@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 10.5s, exp 1403, ex=0.00, 753ms",
+  "s": 1
+ },
+ "ember6@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 11.3s, exp 2345, ex=0.00, 1255ms",
+  "s": 1
+ },
+ "ember6@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 9.8s, exp 13759, ex=0.00, 5663ms",
+  "s": 6
+ },
+ "ember6@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 15.3s, exp 79440, ex=0.00, 29224ms",
+  "s": 29
+ },
+ "ember6@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 11.3s, exp 2347, ex=0.00, 1285ms",
+  "s": 1
+ },
+ "ember5@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 9.4s, exp 186865, ex=0.08, 69718ms",
+  "s": 70
+ },
+ "ember6@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 11.0s, exp 29899, ex=0.00, 12071ms",
+  "s": 12
+ },
+ "ember6@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 14.4s, exp 61795, ex=0.00, 23180ms",
+  "s": 23
+ },
+ "ember7@0#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 9.7s, exp 1786, ex=0.00, 965ms",
+  "s": 1
+ },
+ "ember7@0#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 10.8s, exp 1668, ex=0.00, 889ms",
+  "s": 1
+ },
+ "ember7@0#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 15.9s, exp 78258, ex=0.00, 28270ms",
+  "s": 28
+ },
+ "ember7@4#1": {
+  "ok": true,
+  "line": "segment 1 -> 2: ok 9.7s, exp 1787, ex=0.00, 1234ms",
+  "s": 1
+ },
+ "ember7@4#2": {
+  "ok": true,
+  "line": "segment 2 -> 3: ok 10.5s, exp 1403, ex=0.00, 773ms",
+  "s": 1
+ },
+ "ember7@4#0": {
+  "ok": true,
+  "line": "segment 0 -> 1: ok 15.9s, exp 80778, ex=0.00, 30307ms",
+  "s": 30
+ },
+ "descent0@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 55ms",
+  "s": 0
+ },
+ "descent1@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 56ms",
+  "s": 0
+ },
+ "descent0@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 56ms",
+  "s": 0
+ },
+ "descent1@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 67ms",
+  "s": 0
+ },
+ "descent2@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 27ms",
+  "s": 0
+ },
+ "descent3@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 20ms",
+  "s": 0
+ },
+ "descent2@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 65ms",
+  "s": 0
+ },
+ "descent3@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 57ms",
+  "s": 0
+ },
+ "descent4@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 51ms",
+  "s": 0
+ },
+ "descent5@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 32ms",
+  "s": 0
+ },
+ "descent4@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 58ms",
+  "s": 0
+ },
+ "descent5@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 33ms",
+  "s": 0
+ },
+ "descent6@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 36ms",
+  "s": 0
+ },
+ "descent7@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 21ms",
+  "s": 0
+ },
+ "descent6@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 50ms",
+  "s": 0
+ },
+ "descent7@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 54ms",
+  "s": 0
+ },
+ "ember0@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 20ms",
+  "s": 0
+ },
+ "ember0@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 41ms",
+  "s": 0
+ },
+ "ember1@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.6s, exp 19, ex=0.00, 21ms",
+  "s": 0
+ },
+ "ember1@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.6s, exp 19, ex=0.00, 49ms",
+  "s": 0
+ },
+ "ember2@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 36ms",
+  "s": 0
+ },
+ "ember3@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 26ms",
+  "s": 0
+ },
+ "ember2@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 42ms",
+  "s": 0
+ },
+ "ember3@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 34ms",
+  "s": 0
+ },
+ "ember4@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 45ms",
+  "s": 0
+ },
+ "ember5@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.6s, exp 19, ex=0.00, 30ms",
+  "s": 0
+ },
+ "ember4@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 50ms",
+  "s": 0
+ },
+ "ember5@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.6s, exp 19, ex=0.00, 24ms",
+  "s": 0
+ },
+ "ember6@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 32ms",
+  "s": 0
+ },
+ "ember6@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 61ms",
+  "s": 0
+ },
+ "ember7@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.6s, exp 19, ex=0.00, 64ms",
+  "s": 0
+ },
+ "foundry0@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.4s, exp 17, ex=0.00, 35ms",
+  "s": 0
+ },
+ "ember7@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.6s, exp 19, ex=0.00, 65ms",
+  "s": 0
+ },
+ "foundry0@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.4s, exp 17, ex=0.00, 31ms",
+  "s": 0
+ },
+ "foundry2@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.4s, exp 17, ex=0.00, 28ms",
+  "s": 0
+ },
+ "foundry1@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 73ms",
+  "s": 0
+ },
+ "foundry1@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 54ms",
+  "s": 0
+ },
+ "foundry3@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 26ms",
+  "s": 0
+ },
+ "foundry2@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.4s, exp 17, ex=0.00, 79ms",
+  "s": 0
+ },
+ "foundry4@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 28ms",
+  "s": 0
+ },
+ "foundry3@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 61ms",
+  "s": 0
+ },
+ "foundry4@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 50ms",
+  "s": 0
+ },
+ "foundry5@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 34ms",
+  "s": 0
+ },
+ "foundry6@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.4s, exp 17, ex=0.00, 26ms",
+  "s": 0
+ },
+ "foundry5@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 38ms",
+  "s": 0
+ },
+ "foundry6@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.4s, exp 17, ex=0.00, 63ms",
+  "s": 0
+ },
+ "foundry7@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 34ms",
+  "s": 0
+ },
+ "foundry7@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 73ms",
+  "s": 0
+ },
+ "glass0@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 43ms",
+  "s": 0
+ },
+ "glass1@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 35ms",
+  "s": 0
+ },
+ "glass0@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 52ms",
+  "s": 0
+ },
+ "glass2@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 23ms",
+  "s": 0
+ },
+ "glass1@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 55ms",
+  "s": 0
+ },
+ "glass3@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 23ms",
+  "s": 0
+ },
+ "glass2@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 50ms",
+  "s": 0
+ },
+ "glass4@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 33ms",
+  "s": 0
+ },
+ "glass3@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 54ms",
+  "s": 0
+ },
+ "glass5@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 49ms",
+  "s": 0
+ },
+ "glass5@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 76ms",
+  "s": 0
+ },
+ "glass4@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 111ms",
+  "s": 0
+ },
+ "glass6@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 36ms",
+  "s": 0
+ },
+ "glass6@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 74ms",
+  "s": 0
+ },
+ "glass7@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 52ms",
+  "s": 0
+ },
+ "glass7@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 59ms",
+  "s": 0
+ },
+ "heart1@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 23ms",
+  "s": 0
+ },
+ "heart0@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 42ms",
+  "s": 0
+ },
+ "heart0@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 40ms",
+  "s": 0
+ },
+ "heart1@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 45ms",
+  "s": 0
+ },
+ "heart2@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 43ms",
+  "s": 0
+ },
+ "heart2@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 48ms",
+  "s": 0
+ },
+ "heart3@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 58ms",
+  "s": 0
+ },
+ "heart4@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 39ms",
+  "s": 0
+ },
+ "heart3@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 85ms",
+  "s": 0
+ },
+ "heart4@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 63ms",
+  "s": 0
+ },
+ "heart5@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 52ms",
+  "s": 0
+ },
+ "heart5@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 38ms",
+  "s": 0
+ },
+ "heart6@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 48ms",
+  "s": 0
+ },
+ "heart6@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 64ms",
+  "s": 0
+ },
+ "heart7@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 46ms",
+  "s": 0
+ },
+ "heart7@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 51ms",
+  "s": 0
+ },
+ "mycelium0@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 38ms",
+  "s": 0
+ },
+ "mycelium0@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 27ms",
+  "s": 0
+ },
+ "mycelium1@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 29ms",
+  "s": 0
+ },
+ "mycelium2@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 25ms",
+  "s": 0
+ },
+ "mycelium1@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 37ms",
+  "s": 0
+ },
+ "mycelium2@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 67ms",
+  "s": 0
+ },
+ "mycelium3@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 23ms",
+  "s": 0
+ },
+ "mycelium3@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 34ms",
+  "s": 0
+ },
+ "mycelium4@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 29ms",
+  "s": 0
+ },
+ "mycelium4@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 43ms",
+  "s": 0
+ },
+ "mycelium5@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.4s, exp 17, ex=0.00, 48ms",
+  "s": 0
+ },
+ "mycelium5@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.4s, exp 17, ex=0.00, 45ms",
+  "s": 0
+ },
+ "mycelium6@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 47ms",
+  "s": 0
+ },
+ "mycelium7@0#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.4s, exp 17, ex=0.00, 26ms",
+  "s": 0
+ },
+ "mycelium6@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.3s, exp 16, ex=0.00, 45ms",
+  "s": 0
+ },
+ "mycelium7@4#3": {
+  "ok": true,
+  "line": "segment 3 -> GOAL: ok 1.4s, exp 17, ex=0.00, 27ms",
+  "s": 0
+ }
+}
