@@ -24,46 +24,17 @@ the door to the final depth opens.
 
 | | Level | Theme | Route |
 |---|---|---|---|
-| I | The Descent | ice-blue caves | long halls left to right: lamps, walking lights, eyes, beams |
-| II | The Mycelium | fungal teal | up a gill ladder, bounce across the canopy, swing on hyphae, a high or low road, under or over the eyed caps, down the spore shafts, a cap bridge over tar, down a root tangle, through the spore cloud and up the mycelial web, the gill run, the spore stair, caps that throw you over fallen stems |
-| III | The Glass Garden | violet crystal | a switchback that doubles back, a prism well, hush stones, a glass stair, a turning orrery, a mirror hall of crossing beams, a crystal tree, light raining upward, a shard field, a frost bridge, a glass orchard, down four tiers of a lens |
-| IV | The Foundry | rust and copper | ride hot-air vents up a stack, drop through gantry grates, pull the boiler lever and race the fire, hammers in the forge, a scrapyard, pipeworks, a smelter of sprung plates, an oiled conveyor, a crane yard, climb the bellows |
-| V | Ember Deep | crimson | climb out past a buried sun on ash vents, stepping stones and geysers over tar, three suns and three stones, a walking sun, an obsidian stair, a turning sun, magma locks, ash falls, a magma river, the slag heaps, the kiln |
-| VI | The Heart | bone and magenta | a loop through the atrium, a rib cage climb, weave between two beating ventricles, a maze of vessels, tendons, the aorta, the lungs, a nerve to crawl, the marrow, synapses, a valve chain, the pulse, two valves to still the heart |
-| VII | The Core | void and white | behind the door of six slivers: set them in the Guardian's six alcoves while its gaze turns; each sliver changes it (it turns faster, the room breathes, its gaze splits, it keeps the beat, it flares like a sun, its heart stumbles); then it shatters and the light floods down the shaft after you. Needs the SEEKER |
+| I | The Descent | ice-blue caves |
+| II | The Mycelium | fungal teal | 
+| III | The Glass Garden | violet crystal | 
+| IV | The Foundry | rust and copper | 
+| V | Ember Deep | crimson | 
+| VI | The Heart | 
+| VII | The Core | void and white - Needs the SEEKER |
 
-New pieces along the way: one-way shelves you can drop through, bounce caps, slick glass, vines to climb,
-hot-air vents, and hush stones that put nearby lights to sleep for a few beats.
 
-**The town.** Between descents you walk a hollow village in a dead wood under the mountains. Every level
-is a door somewhere in town (a house, a hollow tree, a ring of glass, a forge, an ember hut, an arch of
-thorns); a door is sealed until the level before it is beaten, and glows in the colour of its sliver once
-you have it. Walk up to a door and press E (ENTER on touch) to descend; N starts it from the top. The great
-door under the mountain takes the whole crystal: bring all six slivers, set them, and it opens onto the
-Core. Wooden signs at the edge of town show the controls. A few residents have things to say, and the town
-keeps three quiet secrets.
 
-**The SEEKER.** Somewhere in level II a wall is not stone. Behind it sleeps a seeker from SEEKER NET, any one of all 2,222, rolled for your save. Wake it
-and it follows you; press E and it flies to the nearest light and covers it for a few beats (an
-eclipse), then needs a moment to recharge. Every level can be beaten without it.
-
-**The Codex and The Deep.** Once the Guardian is gone, the great door opens on what is left of its arena: the Codex,
-an archive of every seeker you have found (tools/archive.py builds it from level VII, which is never changed). You come
-in through a carved hall; your seekers stand in niches on two towers of balconies, 35 of them, ranked by how much they
-help in The Deep (tiers S to D, the best highest). Where the Guardian hung, a Planetary Prime turns in its two shells;
-stand in front of a seeker and the Prime opens to show it, its tier, what it does, and how it compares with the seeker
-you have now. Press E and it comes with you. A glass bridge crosses the hole the Guardian tore in the floor; press down
-on it to drop into The Deep.
-
-The Deep is a run of eight rooms through four strata, two rooms each, drawn from 72 (twelve for each world), never the
-same room twice in a run and never more than two of a kind in a row. You have one spare life; between rooms you choose
-a gift (a rare one gives another life). Each room opens through one of six kinds of entrance and ends at a gate that
-glows in the colour of the room beyond. At the bottom a chest holds a seeker you have not found yet, or, at 5, 10, 15,
-20, 30 and 35 wins, a spool of thread: take it to the weaver in town for a new coat. Down there (and only there) a
-seeker's real SEEKER NET traits matter: its base shapes its eclipse, its eyes how far it reaches, and a head, side or
-back add-on brings a gift of its own. The Deep grows harsher as your Codex grows, up to a ceiling at 35, and its music
-is written fresh for each run, always building toward the bottom.
-
+The Deep is a run of eight rooms through four strata, two rooms each.
 ## Source
 
 - `src/` — the game: `sim.js` (deterministic 96 Hz simulation, also runs in Node), `render.js`,
