@@ -5230,9 +5230,12 @@ body.cmp #tbE{display:flex}
     const hsh = (X, Y) => { let h = (Math.imul(X, 374761393) + Math.imul(Y, 668265263)) >>> 0; h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0; return (h & 0xffff) / 65535; };
     const hex = (r, g, b) => 'rgb(' + Math.round(r) + ',' + Math.round(g) + ',' + Math.round(b) + ')';
     const dist = (tx, ty) => { let d = 9; for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (open(tx + dx, ty + dy)) d = Math.min(d, Math.max(Math.abs(dx), Math.abs(dy))); return d; };
+    // paint only where the well's cover lies when you are not inside it (the room's box and the shaft's strip), so
+    // from the town above nothing of it ever shows through the earth
+    const covered = (tx, ty) => (tx >= rx0 - 1 && tx <= rx1 && ty >= ry0 - 1 && ty <= ry1 + 1) || (tx >= WELL.x0 && tx <= WELL.x1 && ty >= G && ty < ry0 - 1);
     const kind = {};            // per tile: 'o' open (the far wall), 'w' wall near the room (d tiles from it), or none
     for (let ty = ty0; ty < ty1; ty++) for (let tx = tx0; tx < tx1; tx++) {
-      if (ty < G) continue;
+      if (ty < G || !covered(tx, ty)) continue;
       if (open(tx, ty)) { if (tx > WELL.x0 && tx < WELL.x1 && ty < ry0 - 4) continue; kind[tx + ',' + ty] = ['o', 0]; continue; }   // (higher up, the shaft stays under its cover)
       const d = dist(tx, ty); if (d <= 2) kind[tx + ',' + ty] = ['w', d];
     }
@@ -7089,6 +7092,19 @@ body.cmp #tbE{display:flex}
       pts.forEach(([x, y], i) => T.candle(ctx, Math.round(x), Math.round(y), P.cand[i][side] ? 1 : 0, i * 1.7 + side * 0.9, t));
     }
   }
+  // the arch is drawn behind the Dweller, with the room, so it lights itself: each burning candle, and the doorway once it wakes
+  function gateLift(lc, cx, cy, disc) {
+    const G = gate(), mid = G.x - cx, bot = G.y - cy, aw = 34, top3 = 42 - aw / 2;
+    if (mid < -80 || mid > LW + 80) return;
+    const open = P.keptOpen && allCandles() ? (ARCH.wake ? Math.max(0, Math.min(1, (gameTime - ARCH.wake) / 2.2)) : 1) : 0;
+    if (open > 0) disc(lc, mid, bot - 18, 34, 0.45 * open);
+    for (let side = 0; side < 2; side++) {
+      const sgn = side ? 1 : -1, pts = [];
+      for (const j of [3, 11, 19]) pts.push([mid + sgn * (aw / 2 + 6), bot - j]);
+      for (const a of [25, 52, 78]) { const rr = aw / 2 + 7, th = a * Math.PI / 180; pts.push([mid + sgn * Math.cos(th) * rr, bot - top3 - Math.sin(th) * rr]); }
+      pts.forEach(([x, y], i) => disc(lc, x, y - 4, P.cand[i][side] ? 12 : 5, P.cand[i][side] ? 0.55 : 0.18));
+    }
+  }
   function toKept() {
     const first = !P.keptSeen; P.keptSeen = true; saveProgress();
     ARCH = null; RUN = null;
@@ -7679,14 +7695,14 @@ body.cmp #tbE{display:flex}
       HINTS.length = 0;
       if (KEPT) { drawKept(ctx, dt); drawHUD(ctx); }
       else {
-      R.drawScene(ctx, { hints: HINTS, w: world, s: S, time: gameTime, dt: mode === 'pause' || mode === 'deepPick' ? 0 : dt, back: ARCH ? (c, x, y) => AR.drawBack(c, x, y, archSt()) : null, lift: ARCH ? (c, x, y, disc) => AR.lift(c, x, y, disc, archSt()) : null }, fx, fy, LW, LH);
+      R.drawScene(ctx, { hints: HINTS, w: world, s: S, time: gameTime, dt: mode === 'pause' || mode === 'deepPick' ? 0 : dt, back: ARCH ? (c, x, y) => { AR.drawBack(c, x, y, archSt()); drawGate(c, x, y); } : null, lift: ARCH ? (c, x, y, disc) => { AR.lift(c, x, y, disc, archSt()); gateLift(c, x, y, disc); } : null }, fx, fy, LW, LH);
       if (window.__overlay) window.__overlay(ctx, fx, fy, LW, LH, gameTime);   // (for mock-ups)
       halfText();
       if (mode !== 'pause') for (const h of HINTS) {      // carved: a dark groove a letter-pixel above, the pale stone face below
         ht(h.text, h.x, h.y - HS, '#05070b', 'left', h.a * 0.9);
         ht(h.text, h.x, h.y, '#8f9aa6', 'left', h.a);
       }
-      if (ARCH) { drawGate(ctx, fx, fy); drawArchive(ctx, fx, fy); }
+      if (ARCH) drawArchive(ctx, fx, fy);
       drawHUD(ctx);
       if (RUN || mode === 'deepOver' || mode === 'deepWin') drawDeepHUD(ctx);
       }
