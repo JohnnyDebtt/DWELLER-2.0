@@ -121,6 +121,11 @@ body.cmp #tbE{display:flex}
     const put = (arr, v, runs) => (runs || []).forEach(([x, y, n, h]) => { for (let yy = y; yy < y + (h || 1); yy++) for (let xx = x; xx < x + n; xx++) if (xx >= 0 && yy >= 0 && xx < w.W && yy < w.H) arr[yy * w.W + xx] = v; });
     put(w.tt, TT.ONEWAY, T.oneway); put(w.tt, TT.BOUNCE, T.bounce); put(w.tt, TT.ICE, T.ice);
     put(w.vine, 1, level.vines); put(w.vent, 1, level.vents);
+    // every strand is drawn reaching up to the rock (or the shelf) it grows from, and all of what you see is climbable
+    for (const [x, y, n] of level.vines || []) for (let xx = x; xx < x + n; xx++) {
+      let k = 0; while (k < 90 && y - k - 1 >= 0 && w.solid[(y - k - 1) * w.W + xx] !== 1 && w.tt[(y - k - 1) * w.W + xx] !== TT.ONEWAY) k++;
+      if (k < 90 && y - k - 1 >= 0) for (let yy = y - k; yy < y; yy++) w.vine[yy * w.W + xx] = 1;
+    }
     w.hasOneway = !!(T.oneway && T.oneway.length); w.ventK = level.ventK || 1; w.hasVine = !!(level.vines && level.vines.length);
     w.hasVent = !!(level.vents && level.vents.length); w.hasTT = !!(T.bounce && T.bounce.length) || !!(T.ice && T.ice.length);
     // the Guardian: its marker and its six alcoves come in the light list but are not lights
