@@ -1209,6 +1209,61 @@ body.cmp #tbE{display:flex}
   }
 
   /* background silhouettes for the deeper levels */
+  /* Ember Deep's far rock, cooled lava with a pattern of its own: lumpy flows, heaps of rounded pillows, rough masses
+     at the edges; broken into plates by cooling joints, pitted all over with gas holes, mottled, glazed along every top
+     edge. Every texture wraps round the tile, so the tiles stacked up and across meet without a seam */
+  function emberRock(x, r, W, H, kind, col) {
+  const hx = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const base = hx(col[0]);
+  const TPW = 6.2832 / W, lump = (px, seed, amp) => amp * (0.55 * Math.sin(px * TPW * 2 + seed) + 0.3 * Math.sin(px * TPW * 5 + seed * 2.1) + 0.15 * Math.sin(px * TPW * 11 + seed * 3.7));   // (periodic across the tile)
+  const mask = new Uint8Array(W * H);
+  const fill = (fn) => { for (let y = 0; y < H; y++) for (let i = 0; i < W; i++) if (fn(i, y)) mask[y * W + i] = 1; };
+  if (kind === 0) {
+    const s1 = r() * 9, s2 = r() * 9;
+    // (rock along the top as well, so the tile joins the one stacked over it without a seam)
+    fill((i, y) => y > H * 0.3 + lump(i, s1, 40) || y > H * 0.6 + lump(i + 200, s2, 26) || y < H * 0.06 + lump(i + 400, s2, 10));
+  } else if (kind === 1) {
+    // mid: heaps of rounded pillows of lava, piled in clumps, none of them touching the tile's edges
+    const blobs = [];
+    for (let k = 0; k < 9; k++) { const cx = r() * W, cy = H * (0.3 + r() * 0.45), n = 3 + Math.floor(r() * 4); for (let m = 0; m < n; m++) blobs.push([cx + (r() - 0.5) * 60, cy + (r() - 0.5) * 34, 12 + r() * 14, 0.6 + r() * 0.3, r() * 6]); }
+    fill((i, y) => { for (const [cx, cy, rx, sq, ph] of blobs) { let dx = Math.abs(i - cx); dx = Math.min(dx, W - dx); const an = Math.atan2(y - cy, dx), q = Math.hypot(dx / rx, (y - cy) / (rx * sq)) / (1 + 0.12 * Math.sin(an * 3 + ph)); if (q < 1) return true; } return false; });
+  } else {
+    const s1 = r() * 9, s2 = r() * 9;
+    fill((i, y) => y < H * 0.12 + lump(i, s1, 28) - 8 || y > H * 0.86 + lump(i + 90, s2, 28) + 6 || y < 2 || y > H - 3);
+  }
+  // cooling joints: the rock is broken into plates (cells), each a slightly different shade
+  const pts = []; const np = kind === 0 ? 46 : kind === 1 ? 60 : 40;
+  for (let k = 0; k < np; k++) pts.push([r() * W, r() * H, 0.86 + r() * 0.26]);
+  // gas holes: little round pits, many small, some larger, in clusters
+  const holes = [];
+  for (let k = 0; k < (kind === 0 ? 260 : 200); k++) { const cl = holes.length && r() < 0.6 ? holes[Math.floor(r() * holes.length)] : null; const hx0 = cl ? cl[0] + (r() - 0.5) * 14 : r() * W, hy0 = cl ? cl[1] + (r() - 0.5) * 10 : r() * H; holes.push([hx0, hy0, r() < 0.15 ? 2.2 : r() < 0.5 ? 1.4 : 0.9]); }
+  const hole = new Float32Array(W * H);   // 0 none, 1 inside, 2 lit lower rim
+  for (const [cx, cy, rr] of holes) for (let y = Math.floor(cy - rr - 1); y <= cy + rr + 1; y++) for (let i = Math.floor(cx - rr - 1); i <= cx + rr + 1; i++) {
+    const ii = ((i % W) + W) % W, yy = ((y % H) + H) % H; const dd = Math.hypot(i - cx, y - cy);
+    if (dd <= rr) hole[yy * W + ii] = 1; else if (dd <= rr + 1 && y > cy && i >= cx - 0.5 && !hole[yy * W + ii]) hole[yy * W + ii] = 2;
+  }
+  const id = x.getImageData(0, 0, W, H), d = id.data;
+  for (let y = 0; y < H; y++) for (let i = 0; i < W; i++) {
+    if (!mask[y * W + i]) continue;
+    let a = 1e9, b = 1e9, sh = 1; for (const p of pts) { let ddx = Math.abs(i - p[0]); ddx = Math.min(ddx, W - ddx); let ddy = Math.abs(y - p[1]); ddy = Math.min(ddy, H - ddy); const q = ddx * ddx + ddy * ddy; if (q < a) { b = a; a = q; sh = p[2]; } else if (q < b) b = q; }
+    const edge = Math.sqrt(b) - Math.sqrt(a);
+    const up = mask[((y - 1 + H) % H) * W + i], up2 = mask[((y - 2 + H) % H) * W + i], dn = mask[((y + 1) % H) * W + i];
+    let k = sh;
+    // mottling: broad patches lighter and darker
+    const TP = 6.2832, U = i / W * TP, V = y / H * TP;
+    k *= 1 + 0.12 * Math.sin(U * 9 + V * 3) * Math.cos(U * 4 - V * 6) + 0.06 * Math.sin(U * 57 + V * 43);
+    if (edge < 1) k *= 0.55;                                             // a joint between plates
+    else if (edge < 2 && (i + y) % 2 === 0) k *= 1.18;                   // the plate's worn edge
+    const hv = hole[y * W + i];
+    if (hv === 1) k *= 0.45; else if (hv === 2) k *= 1.3;
+    if (!up) k *= 1.45; else if (!up2) k *= 1.2;                         // the glazed top
+    else if (!dn) k *= 0.75;
+    if (kind === 0 && Math.abs(Math.sin(U * 7 + V * 17 + Math.sin(U * 2) * 2)) < 0.07) k *= 0.85;   // ropy folds
+    const c = base.map(v => Math.max(0, Math.min(255, Math.round(v * k)))), o = (y * W + i) * 4;
+    d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255;
+  }
+  x.putImageData(id, 0, 0);
+}
   function styledLayer(x, r, W, H, kind) {
     const st = TH.style;
     const col = kind === 0 ? TH.far : kind === 1 ? [TH.mid, TH.mid] : [TH.near, TH.near];
@@ -1261,21 +1316,7 @@ body.cmp #tbE{display:flex}
         for (let k = 0; k < H; k += 16) { x.fillRect(px, k, 12, 2); }
       }
     } else if (st === 'ember') {
-      if (kind === 0) {                                          // jagged ridges
-        for (let i = 0; i < 2; i++) {
-          x.fillStyle = col[i]; x.beginPath(); x.moveTo(0, H);
-          for (let px = 0; px <= W; px += 12) x.lineTo(px, H * (0.35 + 0.25 * i) + (r() - 0.3) * 60);
-          x.lineTo(W, H); x.closePath(); x.fill();
-        }
-      } else if (kind === 1) for (let i = 0; i < 30; i++) {
-        x.fillStyle = col[0]; const px = Math.floor(r() * W), len = 20 + r() * 100, wd = 3 + r() * 8;
-        tri(px - wd, 0, px + wd, 0, px + (r() - 0.5) * 4, len);
-        const p2 = Math.floor(r() * W), l2 = 10 + r() * 60;
-        tri(p2 - wd, H, p2 + wd, H, p2, H - l2);
-      } else for (let i = 0; i < 10; i++) {
-        x.fillStyle = col[0]; const px = Math.floor(r() * W), wd = 3 + r() * 6;
-        tri(px - wd, 0, px + wd, 0, px, H * (0.3 + r() * 0.5)); x.fillRect(px - 1, H - 30 - r() * 80, wd, 200);
-      }
+      emberRock(x, r, W, H, kind, col);
     } else {                                                     // heart: ribs, veins, tendons
       if (kind === 0) for (let i = 0; i < 5; i++) {
         x.strokeStyle = col[i % 2]; x.lineWidth = 7 + r() * 6; const cx = (i + 0.5) * W / 5, cy = H * (0.9 + r() * 0.2), R0 = 60 + r() * 60;
@@ -2387,7 +2428,7 @@ body.cmp #tbE{display:flex}
      only: none of it is solid and none of it burns). Each kind of place gets a far layer that moves, kept dim and in
      its own colours so it never reads as one of the lights that hurt you:
        the Foundry   great gears turning, chains running, pistons on the beat; furnace mouths that breathe, and sparks
-       Ember Deep    spires of deeper rock lit from below by a slow glow, and ash rising
+       Ember Deep    cracks of fire glowing in patches far behind the cooled lava, waves of heat across them; ash rising
        the Heart     veins in the dark that carry a pulse on every beat (lub, dub); cells drifting; the dark itself beats
        the Core      vast rings of strokes turning slowly round the Guardian, and motes
      'back' draws behind the rock (and is darkened with it); 'glow' draws after the dark, only where no rock is. */
@@ -2456,6 +2497,32 @@ body.cmp #tbE{display:flex}
     return e.cv;
   }
 
+  /* the cracks of fire behind Ember Deep's rock: a web of cooling cracks in a tile (worked out once), shown only in
+     patches, laid in faint and then brightened where two slow waves of heat roll across */
+  const ECR = { cv: null };
+  function emberCracks(c, camX, camY, W, H, t) {
+    if (!ECR.cv) {
+      const w = 480, h = 360, cv = document.createElement('canvas'); cv.width = w; cv.height = h; const x = cv.getContext('2d');
+      const r = ambRnd(21), pts = []; for (let i = 0; i < 110; i++) pts.push([r() * w, r() * h]);
+      const id = x.createImageData(w, h), d = id.data;
+      for (let y = 0; y < h; y++) for (let i = 0; i < w; i++) {
+        let a = 1e9, b = 1e9; for (const p of pts) { let dx = Math.abs(i - p[0]); dx = Math.min(dx, w - dx); let dy = Math.abs(y - p[1]); dy = Math.min(dy, h - dy); const q = dx * dx + dy * dy; if (q < a) { b = a; a = q; } else if (q < b) b = q; }
+        const e = Math.sqrt(b) - Math.sqrt(a), o2 = (y * w + i) * 4;
+        const nz = Math.sin(i * 0.021 + 1.3) * Math.cos(y * 0.027 + 0.4) + 0.6 * Math.sin((i + y) * 0.013 + 2.2), keep = Math.max(0, Math.min(1, (nz - 0.15) * 2.5));
+        if (e < 0.8) { d[o2] = 220; d[o2 + 1] = 80; d[o2 + 2] = 45; d[o2 + 3] = Math.round(190 * keep); }
+        else if (e < 1.8) { d[o2] = 140; d[o2 + 1] = 36; d[o2 + 2] = 28; d[o2 + 3] = Math.round(50 * keep); }
+      }
+      x.putImageData(id, 0, 0); ECR.cv = cv;
+    }
+    const T = ECR.cv, par = 0.25;
+    const tiles = () => { const ox = -(((camX * par) % T.width) + T.width) % T.width, oy = -(((camY * par) % T.height) + T.height) % T.height;
+      for (let x = ox - T.width; x < W; x += T.width) for (let y = oy - T.height; y < H; y += T.height) { if (x + T.width < 0 || y + T.height < 0) continue; c.drawImage(T, Math.round(x), Math.round(y)); } };
+    c.globalAlpha = 0.13; tiles(); c.globalAlpha = 1;
+    const o = c.globalCompositeOperation; c.globalCompositeOperation = 'lighter';
+    for (let k = 0; k < 2; k++) { const bx = ((t * 14 + k * 320) % (W + 260)) - 130; c.save(); c.beginPath(); c.rect(bx - 60, 0, 120, H); c.clip(); c.globalAlpha = 0.2; tiles(); c.restore(); }
+    const g = c.createLinearGradient(0, H * 0.5, 0, H); g.addColorStop(0, 'rgba(255,80,30,0)'); g.addColorStop(1, 'rgba(230,80,40,0.12)'); c.fillStyle = g; c.fillRect(0, H * 0.5, W, H * 0.5);
+    c.globalCompositeOperation = o; c.globalAlpha = 1;
+  }
   /* the far layer sits behind everything that is in the level: rock, shelves, vines, tar, lamps, the Dweller and the
      rest are drawn onto a layer of their own over the backdrop, so the far layer (drawn after the dark) can be cut
      away wherever that layer has anything on it */
@@ -2522,27 +2589,10 @@ body.cmp #tbE{display:flex}
       }
     }
     if (kind === 'ember') {
-      if (pass === 'back') {
-        // the warmth from far below, slowly breathing
-        const b = 0.5 + 0.5 * Math.sin(time * 0.6);
-        const g = ctx.createLinearGradient(0, H * 0.55, 0, H); g.addColorStop(0, 'rgba(160,40,30,0)'); g.addColorStop(1, 'rgba(190,60,30,' + (0.16 + 0.08 * b).toFixed(3) + ')');
-        ctx.fillStyle = g; ctx.fillRect(0, H * 0.55, W, H * 0.45);
-      }
       if (pass === 'glow') {
-        // spires of deeper rock far behind, lit at their edges from below
-        LAYER = true; ctx.globalAlpha = 0.6;
-        ambCells(camX, camY, W, H, 0.35, (ox, oy, seed) => {
-          const r = ambRnd(seed + 3);
-          for (let k = 0; k < 10; k++) {
-            const sx = ox + r() * 640, base = oy + 330 + r() * 150, hh = 60 + r() * 170, ww = 10 + r() * 22, up = r() < 0.7, jag = r() * 6.283;
-            for (let j = 0; j < hh; j += 2) {
-              const u = j / hh, half = Math.max(1, Math.round(ww * (1 - u) * 0.5 + Math.sin(j * 0.21 + jag) * 2 * (1 - u))), y = up ? base - j : oy + 10 + j;
-              px('#5a2430', sx - half, y, half * 2, 2);
-              px(up ? 'rgba(240,110,60,' + (0.35 + 0.45 * (1 - u)).toFixed(2) + ')' : '#6e2c38', sx + half - 1, y, 1, 2);
-            }
-          }
-        });
-        LAYER = false; ctx.globalAlpha = 1;
+        // far behind the rock, a crust over fire: cracks glowing through it in patches, wide plain dark between,
+        // and slow waves of heat rolling across them
+        emberCracks(ctx, camX, camY, W, H, time);
         // ash rising, and a few embers among it
         const want = 46;
         while (AMB.parts.length < want) AMB.parts.push({ x: camX + Math.random() * W, y: camY + H + Math.random() * H * 0.2 - (AMB.parts.length < want / 2 ? Math.random() * H : 0), vx: 0, vy: -(6 + Math.random() * 10), t: 0, life: 99, k: Math.random() < 0.22 ? 'ember' : 'ash', ph: Math.random() * 6.283 });
@@ -2756,6 +2806,38 @@ body.cmp #tbE{display:flex}
    * shelves (one-way), bounce caps, slick glass, vines, vents and hush stones, each drawn in the level's style */
   let bounceFx = [];
   function noteBounce(x, y, t) { bounceFx.push({ x, y, t }); if (bounceFx.length > 8) bounceFx.shift(); }
+  /* Ember Deep's chains are hot iron: a dull glow in the links, a slow brighter heat running down each chain, and now
+     and then a spark that drops off it (drawn only; the chains work as they always did) */
+  const ECH = { t: -1 };
+  function emberChains(ctx, w, camX, camY, W, H, time, vis) {
+    const L = w.level, dt = ECH.t < 0 ? 0 : Math.max(0, Math.min(0.1, time - ECH.t)); ECH.t = time;
+    const o = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'lighter';
+    const chain = (cx, y0, y1, seed) => {        // cx in screen px, y0..y1 in world px
+      for (let y = Math.max(y0, camY - 2); y < Math.min(y1, camY + H + 2); y++) {
+        const yy = y - y0;
+        if ((yy >> 1) % 2) continue;                                       // the lit links only
+        const heat = Math.pow(Math.max(0, Math.sin(y * 0.045 - time * 1.4 + seed)), 10);
+        const a = 0.09 + 0.07 * Math.sin(time * 1.1 + seed + y * 0.01) + 0.5 * heat;
+        ctx.fillStyle = 'rgba(255,' + Math.round(90 + 80 * heat) + ',40,' + a.toFixed(3) + ')';
+        ctx.fillRect(cx + ((yy >> 2) % 2 ? 0 : -1), Math.round(y - camY), 2, 1);
+      }
+      // a spark dropping off now and then (about once every two seconds a chain), from somewhere along what is in view
+      const lo = Math.max(y0, camY), hi = Math.min(y1, camY + H);
+      if (hi > lo && Math.random() < dt * 0.5) AMB.parts.push({ x: cx + camX + (Math.random() - 0.5) * 2, y: lo + Math.random() * (hi - lo), vx: (Math.random() - 0.5) * 14, vy: 4 + Math.random() * 10, t: 0, life: 0.5 + Math.random() * 0.7, k: 'spark' });
+    };
+    for (const v of L.vines || []) {
+      if (!v.ext) continue;
+      const x0 = v[0] * TS, y0 = v[1] * TS, hh = v[3] * TS, exM = Math.max.apply(null, v.ext);
+      if (!vis(x0, y0 - exM, TS * v[2], hh + exM)) continue;
+      for (let k = 0; k < v[2]; k++) chain(Math.round(x0 + k * TS + 3 - camX), y0 - v.ext[k], y0 + hh, v[0] * 0.7 + k);
+    }
+    for (const q of L._shelfTies || []) {
+      const yt = q[1] * TS - 1, hh = q[2] * TS + 1;
+      if (!vis(q[0] * TS, yt, TS, hh)) continue;
+      chain(Math.round(q[0] * TS + 2 - camX) + 1, yt, yt + hh, q[0] * 0.9);
+    }
+    ctx.globalCompositeOperation = o;
+  }
   function drawFeatures(ctx, w, s, camX, camY, W, H, time, post) {
     const L = w.level, st = TH.style, T = L.tiles || {};
     const vis = (x, y, ww, hh) => x + ww >= camX - 8 && x <= camX + W + 8 && y + hh >= camY - 8 && y <= camY + H + 8;
@@ -2856,6 +2938,7 @@ body.cmp #tbE{display:flex}
       return;
     }
     // ---- emissive parts, above the dark
+    if (st === 'ember') emberChains(ctx, w, camX, camY, W, H, time, vis);
     for (const r0 of T.bounce || []) for (const r of airRuns(w, r0)) {
       const x0 = r[0] * TS, y0 = r[1] * TS, ww = r[2] * TS;
       if (!vis(x0, y0 - 6, ww, TS + 6)) continue;
@@ -2878,17 +2961,40 @@ body.cmp #tbE{display:flex}
         ctx.fillRect(x + 2, y - 3, ww - 4, 1); ctx.globalAlpha = 1;
       }
     }
+    // vents: an updraft of ash, streaks of it shooting up fast, thick at the bottom and thinning as they rise, and a
+    // light, airy smoke twisting up through it; a ring of ash spins at the mouth where the push begins, and below it
+    // (where it does not push) a few specks drift up lazily from whatever it rises out of, rock or tar
     for (const v of L.vents || []) {
-      const x0 = v[0] * TS, y0 = v[1] * TS, ww = v[2] * TS, hh = v[3] * TS;
-      if (!vis(x0, y0, ww, hh)) continue;
-      ctx.globalCompositeOperation = 'lighter';
-      const n = Math.max(3, Math.round(ww / 3));
-      for (let i = 0; i < n; i++) {
-        const ph = (time * (0.6 + hash2(i, 3) * 0.5) + hash2(i, 9)) % 1;
-        const xx = Math.round(x0 + (i + 0.5) * ww / n + Math.sin(time * 2 + i) * 1 - camX), yy = Math.round(y0 + hh - ph * hh - camY);
-        ctx.fillStyle = 'rgba(' + TH.glowRGB + ',' + (0.25 * (1 - ph)).toFixed(3) + ')'; ctx.fillRect(xx, yy, 1, 3);
+      if (v.vext === undefined) {
+        const stop = (ty) => { for (let c = 0; c < v[2]; c++) { const tx = v[0] + c; if (D.solidAt(w, tx, ty) || D.ttAt(w, tx, ty) === D.TT.ONEWAY || w.vent[ty * w.W + tx]) return true; if (w.kills.some(q => (tx + 0.5) * TS > q[0] && (tx + 0.5) * TS < q[2] && (ty + 0.5) * TS > q[1])) return true; } return false; };
+        let k = 0; while (k < 40 && v[1] + v[3] + k < w.H && !stop(v[1] + v[3] + k)) k++;
+        v.vext = k * TS;
       }
-      ctx.globalCompositeOperation = 'source-over';
+      const x0 = v[0] * TS, y0 = v[1] * TS, ww = v[2] * TS, hh = v[3] * TS, ex = v.vext, tot = hh + ex;
+      if (!vis(x0, y0, ww, tot)) continue;
+      const X0 = x0 - camX, Y0 = y0 - camY, ash = (a) => 'rgba(214,202,196,' + Math.max(0, a).toFixed(3) + ')';
+      const edge = (sx) => Math.min(1, Math.min(sx, 1 - sx) * 5);
+      // below the vent the air is still: a few specks of ash drift up lazily from what it rises out of
+      for (let i = 0, n = Math.round(ww * ex / 70); i < n; i++) {
+        const u = (time * 0.12 * (0.7 + hash2(i, 3) * 0.6) + hash2(i, 9)) % 1, sx = hash2(i, 5);
+        ctx.fillStyle = ash(0.28 * edge(sx) * Math.sin(u * Math.PI)); ctx.fillRect(Math.round(X0 + sx * ww + Math.sin(time * 1.3 + i) * 2), Math.round(Y0 + hh + ex - u * ex), 1, 1);
+      }
+      // the mouth, where the push begins: a ring of ash spinning (seen edge on), air drawn in at its sides
+      { const cx = X0 + ww / 2, cy = Y0 + hh - 1;
+        for (let k = 0; k < 22; k++) { const a = time * 3 + k / 22 * 6.283; ctx.fillStyle = ash(Math.sin(a) > 0 ? 0.5 : 0.22); ctx.fillRect(Math.round(cx + Math.cos(a) * (ww / 2 + 1)), Math.round(cy + Math.sin(a) * 2), 1, 1); }
+        for (let k = 0; k < 6; k++) { const p = (time * 1.2 + k / 6) % 1, sd = k % 2 ? 1 : -1; ctx.fillStyle = ash(0.35 * p); ctx.fillRect(Math.round(cx + sd * (ww / 2 + 6) * (1 - p)), Math.round(cy + 3 * (1 - p)), 1, 1); } }
+      // inside it: the light smoke twisting up, and the ash shooting up fast, thinning as it goes
+      for (let k = 0; k < 2; k++) for (let j = 0; j < hh; j++) {
+        const u = 1 - j / hh, ph = j * 0.09 - time * 3.2 + k * 2.6 + v[0], sx = 0.5 + 0.34 * Math.sin(ph) * (0.6 + 0.4 * u);
+        const a = 0.06 * edge(sx) * Math.min(1, (1 - (1 - u) * 0.8) * 3) * (0.7 + 0.3 * Math.cos(ph));
+        ctx.fillStyle = ash(a); ctx.fillRect(Math.round(X0 + sx * ww - 1), Math.round(Y0 + j), 2, 1);
+      }
+      for (let i = 0, n = Math.round(ww * hh / 22); i < n; i++) {
+        const sp = 0.9 + hash2(i, 3) * 0.8, u = (time * sp + hash2(i, 9)) % 1, sx = hash2(i, 5);
+        if (hash2(i, 7) > 1 - u * 0.8) continue;                          // fewer the higher they go
+        ctx.fillStyle = ash(0.55 * edge(sx) * Math.min(1, (1 - u) * 3));
+        ctx.fillRect(Math.round(X0 + sx * ww + Math.sin(time * 5 + i) * 1.2), Math.round(Y0 + hh - u * hh), 1, 2 + Math.round(hash2(i, 11) * 3));
+      }
     }
     for (const q of w.switches) {
       if (!vis(q.x - 12, q.y - 20, 24, 24)) continue;
