@@ -1853,6 +1853,31 @@ body.cmp #tbE{display:flex}
     drawFrame(ctx, SHEETS.orbT || SHEETS.orb, Math.floor(time * 12 + l.id) % 8, x, y, false);
   }
 
+  /* the eyes' stone cases: the round that was plain black is a ball of the cave's own rock, lit from above and to the
+     left, with grit and a crack or two, and a dark opening the pupil looks out of. Drawn once for each kind of place */
+  const EYECASE = {};
+  function eyeCase() {
+    const key = TH.style + TH.stal.join(); if (EYECASE[key]) return EYECASE[key];
+    const S = 21, c = 10, cv = document.createElement('canvas'); cv.width = cv.height = S; const x = cv.getContext('2d');
+    const lo = TH.stal[0], hi = TH.stal[1], rgbOf = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+    const A = rgbOf(lo), B = rgbOf(hi), mix = (k) => 'rgb(' + A.map((v, i) => Math.round(v + (B[i] - v) * k)).join(',') + ')';
+    const hsh = (a, b) => { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return v - Math.floor(v); };
+    for (let j = -8; j <= 8; j++) for (let i = -8; i <= 8; i++) {
+      const d = Math.hypot(i, j); if (d > 8.4) continue;
+      let col;
+      if (d < 4.6) col = '#05060a';                                                    // the opening
+      else {
+        const lit = (-0.55 * i - 0.8 * j) / (d || 1), n = hsh(i + 30, j + 30);
+        let k = 0.42 + 0.34 * lit + (n - 0.5) * 0.3;
+        if (d > 7.6) k = lit > 0.3 ? k + 0.18 : k - 0.25;                             // the rim: lit above, shadowed below
+        if (d < 5.6) k -= 0.28;                                                        // the lip turning in to the dark
+        if ((Math.abs(i - j * 0.6 - 3) < 0.6 && j > 1) || (Math.abs(i + j * 0.4 + 4) < 0.6 && j < -2)) k -= 0.3;   // cracks
+        col = mix(Math.max(0, Math.min(1, k)));
+      }
+      x.fillStyle = col; x.fillRect(c + i, c + j, 1, 1);
+    }
+    return (EYECASE[key] = cv);
+  }
   function drawWatcher(ctx, l, camX, camY, time, post, caught, S, w) {
     const x = Math.round(l.x - camX), y = Math.round(l.y - camY);
     if (!post) {
@@ -1870,8 +1895,7 @@ body.cmp #tbE{display:flex}
       for (let dy = -1; dy <= 1 && !near; dy++) for (let dx = -1; dx <= 1; dx++) if (D.solidAt(w, tx + dx, ty + dy)) { near = true; break; }
       if (!near) { ctx.globalAlpha = 0.7; drawCord(ctx, w, l.x, l.y, camX, camY, 5, true); ctx.globalAlpha = 1; }
     }
-    const sh = SHEETS.eye;
-    drawFrame(ctx, sh, 0, x, y, false);
+    ctx.drawImage(eyeCase(), x - 10, y - 10);
     // the pupil follows the beam; when the beam finds the Seeker it snaps onto them and burns
     let ang = l.ang, hot = 0;
     if (caught > 0 && S) { ang = Math.atan2(S.y + S.h * 0.5 - l.y, S.x + 2.5 - l.x); hot = Math.min(1, caught); }
@@ -5690,6 +5714,10 @@ body.cmp #tbE{display:flex}
     {
       const fu = st.fuse, set = P.fused || (fu >= 0 && fu > 2.2);
       drawGreatDoor(ctx, GREAT.x - camX, GREAT.y - camY, time, set, P.beaten);
+      // the light in its rings and the crystals over it, all behind the Dweller and the SEEKER (drawn next)
+      const k = P.fused ? 1 : fu > 2.6 ? Math.min(1, (fu - 2.6) / 1.2) : 0;
+      if (k > 0) drawGreatSwirl(ctx, GREAT.x - camX, GREAT.y - camY, time, k, !!P.core);
+      drawGreatCrystals(ctx, GREAT.x - camX, GREAT.y - camY, time, set, P.beaten);
     }
     // the bottom of the well, alive: wet stones glint, and now and then a drop falls from a root
     if (st.inRoom) {
@@ -5751,11 +5779,9 @@ body.cmp #tbE{display:flex}
       const X = GREAT.x - camX, Y = GREAT.y - camY - 30;
       // once the crystal is set, light runs round the rings of the orrery: a pale white before the Core, its green after
       const k = P.fused ? 1 : st.fuse > 2.6 ? Math.min(1, (st.fuse - 2.6) / 1.2) : 0;
-      if (k > 0) drawGreatSwirl(ctx, GREAT.x - camX, GREAT.y - camY, time, k, !!P.core);
       if (P.core) { glow(ctx, X, Y + 8, 46, '#7fd6c4', 0.07 + 0.02 * Math.sin(time * 1.3)); if (P.archNew) glow(ctx, X, Y - 28, 14 + 4 * Math.sin(time * 4), '#c8d8ff', 0.35 + 0.2 * Math.sin(time * 4)); }
       else if (k > 0) glow(ctx, X, Y + 8, 46, '#dcdcf0', (0.06 + 0.02 * Math.sin(time * 1.3)) * k);
       else if (P.beaten.every(Boolean)) glow(ctx, X, Y + 8, 22, '#ffffff', 0.04 + 0.03 * Math.sin(time * 3));
-      drawGreatCrystals(ctx, GREAT.x - camX, GREAT.y - camY, time, P.fused || (st.fuse >= 0 && st.fuse > 2.2), P.beaten);
     }
     // the ember hut's coals and the forge
     glow(ctx, 168 * TS - camX, GY - 3 - camY, 14, '#7a3b2c', 0.12 + 0.04 * Math.sin(time * 5));
@@ -5823,10 +5849,6 @@ body.cmp #tbE{display:flex}
         rect(ctx, PALT.wood1, bx + 3, y0 - 1, 1, H + 2); rect(ctx, PALT.wood1, bx + bw - 4, y0 - 1, 1, H + 2);      // battens behind the words' ends
         words.forEach((q, k) => text(q, X + sway, y0 + k * (bh + 1) + 1.5, dim(k) ? '#6a5e4e' : '#c9bb9f', 'center', -1));
         rect(ctx, PALT.frost, bx + Math.floor(bw * 0.7), y0 + H + 1, 1, 2);                                        // an icicle under the board
-        // snow settles on the arm and the top board over a few minutes in town
-        const amt = Math.min(0.85, SNOWS.t / 180), seed = s.x;
-        for (let i = -1; i < bw + 10; i++) if (lrnd(i * 3 + seed) < amt) rect(ctx, '#c9d3dd', px + i, top - 1 - (lrnd(i + seed) < amt * 0.5 ? 2 : 1), 1, lrnd(i + seed) < amt * 0.5 ? 2 : 1);
-        for (let i = 0; i < bw; i++) if (lrnd(i * 5 + seed + 9) < amt * 0.8) rect(ctx, '#c9d3dd', bx + i, y0 - 2, 1, 1);
       }
     }
   }
@@ -8098,7 +8120,7 @@ body.cmp #tbE{display:flex}
       get state() { return S; }, get world() { return world; }, get mode() { return mode; }, get scale() { return [SC, LW, LH]; }, get level() { return cur; }, get progress() { return P; },
       start(fresh) { startLevel(cur < 0 ? 0 : cur, !!fresh); },
       startLevel(i, fresh) { startLevel(i, fresh === undefined ? true : !!fresh); },
-      map() { toTown(); }, title() { toTitle(); }, town(f) { toTown(f); }, get townState() { return tS; }, get townCam() { return [tcamX, tcamY]; }, get near() { return near; }, interact(f) { townInteract(!!f); }, teleportTown(x, y) { tS.x = x; tS.y = y; snapTown(); },
+      map() { toTown(); }, title() { toTitle(); }, get cam() { return [camX, camY, SC]; }, town(f) { toTown(f); }, get townState() { return tS; }, get townCam() { return [tcamX, tcamY]; }, get near() { return near; }, interact(f) { townInteract(!!f); }, teleportTown(x, y) { tS.x = x; tS.y = y; snapTown(); },
       setProgress(o) { Object.assign(P, o); saveProgress(); },
       replay(inputs, speed) { replay = inputs; replayI = 0; speedMul = speed || 1; },
       setSpeed(v) { speedMul = v; },
