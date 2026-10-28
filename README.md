@@ -8,9 +8,9 @@ the door to the final depth opens.
 - **Play:** open `dist/dweller.html` in any browser. It is one self-contained file: code, art and
   procedurally generated music are all inside.
 - **Controls:** A/D or arrows move · Space jump · S roll/crawl · E send the SEEKER (once found) ·
-  Esc pause (a menu: resume, return to tether, new descent, settings, back to town; or press R, N, O, Q) · O settings · M mute · F fullscreen. Touch and gamepads work too.
+  Esc pause (a menu: resume, return to tether, new descent, records, settings, back to town; or press R, N, H, O, Q) · O settings · M mute · F fullscreen. Touch and gamepads work too.
 - **Settings** (O on the title or pause screen; the bottom line on touch; Select on a gamepad): music and sound
-  volume, soft or full flashes, screen shake on or off.
+  volume, soft or full flashes, screen shake on or off, and a far or near view of the levels and The Deep (near shows the Dweller larger).
 - **Saves** live in the browser. Settings → COPY SAVE CODE gives your whole save as one line of text; keep it, or
   paste it with LOAD SAVE CODE on another device or browser to carry on there.
 - **Door candles:** every level's door in town has two candles that burn blue. The left one lights when you
@@ -31,6 +31,22 @@ the door to the final depth opens.
 | V | Ember Deep | crimson | climb out past a buried sun on ash vents, stepping stones and geysers over tar, three suns and three stones, a walking sun, an obsidian stair, a turning sun, magma locks, ash falls, a magma river, the slag heaps, the kiln |
 | VI | The Heart | bone and magenta | a loop through the atrium, a rib cage climb, weave between two beating ventricles, a maze of vessels, tendons, the aorta, the lungs, a nerve to crawl, the marrow, synapses, a valve chain, the pulse, two valves to still the heart |
 | VII | The Core | void and white | behind the door of six slivers: set them in the Guardian's six alcoves while its gaze turns; each sliver changes it (it turns faster, the room breathes, its gaze splits, it keeps the beat, it flares like a sun, its heart stumbles); then it shatters and the light floods down the shaft after you. Needs the SEEKER |
+
+The first time you find each sliver, a few wordless seconds of what it saw play before you go on: someone came down
+before you, a figure in a dark grey cloak carrying the whole crystal. Once the well under the town is flooded, the water keeps
+a glint of each sliver you have found: stand under one and press E to see its memory again.
+
+A new save opens on two scenes: the figure in the grey cloak carrying the whole crystal down through the sleeping town
+into the mountain, where it breaks; and the Dweller, asleep in a hollow, woken by a teal seam of light (V on the title
+screen plays them again). After the drop past the Core, the ending, once: the figure waiting under the Core walks
+into the light and comes apart into the thread the weaver's first coat is made from; then the Dweller carries the light
+up through the same town, unburned, and something small watches from the well. Both have their own soft piano in the
+Seeker tuning: the opening asks a question, the ending answers it, then asks it again.
+
+Two more kinds of moment play once each: waking the SEEKER for the first time (one of the drifting eyes turns its light on you, and
+the scene waits for you to press E and send the SEEKER to cover it), and every spool of thread from The Deep,
+where you find what is left of a cloak someone else wore down there, and only its thread survives your touch.
+Cutscenes cannot be skipped, except a memory replayed in the well.
 
 New pieces along the way: one-way shelves you can drop through, bounce caps, slick glass, vines to climb,
 hot-air vents, and hush stones that put nearby lights to sleep for a few beats.
@@ -80,7 +96,7 @@ burn you.
 ## Source
 
 - `src/` — the game: `sim.js` (deterministic 96 Hz simulation, also runs in Node), `render.js`,
-  `audio.js` (Web Audio, Seeker 48 Hz tuning), `main.js` (menus, input, flow), `town.js` (the town above the descent), `deep.js` (the rules of The Deep), `relic.js` (the relics and the Relic Room).
+  `audio.js` (Web Audio, Seeker 48 Hz tuning), `main.js` (menus, input, flow), `town.js` (the town above the descent), `deep.js` (the rules of The Deep), `relic.js` (the relics and the Relic Room), `skits.js` (the sliver skits, the first SEEKER and the six threads).
 - `tools/` — `level1.py` … `level6.py` build the levels with `levelkit.py`; `bot.js` is a search bot
   that proves every level can be beaten; `build.py` bundles everything into `dist/dweller.html`;
   `seekernet.py` draws all 2,222 SEEKER NET seekers from the collection's layers into `assets/seeker/net.png`
