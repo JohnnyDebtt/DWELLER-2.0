@@ -64,16 +64,30 @@ seeker's real SEEKER NET traits matter: its base shapes its eclipse, its eyes ho
 back add-on brings a gift of its own. The Deep grows harsher as your Codex grows, up to a ceiling at 35, and its music
 is written fresh for each run, always building toward the bottom.
 
+**The relics.** Nine relics are hidden in The Deep. About one run in four hides one you have not found, behind a false
+wall in a hollow of the rock, somewhere off the main way; the only clue is a line at the start of the run (something
+hums down here). Walk into the wall and it crumbles. Carry the relic to the bottom and it is yours for good; die or turn back and it returns to the dark, to be found again in another run. A run that hides a relic always passes through its stratum, with one of that stratum's rooms the one that hides it. Through the dark arch at the foot of the
+Codex's left tower lies the Relic Room, a cavern of black rock with a rift of black light in its wall: each relic you
+have found stands there on a broken stalagmite, and up to three go on the altar and come with you into The Deep. The
+room's music gains a layer for each relic you own. The six found in the strata: Plumb Line (start with an upgrade),
+Spore Map (a false wall pulses as you near it), Prism (four gifts to choose from), Banked Coal (a full burn taken from
+you, once a run), Spare Gear (reroll the gifts, once a run), Keepsake (reach the bottom and your gifts carry into the next
+run). Found only at the harder tiers: Tuning Fork (your seeker holds two charges), Codex Lens (choose between two
+seekers at the bottom) and The Ninth, which stays in the rift and is always with you: once a run, stand in a light and
+press V (I, or the top face button, or the sun button on a phone) to become the light, and nothing in that stratum can
+burn you.
+
 ## Source
 
 - `src/` — the game: `sim.js` (deterministic 96 Hz simulation, also runs in Node), `render.js`,
-  `audio.js` (Web Audio, Seeker 48 Hz tuning), `main.js` (menus, input, flow), `town.js` (the town above the descent), `deep.js` (the rules of The Deep).
+  `audio.js` (Web Audio, Seeker 48 Hz tuning), `main.js` (menus, input, flow), `town.js` (the town above the descent), `deep.js` (the rules of The Deep), `relic.js` (the relics and the Relic Room).
 - `tools/` — `level1.py` … `level6.py` build the levels with `levelkit.py`; `bot.js` is a search bot
   that proves every level can be beaten; `build.py` bundles everything into `dist/dweller.html`;
   `seekernet.py` draws all 2,222 SEEKER NET seekers from the collection's layers into `assets/seeker/net.png`
   (with their traits in `net.json`, and in `net_lids.png` the pixels that change when each one shuts its eyes);
   `deep.py` builds The Deep's rooms, `deepcheck.js` proves every one of them with the bot at the gentlest and the
-  harshest tier, and `vischeck.js` looks for things that would look wrong (lamps in rock, liquid with no banks,
+  harshest tier, `relicspots.js` finds and proves the relic hollows, `bake_relicroom.js` bakes the Relic Room's still
+  art, and `vischeck.js` looks for things that would look wrong (lamps in rock, liquid with no banks,
   emitters hanging from nothing).
 - `test/` — browser checks with Playwright (replays of the bot's solutions, the town, the companion, The Deep, the
   Codex's stat cards at five screen sizes). Each takes an optional folder for its screenshots; by default they go
