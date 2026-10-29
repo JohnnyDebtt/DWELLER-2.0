@@ -3791,8 +3791,8 @@ body.ninth #tbN{display:flex}
     { tr: 21 / 32, score: 'ember', gain: 0.8, pad: 'ember', drone: 1.25, wind: 0.45, windF: 220, echo: [1.5, 0.44, 900] },
     // VI the heart: the pulse is the rhythm; blood rushes after every beat, a choir hums, and the beat sometimes stumbles
     { tr: 7 / 8, score: 'heart', gain: 1.1, pad: 'choir', drone: 0.8, wind: 0.35, windF: 420, echo: [1.0, 0.3, 1500] },
-    // VII the core: every level's voice returns, one with each sliver set, over the Guardian's turning drone
-    { tr: 1, score: 'core', pad: 'glass', drone: 1.2, wind: 0.5, windF: 600, echo: [0.75, 0.4, 2000], gain: 1.0 },
+    // VII the core: the battle; it builds with every sliver set (its own chords: no pad)
+    { tr: 1, score: 'core', pad: 'none', drone: 0.25, wind: 0.3, windF: 600, echo: [0.75, 0.25, 2200], gain: 0.9 },
     // THE DEEP: one score for the whole run, low and descending in nines and elevens; it gathers a layer for every
     // stretch of the way down and its heart beats faster the nearer you are to the bottom (Live.deep.k, 0..1)
     { tr: 9 / 16, score: 'deep', pad: 'none', drone: 0, wind: 0.5, windF: 340, echo: [1.5, 0.5, 1700], gain: 1.2 },
@@ -4262,36 +4262,123 @@ body.ninth #tbN{display:flex}
       if (e > 0.6 && n % 2 === 1) this.tick(t, 0.35, 1400 + 600 * r());
     }
 
-    /* VII THE CORE: the descent's bells and heart, and each sliver brings its level's voice back in */
+    /* VII THE CORE: the battle with the Guardian. In the minor (the Deep's scale: 1, 9/8, 19/16, 171/128, 3/2, 51/32,
+       57/32, and 15/8 for the raised seventh), eight bars round, a chord every two:
+         asleep   its heart, a low string held, a backwards swell now and then: something waiting
+         awake    the war drums and strings driving in sixteenths, the choir under it        i  VI  iv  V
+         1        brass on every chord, and its call at the end of each bar pair
+         2        the snare on two and four
+         3        the theme, sung bright over it all; every other time round       i  VII  VI  V
+         4        the theme doubled, the bells answering it, the drums rolling into each round
+         5        the strings in octaves, the choir trembling, cymbals swelling into every chord
+       Each sliver set lands a great hit; a flare gathering rises into a crash as it fires */
+    spic(t, f, vel) {                                // a bowed string, short and hard (spiccato)
+      const c = this.ctx, g = c.createGain(); this.env(g, t, 0.004, vel, 0.16);
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 1.5;
+      lp.frequency.setValueAtTime(Math.min(6000, f * 9), t); lp.frequency.exponentialRampToValueAtTime(f * 2.5, t + 0.14);
+      for (const det of [-7, 6]) { const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = det; o.connect(lp); o.start(t); o.stop(t + 0.2); }
+      lp.connect(g); g.connect(this.musicBus); const r = c.createGain(); r.gain.value = 0.25; g.connect(r); r.connect(this.revSend);
+    }
+    brass(t, freqs, vel, dur) {                      // horns: a bright bite that settles, held
+      const c = this.ctx, g = c.createGain(), f0 = freqs[0];
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vel, t + 0.03); g.gain.exponentialRampToValueAtTime(vel * 0.55, t + 0.28);
+      g.gain.setValueAtTime(vel * 0.55, t + Math.max(0.3, dur * 0.8)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.3);
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 2;
+      lp.frequency.setValueAtTime(f0 * 1.5, t); lp.frequency.exponentialRampToValueAtTime(Math.min(7000, f0 * 9), t + 0.06); lp.frequency.exponentialRampToValueAtTime(f0 * 3.2, t + 0.5);
+      for (const f of freqs) for (const [type, a, det] of [['sawtooth', 1, -6], ['sawtooth', 1, 5], ['square', 0.3, 0]]) {
+        const o = c.createOscillator(); o.type = type; o.frequency.value = f; o.detune.value = det;
+        const og = c.createGain(); og.gain.value = a / freqs.length; o.connect(og); og.connect(lp); o.start(t); o.stop(t + dur + 0.35);
+      }
+      lp.connect(g); g.connect(this.musicBus);
+      const r = c.createGain(); r.gain.value = 0.6; g.connect(r); r.connect(this.revSend);
+      const e = c.createGain(); e.gain.value = 0.15; g.connect(e); e.connect(this.echo);
+    }
+    snare(t, vel) {
+      this.noiseHit(t, 0.2, 'bandpass', 2600, 1500, 0.2 * vel, 0.7, 0.002);
+      this.noiseHit(t, 0.1, 'highpass', 5200, 7000, 0.08 * vel, 0.7, 0.002);
+      const c = this.ctx, o = c.createOscillator(); o.type = 'triangle'; o.frequency.setValueAtTime(F0 * 4, t); o.frequency.exponentialRampToValueAtTime(F0 * 2.5, t + 0.08);
+      const g = c.createGain(); this.env(g, t, 0.002, 0.16 * vel, 0.1); o.connect(g); g.connect(this.musicBus); o.start(t); o.stop(t + 0.15);
+    }
+    crash(t, vel) { this.noiseHit(t, 2.4, 'highpass', 3400, 6500, 0.1 * vel, 0.5, 0.003); this.noiseHit(t, 0.6, 'bandpass', 900, 500, 0.05 * vel, 0.6, 0.003); }
+    riser(t, dur, vel) {                             // noise sweeping up to a point, and stopping dead there
+      const c = this.ctx, s = c.createBufferSource(); s.buffer = this.noise; s.loop = true;
+      const hp = c.createBiquadFilter(); hp.type = 'bandpass'; hp.Q.value = 1.2; hp.frequency.setValueAtTime(300, t); hp.frequency.exponentialRampToValueAtTime(6000, t + dur);
+      const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vel, t + dur); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.04);
+      s.connect(hp); hp.connect(g); g.connect(this.musicBus); const r = c.createGain(); r.gain.value = 0.4; g.connect(r); r.connect(this.revSend);
+      s.start(t, this.rnd() * 2); s.stop(t + dur + 0.08);
+    }
     score_core(t, n, e) {
-      const b = Live.boss || { p: 0 }, P = b.wake ? b.p : -1, r = this.rnd, s8 = n % 8;
+      const b = Live.boss || { p: 0 }, P = b.wake ? b.p : -1, r = this.rnd, H = STEP / 2;
+      const p = n % 64, s8 = p % 8, round = Math.floor(n / 64);
+      const i_ = [0, 2, 4], VI = [5, 7, 9], iv = [3, 5, 7], V = [4, 6.5, 8], VII = [6, 8, 10];
+      const PROG = P >= 3 && round % 2 === 1 ? [i_, VII, VI, V] : [i_, VI, iv, V];
+      const ch = PROG[Math.floor(p / 16)], next = PROG[(Math.floor(p / 16) + 1) % 4];
       if (b.burst) {                                   // after it shatters: only the fall, and a long chord
+        if (this._cP !== 'burst') { this._cP = 'burst'; this.crash(t, 1.4); this.taiko(t, 1, 30); }
         if (n % 16 === 0) [0, 4, 5].forEach((d, j) => this.bell(t + j * 0.05, fold(F0 * this.pick(d) * 8, 300, 900), 0.6, 6));
         if (n % 4 === 0) this.noiseHit(t, BEAT * 2, 'highpass', 900, 5200, 0.05, 0.7, BEAT);
         return;
       }
-      if (b.die) {                                     // the heart stumbles
+      if (b.die) {                                     // the heart stumbles; the horns hold a chord that will not resolve
+        if (this._cP !== 'die') { this._cP = 'die'; this.brass(t, [this.dn(0, 2), this.dn(1, 2), this.dn(5, 2), this.dn(6.5, 2)], 0.09, BEAT * 6); this.crash(t, 1); }
         if (r() < 0.55) { this.thump(t + r() * STEP * 0.5, 46, 0.7, 0.4); this.thump(t + 0.12 + r() * 0.1, 46, 0.45, 0.3); }
+        if (r() < 0.5) this.spic(t, this.dn([0, 1, 5, 6.5][Math.floor(r() * 4)], 2 + Math.floor(r() * 2)), 0.05);
         this.noiseHit(t, STEP, 'bandpass', 3000 + 2000 * r(), 800, 0.06, 2, 0.002);
         return;
       }
-      // always: the heartbeat of the descent, slow while it sleeps
-      if (n % (P < 0 ? 8 : 4) === 0) { const v = 0.3 + 0.08 * Math.max(0, P); this.thump(t, 48, v, 0.5); this.thump(t + 0.2, 48, v * 0.55, 0.32); }
-      if (P < 0) { if (r() < 0.06) this.bell(t, fold(F0 * this.pick(Math.floor(r() * 6)) * 32, 900, 2400), 0.3, 3); return; }
-      // I: the descent's bells
-      if ([1, 0, 1, 1, 0, 1, 0][n % 7] && r() < 0.5) this.bell(t, fold(F0 * this.pick([0, 2, 4, 5][Math.floor(r() * 4)]) * 16, 380, 2000), 0.5, 2.4);
-      // II: the kalimba in threes
-      if (P >= 1 && n % 2 === 0) this.kalimba(t, fold(F0 * this.pick([0, 4, 2, 5, 4, 2][n % 6]) * 8, 260, 620), 0.5);
-      if (P >= 1 && n % 12 === 0) this.noiseHit(t, BEAT * 5, 'lowpass', 260, 900, 0.06, 0.9, BEAT * 2.5);
-      // III: the music box on the off-steps
-      if (P >= 2 && n % 2 === 1) this.glassPing(t, fold(F0 * this.pick([0, 2, 4, 5, 4, 2, 1][n % 7]) * 16, 700, 2300), 0.5, 1.2);
-      // IV: the machine and the anvil
-      if (P >= 3) { this.machine(t, fold(F0 * this.pick([0, 0, 4, 0, 0, 4, 5, 4][s8]) * 2, 50, 110), s8 === 0 ? 0.9 : 0.55, STEP * 0.7); if (s8 === 0) this.anvil(t, fold(F0 * this.pick(0) * 13, 500, 1000), 0.7); }
-      // V: the great drum, and the flare's warning swell
-      if (P >= 4) { if (s8 === 0) this.taiko(t, 0.6, 34); if (s8 === 5) this.taiko(t, 0.3, 42); }
-      if (b.warn >= 0 && b.warn < 32 && n % 2 === 0) this.noiseHit(t, BEAT * 1.5, 'bandpass', 400, 3200, 0.08, 1.2, BEAT);
-      // V/VI: the reed over the top
-      if (P >= 5 && n % 16 === 0) this.reed(t, fold(F0 * this.pick([0, 4, 2, 5][Math.floor(n / 16) % 4]) * 4, 150, 300), 0.08, BEAT * 4, 4.6);
+      // a sliver set: a great hit on the next step
+      if (this._cP !== undefined && typeof this._cP === 'number' && P > this._cP && P >= 1) { this.taiko(t, 1, 30); this.crash(t, 1.2); this.brass(t, i_.map((d, k) => this.dn(d, k ? 2 : 1)), 0.11, BEAT * 3); }
+      this._cP = P;
+      if (P < 0) {                                     // asleep: its heart, a low string held, a backwards swell now and then
+        if (n % 8 === 0) { this.thump(t, 48, 0.32, 0.5); this.thump(t + 0.2, 48, 0.18, 0.32); }
+        if (n % 32 === 0) this.pluckBass(t, this.dn(0, 0), 0.4, STEP * 30);
+        if (n % 32 === 26) this.revSwell(t + STEP * 6, this.dn(5, 3), 0.03, STEP * 6);
+        if (r() < 0.04) this.bell(t, this.dn([1, 5, 6.5][Math.floor(r() * 3)], 4), 0.25, 3);
+        return;
+      }
+      const v = 0.85 + 0.15 * e;
+      // the choir under it all
+      if (p % 16 === 0) this.deepPad(t, ch.map((d, k) => this.dn(d, k ? 2 : 1)).concat(P >= 4 ? [this.dn(ch[0], 3)] : []), STEP * 16, Math.min(3, 1 + Math.floor(P / 2)));
+      // the strings: sixteenths on the root, its octave and fifth (in octaves from the fifth sliver)
+      const OST = [0, 0, 7, 0, 0, 0, 4, 0, 0, 0, 7, 0, 3, 0, 4, 2];
+      for (let k = 0; k < 2; k++) {
+        const q = OST[(s8 * 2 + k) % 16], f = this.dn(ch[0] + q, 1);
+        const acc = (s8 * 2 + k) % 4 === 0 ? 1 : 0.7;
+        this.spic(t + k * H, f, 0.07 * acc * v);
+        if (P >= 5) this.spic(t + k * H, f * 2, 0.035 * acc * v);
+      }
+      // the low root under the strings on every chord, and a pulse on each bar
+      if (p % 16 === 0) this.pluckBass(t, this.dn(ch[0], 0), 0.75, STEP * 6);
+      if (p % 8 === 4 || p % 8 === 7) this.pluckBass(t, this.dn(ch[0], 0), 0.45, STEP * 0.9);
+      // the war drums
+      if (s8 === 0) this.taiko(t, 0.75 * v, 32);
+      if (s8 === 3) this.taiko(t + H, 0.45 * v, 36);
+      if (s8 === 4) this.taiko(t, 0.55 * v, 34);
+      if (s8 === 6 && P >= 2) this.taiko(t, 0.4 * v, 40);
+      if (P >= 4 && p >= 56) { this.taiko(t, 0.35, 44); this.taiko(t + H, 0.3, 46); }     // rolling into the next round
+      // the snare, and its ghosts
+      if (P >= 2 && (s8 === 2 || s8 === 6)) this.snare(t, 0.9);
+      if (P >= 4 && r() < 0.35) this.snare(t + H, 0.25);
+      // brass on every chord, and its call on the last beat of each pair of bars
+      if (P >= 1 && p % 16 === 0) this.brass(t, ch.map((d, k) => this.dn(d, 2 + (k === 0 ? 0 : 0))), 0.075, STEP * 3.5);
+      if (P >= 1 && p % 16 === 13) { this.brass(t, [this.dn(next[0], 2), this.dn(next[0] + 4, 2)], 0.05, H * 0.9); this.brass(t + H, [this.dn(next[0], 2), this.dn(next[0] + 4, 2)], 0.06, H * 0.9); }
+      // a crash at the head of each round, cymbals swelling into every chord in the last stage
+      if (P >= 2 && p === 0) this.crash(t, 0.8);
+      if (P >= 5 && p % 16 === 12) this.riser(t, STEP * 4, 0.05);
+      // the theme
+      if (P >= 3) {
+        const TH = round % 2 === 1
+          ? [[0, 7, 3], [3, 8, 1], [4, 7, 4], [8, 4, 6], [14, 6, 2], [16, 8, 6], [22, 7, 2], [24, 6, 4], [28, 4, 4], [32, 5, 6], [38, 4, 2], [40, 2, 4], [44, 4, 4], [48, 6.5, 4], [52, 8, 4], [56, 7, 8]]
+          : [[0, 4, 3], [3, 3, 1], [4, 4, 4], [8, 7, 6], [14, 6, 2], [16, 5, 6], [22, 4, 2], [24, 2, 4], [28, 4, 4], [32, 3, 6], [38, 5, 2], [40, 7, 4], [44, 5, 4], [48, 6.5, 4], [52, 8, 4], [56, 4, 8]];
+        for (const [at, d, len] of TH) {
+          if (at !== p) continue;
+          this.deepLead(t, this.dn(d, 2), 0.07, STEP * len, true);
+          if (P >= 4) { this.deepLead(t, this.dn(d, 3), 0.035, STEP * len, true, true); this.bell(t + STEP * 2, this.dn(d, 4), 0.3, 2); }
+        }
+      }
+      // a flare gathering: a rise into a crash as it fires
+      if (b.warn >= 0 && b.warn < 40 && !this._cW) { this._cW = 1; this.riser(t, 0.6, 0.09); this.crash(t + 0.62, 1.1); this.taiko(t + 0.62, 0.9, 30); }
+      if (b.warn < 0) this._cW = 0;
     }
 
     /* THE DEEP: the whole run is one piece. k is how far down the run you are (0 at the first room, 1 at the bottom) */
