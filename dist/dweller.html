@@ -1099,7 +1099,7 @@ body.ninth #tbN{display:flex}
   }
   const tintCache = {};
   function themeTiles(th) {
-    const k = th.tile ? th.style : 'plain';
+    const k = th.tile ? th.style + th.tile.join() + (th.rock || th.bgTop).join() : 'plain';
     // solid rock reads a good step darker than the cave behind it, as in the ice biome
     const ramp = th.tile ? [th.rock || th.bgTop.map(v => Math.round(v * 0.5)), th.tile[1], th.tile[2]] : null;   // (rock: a world whose cave was lifted keeps its rock dark)
     if (!tintCache[k]) tintCache[k] = mirrorSet(ramp ? coldTint(IMG.tiles, ramp) : IMG.tiles);
@@ -1107,7 +1107,7 @@ body.ninth #tbN{display:flex}
   }
   const orbCache = {};
   function themeOrb(th) {
-    const k = th.style;
+    const k = th.style + th.orb.join();
     if (!orbCache[k]) orbCache[k] = { cv: coldTint(IMG.orb, th.orb), cols: 8, rows: 1, w: 48, h: 48, ax: 24, ay: 24, n: 8 };
     return orbCache[k];
   }
@@ -1425,7 +1425,9 @@ body.ninth #tbN{display:flex}
     ocv = document.createElement('canvas'); ocv.width = W; ocv.height = H;
     octx = ocv.getContext('2d');
     oimg = octx.createImageData(W, H); o32 = new Uint32Array(oimg.data.buffer);
+    tcv = document.createElement('canvas'); tcv.width = W; tcv.height = H; tctx = tcv.getContext('2d');
   }
+  let tcv = null, tctx = null;
 
   function visPoly(w, ox, oy, r, a0, a1, n) {
     const pts = [];
@@ -1528,6 +1530,14 @@ body.ninth #tbN{display:flex}
       const l = lights[i];
       if (l.hazard) drawHazardLight(lctx, w, l, camX, camY, W, H);
     }
+    // (in the Foundry and Ember Deep the open cave is kept bright, so a light's reach is hard to tell from the cave
+    //  around it: there, everything a burning light reaches is also tinted warm over the scene)
+    const tint = !!TH.amb && TH.amb !== AMBIENT && !!TH.glowRGB;
+    if (tint) {
+      tctx.globalCompositeOperation = 'copy'; tctx.drawImage(lc, 0, 0);
+      tctx.globalCompositeOperation = 'multiply'; tctx.fillStyle = 'rgb(' + TH.glowRGB + ')'; tctx.fillRect(0, 0, W, H);
+      tctx.globalCompositeOperation = 'source-over';
+    }
     // gentle lifts: the Dweller sees a little in the dark; tethers and the crystal glow without hurting
     const px = s.x + 2.5, py = s.y + s.h * 0.5;
     softDisc(lctx, px - camX, py - camY, COAT && COAT.glow ? 32 : 26, COAT && COAT.glow ? 0.30 + COAT.glowA * 0.4 : 0.30);
@@ -1568,6 +1578,7 @@ body.ninth #tbN{display:flex}
     }
     octx.putImageData(oimg, 0, 0);
     ctx.drawImage(ocv, 0, 0);
+    if (tint) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.2; ctx.drawImage(tcv, 0, 0); ctx.restore(); }
   }
 
   /* ------------------------------------------------------------------ sprites in the world */
@@ -1872,6 +1883,12 @@ body.ninth #tbN{display:flex}
     if (top >= 90) return false;
     const x = Math.round(wx - camX), y0 = shelfAt(w, tx, ty - top - 1) ? Math.round((ty - top - 1) * TS - camY) + 2 : Math.round((ty - top) * TS - camY) - 1, y1 = Math.round(wy - camY) - gap;   // (from rock, or from under a shelf)
     if (y1 <= y0) return true;
+    if (TH.style === 'ember') {   // in Ember Deep a lamp hangs on a chain of hot iron, like every other chain there
+      for (let i = 0; i < y1 - y0; i += 3) { ctx.fillStyle = (i / 3) % 2 ? TH.mid : TH.stal[1]; ctx.fillRect(x, y0 + i, 1, 2); }
+      hotLinks(ctx, x, y0 + camY, y1 + camY, wx * 0.013, camY, 4096, sceneTime);
+      ctx.fillStyle = TH.stal[1]; ctx.fillRect(x - 1, y0, 4, 2);
+      return true;
+    }
     ctx.fillStyle = lit ? TH.stal[1] : TH.near; ctx.fillRect(x, y0, 1, y1 - y0);
     ctx.fillStyle = lit ? TH.stal[0] : TH.far[0]; ctx.fillRect(x + 1, y0, 1, Math.max(0, y1 - y0 - 1));
     ctx.fillStyle = lit ? TH.stal[1] : TH.near; ctx.fillRect(x - 1, y0, 4, 2);           // where it is fixed into the rock
@@ -2446,6 +2463,7 @@ body.ninth #tbN{display:flex}
     ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')'; ctx.fillRect(0, 0, W, H);
     const par = [0.12, 0.28, 0.5];
     for (let i = 0; i < 3; i++) {
+      if (i === 0 && w.boss && VXMODE) { drawSpires(ctx, w, camX, camY, W, H, time); continue; }   // (the Guardian's arena: its own spires, that answer it)
       const L = bgLayers[i];
       const ox = -((camX * par[i]) % 512 + 512) % 512;
       const oy = Math.round(-(camY * par[i]) % 400) + (i === 0 ? 20 : i === 1 ? 0 : -10);
@@ -2470,6 +2488,114 @@ body.ninth #tbN{display:flex}
     if (!w) return null;
     if (TH === THEMES.core) return w.boss ? 'core' : null;
     return ['foundry', 'ember', 'heart', 'descent', 'fungal', 'glass'].includes(TH.style) ? TH.style : null;
+  }
+
+  /* the far spires of the Guardian's arena, drawn live: as each sliver is set they lean further toward it, crack, and
+     the tallest lose their tips, which hang in the air above the stumps, pulled toward it */
+  const SPR = { w: null, list: [], lean: 0, P: 0, jolt: 0 };
+  function drawSpires(ctx, w, camX, camY, W, H, time) {
+    const s = VX.s || {}, B = w.boss, P = s.bP || 0, dt = Math.min(0.05, Math.max(0, time - (SPR.t || time))); SPR.t = time;
+    if (SPR.w !== w) {
+      SPR.w = w; SPR.list.length = 0; SPR.lean = 0; SPR.P = P;
+      let seed = 11; const r = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      for (let i = 0; i < 26; i++) {
+        const cr = []; let cx = (r() - 0.5) * 0.5, cy = 0.25 + r() * 0.3; cr.push([cx, cy]);
+        for (let k = 0; k < 5; k++) { cx += (r() - 0.5) * 0.5; cy += 0.07 + r() * 0.08; cr.push([Math.max(-0.7, Math.min(0.7, cx)), cy]); }
+        SPR.list.push({ u: i * 92 + (r() - 0.5) * 40, h: 0.42 + r() * 0.42, hw: 10 + r() * 16, c: i % 2, crackAt: 1 + Math.floor(r() * 6), breakAt: r() < 0.45 ? 3 + Math.floor(r() * 3) : 9, cr, ph: r() * 6.283, cut: 0.22 + r() * 0.12 });
+      }
+    }
+    if (P > SPR.P) SPR.jolt = 1; SPR.P = P;
+    SPR.jolt = Math.max(0, SPR.jolt - dt * 1.2);
+    SPR.lean += ((s.bWake ? 0.03 + 0.11 * P / 6 : 0) - SPR.lean) * Math.min(1, dt * 0.8);
+    const par = 0.12, bx = B.x - camX, base = H + 10 - Math.round(camY * par * 0.3) % 30;
+    const tri = (pts) => { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]); ctx.closePath(); ctx.fill(); };
+    for (const sp of SPR.list) {
+      const x0 = sp.u - camX * par - 120; if (x0 < -60 || x0 > W + 60) continue;
+      const hh = sp.h * H, dir = Math.sign(bx - x0) || 1, near = Math.max(0.35, 1 - Math.abs(bx - x0) / (W * 1.2));
+      const shudder = SPR.jolt * Math.sin(time * 40 + sp.ph) * 2;
+      const lean = dir * SPR.lean * near + shudder / hh;
+      // a point on the spire: v up its height (0 base, 1 tip), q across it (-1 left, 1 right)
+      const at = (v, q) => { const wv = sp.hw * (v < 0.82 ? 1 - v * 0.25 : (1 - v) / 0.18 * 0.8); return [x0 + q * wv + lean * hh * v * v, base - hh * v]; };
+      const broken = P >= sp.breakAt, topV = broken ? 1 - sp.cut : 1;
+      ctx.fillStyle = TH.far[sp.c];
+      if (!broken) tri([at(0, -1), at(0.82, -1), at(1, 0), at(0.82, 1), at(0, 1)]);
+      else {
+        // the stump, with a jagged top; the tip hangs above it, turned, drifting a little toward the Guardian
+        tri([at(0, -1), at(topV - 0.03, -1), at(topV, -0.3), at(topV - 0.05, 0.2), at(topV + 0.01, 0.6), at(topV - 0.02, 1), at(0, 1)]);
+        const lift = Math.min(1, (P - sp.breakAt + 1) * 0.5), off = hh * (0.05 + 0.06 * lift) + Math.sin(time * 0.7 + sp.ph) * 3, drift = dir * (6 + 8 * lift);
+        const tip = [at(topV + 0.02, -0.7), at(0.82, -1), at(1, 0), at(0.82, 1), at(topV + 0.02, 0.8)];
+        const [mx, my] = at(topV + sp.cut / 2, 0), rot = dir * (0.15 + 0.1 * lift) + Math.sin(time * 0.5 + sp.ph) * 0.04;
+        tri(tip.map(([x, y]) => { const dx = x - mx, dy = y - my; return [mx + dx * Math.cos(rot) - dy * Math.sin(rot) + drift, my + dx * Math.sin(rot) + dy * Math.cos(rot) - off]; }));
+      }
+      // its crack, opening as the slivers go in: a dark seam, a pale edge on the side toward the eye
+      if (P >= sp.crackAt) {
+        const open = Math.min(1, (P - sp.crackAt + 1) * 0.5), n = Math.min(sp.cr.length, 2 + Math.round(open * 4));
+        for (let k = 0; k + 1 < n; k++) {
+          const [a0, b0] = sp.cr[k], [a1, b1] = sp.cr[k + 1]; if (b1 > topV - 0.02) break;
+          const [xa, ya] = at(b0, a0), [xb, yb] = at(b1, a1), m = Math.ceil(Math.hypot(xb - xa, yb - ya));
+          for (let j = 0; j <= m; j++) {
+            const x = Math.round(xa + (xb - xa) * j / m), y = Math.round(ya + (yb - ya) * j / m);
+            ctx.fillStyle = TH.near; ctx.fillRect(x, y, 1, 1);
+            ctx.globalAlpha = 0.5 * open; ctx.fillStyle = TH.sheen; ctx.fillRect(x + (dir > 0 ? 1 : -1), y, 1, 1); ctx.globalAlpha = 1;
+          }
+        }
+      }
+    }
+  }
+
+  /* the Guardian's pull: a disc of motes in three bands turning round it, tilted toward us, the near half passing in
+     front of it, and broken rock torn from the arena riding the inner band. Faint and slow while it sleeps; awake it
+     turns faster, draws in as a flare gathers and is flung out as it fires; each sliver set takes a twelfth of the motes
+     into its colour; as it dies everything falls into it */
+  const VX = { w: null, p: [], sq: 1 };
+  const VXMODE = 2;
+  const VX_BANDS = [[78, 118, 150], [150, 205, 190], [250, 330, 150], [380, 460, 50]];
+  function drawVortex(ctx, w, s, camX, camY, W, H, time, dt, front, open) {
+    const B = w.boss; if (!B || s.bBurst || !VXMODE) return;
+    if (VX.w !== w) {
+      VX.w = w; VX.p.length = 0; VX.sq = 1;
+      let seed = 7; const r = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      VX_BANDS.forEach(([r0, r1, n], band) => { for (let i = 0; i < n; i++) VX.p.push({ R: r0 + (r1 - r0) * r(), a: r() * 6.283, sp: 0.9 + r() * 0.25, sz: r() < 0.15 ? 2 : 1, c: Math.floor(r() * 12), lift: (r() - 0.5) * (6 + band * 6), band }); });
+      if (VXMODE >= 2) for (let i = 0; i < 16; i++) VX.p.push({ R: 95 + r() * 120, a: r() * 6.283, sp: 0.55 + r() * 0.2, rock: 3 + Math.floor(r() * 4), spinR: (r() - 0.5) * 2, lift: (r() - 0.5) * 20, c: 9, band: 0 });
+    }
+    const [gx0, gy0] = guardianPos(w, s, time), cx = gx0 - camX, cy = gy0 - camY;
+    const awake = s.bWake ? 1 : 0, P = s.bP || 0, fk = B.flare.k || 0, warn = s.bFlareWarn >= 0 && fk < 0.2;
+    const die = s.bDie ? Math.min(1, s.bDie / 160) : 0, I = 0.3 + 0.7 * awake;
+    if (!front) VX.sq += ((warn ? 0.8 : fk > 0.2 ? 1 + 0.2 * fk : 1) - VX.sq) * Math.min(1, (dt || 0) * 2.5);
+    const spin = (0.1 + 0.3 * awake + 0.6 * fk) * (1 + 3 * die);
+    const tilt = -0.14, ct = Math.cos(tilt), st = Math.sin(tilt), flat = 0.3;
+    const at = (q, a, R) => { const ox = Math.cos(a) * R, oy = Math.sin(a) * R * flat + q.lift * (1 - die); return [cx + ox * ct - oy * st, cy + ox * st + oy * ct]; };
+    for (const q of VX.p) {
+      if (!front) q.a += (dt || 0) * spin * q.sp * Math.sqrt(160 / q.R);
+      const z = Math.sin(q.a); if ((z > 0) !== !!front) continue;
+      const R = q.R * VX.sq * (1 - 0.9 * die * die);
+      const [x, y] = at(q, q.a, R);
+      if (x < -8 || y < -8 || x > W + 8 || y > H + 8) continue;
+      if (!front && open && !open(x, y)) continue;
+      if (!front && Math.hypot(x - cx, y - cy) < 48) continue;          // behind the orb
+      const depth = 0.5 + 0.5 * Math.abs(z);
+      if (q.rock) {
+        // a torn stone: dark, its edge toward the eye caught pale
+        const k = q.rock, ang = time * q.spinR, ox = Math.round(x), oy = Math.round(y);
+        ctx.globalAlpha = (front ? 1 : 0.55) * I; ctx.fillStyle = TH.tile[0] ? 'rgb(' + TH.tile[0].map(v => v + 10).join(',') + ')' : '#1a1a22';
+        ctx.fillRect(ox - (k >> 1), oy - (k >> 1), k, k - (Math.sin(ang) > 0 ? 1 : 0));
+        ctx.globalAlpha = (front ? 0.8 : 0.4) * I; ctx.fillStyle = 'rgb(' + TH.tile[1].join(',') + ')';
+        if (x > cx) ctx.fillRect(ox - (k >> 1), oy - (k >> 1), 1, k - 1); else ctx.fillRect(ox + k - 1 - (k >> 1), oy - (k >> 1), 1, k - 1);
+        continue;
+      }
+      const lit = q.c < P ? SHARDS[q.c] : (front ? '#e4eaff' : '#8f9ad0');
+      const a = (front ? 0.85 : 0.45) * I * depth * (q.band === 3 ? 0.6 : 1);
+      ctx.fillStyle = lit;
+      // the tail grows with the speed of the turn
+      const tail = Math.min(5, Math.floor(spin * 6 * q.sp));
+      for (let j = tail; j >= 0; j--) {
+        const [tx, ty] = j ? at(q, q.a - j * 0.012 * (200 / q.R) * 2, R) : [x, y];
+        ctx.globalAlpha = Math.min(1, a * (1 - j / (tail + 1)));
+        const sz = j ? 1 : (front ? q.sz + (q.band === 0 ? 1 : 0) : q.sz);
+        ctx.fillRect(Math.round(tx), Math.round(ty), sz, sz);
+      }
+    }
+    ctx.globalAlpha = 1;
   }
   // the far layer repeats in cells of 640 x 480, moving with the view at a fraction of its speed
   function ambCells(camX, camY, W, H, par, fn) {
@@ -2658,17 +2784,18 @@ body.ninth #tbN{display:flex}
       const B = w.boss;
       if (pass === 'glow') {
         LAYER = true; ctx.globalAlpha = 0.6;
-        // vast rings of strokes round the Guardian, far behind, turning
-        const bx = (B.x - camX) * 0.6 + W * 0.2, by = (B.y - camY) * 0.6 + H * 0.2;
-        for (let ring = 0; ring < 3; ring++) {
-          const R = 150 + ring * 80, n = 140 + ring * 60, rot = time * (ring % 2 ? -0.02 : 0.03) + ring;
+        // vast rings of strokes round the Guardian, in the plane of the disc that turns about it
+        const [bwx, bwy] = guardianPos(w, VX.s || {}, time), bx = bwx - camX, by = bwy - camY, tl = -0.14, ct = Math.cos(tl), st = Math.sin(tl);
+        for (let ring = 0; ring < 4; ring++) {
+          const R = 190 + ring * 110, n = 160 + ring * 70, rot = time * (ring % 2 ? -0.02 : 0.03) + ring;
           for (let i = 0; i < n; i++) {
             if ((i * 7 + ring) % 5 === 0) continue;
-            const a = rot + i / n * 6.283, x = bx + Math.cos(a) * R, y = by + Math.sin(a) * R * 0.38;
+            const a = rot + i / n * 6.283, ox = Math.cos(a) * R, oy = Math.sin(a) * R * 0.3, x = bx + ox * ct - oy * st, y = by + ox * st + oy * ct;
             px(ring === 1 ? '#5a66a8' : '#48528a', x, y, 2, 1);
           }
         }
         LAYER = false; ctx.globalAlpha = 1;
+        if (VX.s) { drawVortex(ctx, w, VX.s, camX, camY, W, H, time, dt, false, open); }
         while (AMB.parts.length < 30) AMB.parts.push({ x: camX + Math.random() * W, y: camY + Math.random() * H, vx: (Math.random() - 0.5) * 3, vy: -2 - Math.random() * 4, t: 0, life: 5 + Math.random() * 6, k: 'mote', ph: Math.random() * 6.283 });
       }
     }
@@ -2840,18 +2967,24 @@ body.ninth #tbN{display:flex}
   /* Ember Deep's chains are hot iron: a dull glow in the links, a slow brighter heat running down each chain, and now
      and then a spark that drops off it (drawn only; the chains work as they always did) */
   const ECH = { t: -1 };
+  // the glow in a hot chain's links: dull, with a slow brighter heat running down it (cx in screen px, y0..y1 in world px)
+  function hotLinks(ctx, cx, y0, y1, seed, camY, H, time) {
+    const o = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'lighter';
+    for (let y = Math.max(y0, camY - 2); y < Math.min(y1, camY + H + 2); y++) {
+      const yy = y - y0;
+      if ((yy >> 1) % 2) continue;                                       // the lit links only
+      const heat = Math.pow(Math.max(0, Math.sin(y * 0.045 - time * 1.4 + seed)), 10);
+      const a = 0.09 + 0.07 * Math.sin(time * 1.1 + seed + y * 0.01) + 0.5 * heat;
+      ctx.fillStyle = 'rgba(255,' + Math.round(90 + 80 * heat) + ',40,' + a.toFixed(3) + ')';
+      ctx.fillRect(cx + ((yy >> 2) % 2 ? 0 : -1), Math.round(y - camY), 2, 1);
+    }
+    ctx.globalCompositeOperation = o;
+  }
   function emberChains(ctx, w, camX, camY, W, H, time, vis) {
     const L = w.level, dt = ECH.t < 0 ? 0 : Math.max(0, Math.min(0.1, time - ECH.t)); ECH.t = time;
     const o = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'lighter';
     const chain = (cx, y0, y1, seed) => {        // cx in screen px, y0..y1 in world px
-      for (let y = Math.max(y0, camY - 2); y < Math.min(y1, camY + H + 2); y++) {
-        const yy = y - y0;
-        if ((yy >> 1) % 2) continue;                                       // the lit links only
-        const heat = Math.pow(Math.max(0, Math.sin(y * 0.045 - time * 1.4 + seed)), 10);
-        const a = 0.09 + 0.07 * Math.sin(time * 1.1 + seed + y * 0.01) + 0.5 * heat;
-        ctx.fillStyle = 'rgba(255,' + Math.round(90 + 80 * heat) + ',40,' + a.toFixed(3) + ')';
-        ctx.fillRect(cx + ((yy >> 2) % 2 ? 0 : -1), Math.round(y - camY), 2, 1);
-      }
+      hotLinks(ctx, cx, y0, y1, seed, camY, H, time);
       // a spark dropping off now and then (about once every two seconds a chain), from somewhere along what is in view
       const lo = Math.max(y0, camY), hi = Math.min(y1, camY + H);
       if (hi > lo && Math.random() < dt * 0.5) AMB.parts.push({ x: cx + camX + (Math.random() - 0.5) * 2, y: lo + Math.random() * (hi - lo), vx: (Math.random() - 0.5) * 14, vy: 4 + Math.random() * 10, t: 0, life: 0.5 + Math.random() * 0.7, k: 'spark' });
@@ -2926,6 +3059,7 @@ body.ninth #tbN{display:flex}
           ctx.fillStyle = TH.stal[1]; ctx.fillRect(x, y, ww, 2);
           ctx.fillStyle = dk; for (let i = 2; i < ww - 1; i += 3) ctx.fillRect(x + i, y + 1, 1, 1);
           ctx.fillStyle = md; ctx.fillRect(x + 1, y + 2, 1, 2); ctx.fillRect(x + ww - 2, y + 2, 1, 2);
+          ctx.fillStyle = 'rgba(' + TH.tile[2].join(',') + ',0.6)'; ctx.fillRect(x, y, ww, 1);      // (a pale top edge, so the grate reads)
         } else if (st === 'fungal') {
           ctx.fillStyle = TH.tuft[0]; ctx.fillRect(x, y, ww, 1); ctx.fillRect(x + 1, y + 1, ww - 2, 1); ctx.fillRect(x + 3, y + 2, ww - 6, 1);
           ctx.fillStyle = dk; for (let i = 3; i < ww - 3; i += 2) ctx.fillRect(x + i, y + 2, 1, 1);
@@ -2938,7 +3072,7 @@ body.ninth #tbN{display:flex}
           ctx.fillStyle = TH.stal[1]; ctx.fillRect(x + 1, y, ww - 2, 2); ctx.fillStyle = TH.tuft[1]; ctx.fillRect(x + 1, y, ww - 2, 1);
           ctx.fillStyle = TH.stal[1]; ctx.fillRect(x, y - 1, 2, 3); ctx.fillRect(x + ww - 2, y - 1, 2, 3);
         } else {
-          ctx.fillStyle = TH.stal[1]; ctx.fillRect(x, y, ww, 2); ctx.fillStyle = st === 'ember' ? TH.tuft[0] : '#94A6B1'; ctx.fillRect(x, y, ww, 1);
+          ctx.fillStyle = TH.stal[1]; ctx.fillRect(x, y, ww, 2); ctx.fillStyle = st === 'ember' ? 'rgba(' + TH.tile[2].join(',') + ',0.65)' : '#94A6B1'; ctx.fillRect(x, y, ww, 1);
         }
       }
       // slick glass
@@ -3256,7 +3390,7 @@ body.ninth #tbN{display:flex}
   }
 
   function drawScene(ctx, Gm, camX, camY, W, H) {
-    const w = Gm.w, s = Gm.s, time = Gm.time; sceneTime = time;
+    const w = Gm.w, s = Gm.s, time = Gm.time; sceneTime = time; VX.s = s;
     drawBackground(ctx, w, camX, camY, W, H, time);
     if (!Gm.back) drawAmbience(ctx, w, camX, camY, W, H, time, 'back', 0);
     // everything in the level goes on its own layer over the backdrop (so the far layer can stay behind all of it)
@@ -3312,7 +3446,7 @@ body.ninth #tbN{display:flex}
     drawFeatures(ctx, w, s, camX, camY, W, H, time, true);
     if (!Gm.back && !w.boss) drawLife(ctx, w, s, camX, camY, W, H, time, Gm.dt || 0);
     if (Gm.hints) drawHints(ctx, w, camX, camY, W, H, Gm, Gm.hints);
-    if (w.boss) { drawGuardian(ctx, w, s, camX, camY, time, true); drawAlcoves(ctx, w, s, camX, camY, time, true); drawGuardianBits(ctx, camX, camY, Gm.dt || 0.016); }
+    if (w.boss) { drawGuardian(ctx, w, s, camX, camY, time, true); if (!Gm.back) drawVortex(ctx, w, s, camX, camY, W, H, time, Gm.dt || 0, true, null); drawAlcoves(ctx, w, s, camX, camY, time, true); drawGuardianBits(ctx, camX, camY, Gm.dt || 0.016); }
     // emissive things, drawn after the dark
     for (const l of w.lights) {
       if (l.boss || l.x < camX - 60 || l.x > camX + W + 60 || l.y < camY - 60 || l.y > camY + H + 60) continue;
@@ -4500,6 +4634,10 @@ body.ninth #tbN{display:flex}
         case 'caught': {
           this.sfxTone(t, F0 * 19, F0 * 19 * 0.96, 0.5, 0.16 * v, 'sawtooth'); this.sfxTone(t, F0 * 21, F0 * 21 * 0.95, 0.5, 0.14 * v, 'sawtooth');
           this.sfxNoise(t, 0.35, 'bandpass', 3400, 1500, 0.12 * v, 2.5); this.sfxTone(t, 120, 60, 0.3, 0.2 * v); break;
+        }
+        case 'quake': {                     // the Guardian's weight: a fall of 48 Hz to 24 under a low roll of rock
+          this.sfxTone(t, F0, F0 / 2, 1.8 * v, 0.34 * v, 'sine'); this.sfxTone(t, F0 * 3 / 2, F0 * 3 / 4, 1.2 * v, 0.1 * v, 'triangle');
+          this.sfxNoise(t, 2.2 * v, 'lowpass', 220, 50, 0.3 * v, 0.9); this.sfxNoise(t + 0.05, 0.5, 'bandpass', 380, 120, 0.08 * v, 1.4); break;
         }
         case 'ui': this.bell(t, F0 * 8 * 1.5, 0.35, 0.7); break;
         case 'nope': this.sfxTone(t, F0 * 4 * 7 / 4, F0 * 4 * 3 / 2, 0.18, 0.06, 'triangle'); this.sfxNoise(t, 0.08, 'bandpass', 900, 500, 0.04, 2); break;
@@ -8789,6 +8927,7 @@ body.ninth #tbN{display:flex}
     audioInit(); ARCH = null;
     loadLevel(i);
     if (fresh) { delete P.cp[i]; saveProgress(); }
+    BZ.t = -1; BZ.done = false; BZ.wake = false; BZ.fk = 0;
     S = D.newState(world, { companion: P.comp }); runTicks = 0; runEcl = 0; candWin = null; R.parts.length = 0; R.clearGuardian(); A.Live.boss = null; R.resetTethers(); beamPrev = {}; deathFade = 0; flash = 0; shake = 0;
     seekerCardT = 99; newBest = false;
     const sv = P.cp[i];
@@ -9156,9 +9295,9 @@ body.ninth #tbN{display:flex}
         const L = LINES[near.q.id](), reacting = REACT && REACT.id === near.q.id, t = reacting ? REACT.text : L[(talk[near.q.id] || 0) % L.length];
         for (const w of wrap(t, Math.min(200, LW - 24) / HS)) lines.push([w, near.q.id === 'monk' && !P.core ? '#6b7280' : '#c3cbd6']);
         if (near.q.id === 'weaver' && P.core) {
-          const cur = COATS.find(c => c.id === P.coat) || COATS[0], nx = COATS.find(c => !coatOpen(c)), n = coatsOpen().length;
+          const cur = COATS.find(c => c.id === P.coat) || COATS[0], nx = COATS.find(c => !coatOpen(c)), op = coatsOpen(), n = op.length, at = Math.max(1, op.findIndex(c => c.id === cur.id) + 1);
           lines.push([null, 'gap']);                                   // (a gap and a faint rule: his words end here)
-          lines.push(['YOU WEAR:  ' + cur.name + '   -   ' + n + ' OF ' + COATS.length + ' CLOAKS', '#8ea0b4']);
+          lines.push(['YOU WEAR:  ' + cur.name + '   -   ' + at + ' OF ' + COATS.length + ' CLOAKS', '#8ea0b4']);   // (which of them you wear, as you go through them)
           if (n > 1) lines.push([key + '  ANOTHER CLOAK', PAL.gold, true]);
         } else if (L.length > 1 || reacting) lines.push([key + '  MORE', '#5d6474', false, -1]);
       } else if (near.k === 'memory') {
@@ -10157,6 +10296,34 @@ body.ninth #tbN{display:flex}
   }
 
   /* ------------------------------------------------------------ camera */
+  /* the Guardian's weight. The first time it wakes the view draws back for a few seconds to show all of it, then
+     settles; each flare it fires shakes the arena, rolls a low quake and lifts the dust off every surface in view */
+  let ZBLIT = null;
+  const cy0 = (h) => h / 2 - 24;
+  const BZ = { t: -1, done: false, wake: false, fk: 0 }, BZ_Z = 1.5, BZ_A = 0.3, BZ_B = 1.9, BZ_C = 3.9, BZ_D = 5.9;
+  function bzK() {
+    if (BZ.t < 0) return 0;
+    const t = BZ.t, u = t < BZ_A ? 0 : t < BZ_B ? (t - BZ_A) / (BZ_B - BZ_A) : t < BZ_C ? 1 : Math.max(0, 1 - (t - BZ_C) / (BZ_D - BZ_C));
+    return u * u * (3 - 2 * u);
+  }
+  function bossFx(dt) {
+    const B = world.boss; if (!B) return;
+    if (S.bWake && !BZ.wake && !BZ.done && !S.bP && !S.dead) { BZ.done = true; BZ.t = 0; A.Live.sfx('quake', { v: 0.8 }); shake = Math.max(shake, 1.5); }
+    BZ.wake = !!S.bWake;
+    if (BZ.t >= 0) { BZ.t += dt; if (BZ.t > BZ_D) BZ.t = -1; }
+    const k = B.flare.k || 0;
+    if (k >= 0.2 && BZ.fk < 0.2 && !S.bDie && !S.bBurst) { A.Live.sfx('quake'); shake = Math.max(shake, 3); liftDust(); }
+    BZ.fk = k;
+  }
+  function liftDust() {
+    const T = D.TS, x0 = Math.floor(camX / T) - 2, y0 = Math.floor(camY / T) - 2, nx = Math.ceil(LW * BZ_Z / T) + 4, ny = Math.ceil(LH * BZ_Z / T) + 4;
+    const col = 'rgb(' + R.theme.tile[1].join(',') + ')', col2 = 'rgb(' + R.theme.tile[2].join(',') + ')';
+    for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
+      const tx = x0 + i, ty = y0 + j;
+      if (!D.solidAt(world, tx, ty) || D.solidAt(world, tx, ty - 1) || Math.random() > 0.5) continue;
+      for (let k = 0; k < 2; k++) R.spawn((tx + Math.random()) * T, ty * T - 1, (Math.random() - 0.5) * 8, -(5 + Math.random() * 20), 1.2 + Math.random() * 1.6, Math.random() < 0.15 ? col2 : col, 1, -3, false);
+    }
+  }
   function camTarget() {
     if (window.__cam) return [window.__cam[0] - LW / 2, window.__cam[1] - LH / 2];   // (for mock-ups)
     if (KEPT) return [0, 0];                         // the kept room is one still view
@@ -10366,6 +10533,7 @@ body.ninth #tbN{display:flex}
         shake = Math.max(0, shake - dt * 6); flash = Math.max(0, flash - dt * 1.6);
         const fear = Math.min(1, Math.max(S.ex * 1.15, S.lit * 0.55));
         A.Live.update(S.dead ? 0.1 : fear, mode === 'win' ? 0.7 : 1);
+        if (world.boss) bossFx(dt);
         if (world.boss) A.Live.boss = { p: S.bP || 0, wake: !!S.bWake, die: S.bDie || 0, burst: !!S.bBurst, warn: S.bFlareWarn };
         if (RUN) { const k = (RUN.i + Math.max(0, Math.min(1, (S.x + 2.5) / (world.W * D.TS)))) / RUN.rooms.length; A.Live.deep = { k, seed: RUN.music }; A.Live.setMood(0.25 + 0.7 * k, RUN.keys[RUN.i % 8]); }
       } else if (mode === 'deepPick' || mode === 'deepOver' || mode === 'deepWin' || mode === 'deepChoose') {
@@ -10395,7 +10563,8 @@ body.ninth #tbN{display:flex}
 
 
   function render(dt) {
-    fitView();
+    fitView(); ZBLIT = null;
+    if (BZ.t < 0 && (off.width !== LW || off.height !== LH)) { off.width = LW; off.height = LH; octx.imageSmoothingEnabled = false; }
     const ctx = octx;
     ctx.imageSmoothingEnabled = false;
     let ox = 0, oy = 0;
@@ -10413,6 +10582,21 @@ body.ninth #tbN{display:flex}
       HINTS.length = 0;
       if (KEPT) { drawKept(ctx, dt); drawHUD(ctx); }
       else if (RLM) { drawRelicRoom(ctx, fx, fy, dt); drawHUD(ctx); }
+      else if (BZ.t >= 0 && world.boss && !ARCH && mode === 'play') {
+        // the view drawn back: the scene drawn wide into a larger buffer, and a window of it, growing and shrinking
+        // again, stretched over the screen (no HUD while it lasts)
+        const e = bzK(), z = 1 + (BZ_Z - 1) * e, LW0 = LW, LH0 = LH, LWm = Math.ceil(LW0 * BZ_Z) + 2, LHm = Math.ceil(LH0 * BZ_Z) + 2;
+        if (off.width !== LWm || off.height !== LHm) { off.width = LWm; off.height = LHm; octx.imageSmoothingEnabled = false; }
+        const B = world.boss, wx = Math.max(S.x - LW0 * BZ_Z / 2 + 50, Math.min(S.x + LW0 * BZ_Z / 2 - 50, B.x)), wy = Math.min((S.y + B.y) / 2, S.y + 40 - LH0 * BZ_Z / 2);   // (the Guardian at the middle, the Dweller kept in; the floor low)
+        const cw = LW0 * z, chh = LH0 * z;
+        let mx = cxp + LW0 / 2 + (wx - cxp - LW0 / 2) * e, my = cyp + LH0 / 2 + (wy - cyp - LH0 / 2) * e;
+        mx = Math.max(cw / 2, Math.min(world.W * D.TS - cw / 2, mx)); my = Math.max(cy0(chh), Math.min(world.H * D.TS + 24 - chh / 2, my));
+        const bx = Math.floor(mx - LWm / 2), by = Math.floor(my - LHm / 2);
+        LW = LWm; LH = LHm;
+        R.drawScene(ctx, { hints: null, w: world, s: S, time: gameTime, dt: mode === 'pause' ? 0 : dt, back: null, lift: null }, bx, by, LW, LH);
+        LW = LW0; LH = LH0;
+        ZBLIT = [mx - cw / 2 - bx, my - chh / 2 - by, cw, chh];
+      }
       else {
       R.drawScene(ctx, { hints: HINTS, w: world, s: S, time: gameTime, dt: mode === 'pause' || mode === 'deepPick' ? 0 : dt, back: ARCH ? (c, x, y) => { AR.drawBack(c, x, y, archSt()); drawGate(c, x, y); drawRelicGate(c, x, y); } : null, lift: ARCH ? (c, x, y, disc) => { AR.lift(c, x, y, disc, archSt()); gateLift(c, x, y, disc); relicGateLift(c, x, y, disc); } : null }, fx, fy, LW, LH);
       if (window.__overlay) window.__overlay(ctx, fx, fy, LW, LH, gameTime);   // (for mock-ups)
@@ -10446,7 +10630,8 @@ body.ninth #tbN{display:flex}
     if (setOpen) { setT += dt; HT.length = 0; drawSettings(ctx); }      // (only the settings' own words over the dimmed screen)
     gctx.imageSmoothingEnabled = false;
     gctx.fillStyle = '#000'; gctx.fillRect(0, 0, canvas.width, canvas.height);
-    gctx.drawImage(off, 0, 0, LW, LH, Math.round(-ox), Math.round(-oy), LW * SC, LH * SC);
+    if (ZBLIT) gctx.drawImage(off, ZBLIT[0], ZBLIT[1], ZBLIT[2], ZBLIT[3], 0, 0, LW * SC, LH * SC);
+    else gctx.drawImage(off, 0, 0, LW, LH, Math.round(-ox), Math.round(-oy), LW * SC, LH * SC);
     flushHT();
     if (mode === 'title' || mode === 'town') {
       if (bootFade < 2.5) { gctx.globalAlpha = 1 - bootFade / 2.5; gctx.fillStyle = '#000'; gctx.fillRect(0, 0, canvas.width, canvas.height); gctx.globalAlpha = 1; }
