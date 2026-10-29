@@ -8561,6 +8561,7 @@ body.ninth #tbN{display:flex}
     if (e.code === 'KeyO' && (mode === 'title' || mode === 'pause')) { openSettings(); return; }
     if (mode === 'title') {
       if (e.code === 'KeyV' && openingKnown() && !SKIT) { playOpening(true, null); return; }
+      if (e.code === 'KeyH' && !SKIT) { openRecords(); return; }
       if (['Space', 'Enter', 'ArrowUp', 'KeyW', 'ArrowRight', 'KeyD', 'ArrowLeft', 'KeyA', 'KeyZ', 'KeyK', 'ArrowDown', 'KeyS', 'KeyE'].includes(e.code)) beginTown();
     } else if (mode === 'deepPick' || mode === 'deepOver' || mode === 'deepWin' || mode === 'deepChoose') { deepKey(e.code); return;
     } else if (mode === 'town') {
@@ -8682,6 +8683,7 @@ body.ninth #tbN{display:flex}
     if (setOpen) { setTap(fx * LW, fy * LH); return; }
     if (mode === 'title' && touchMode && fy * LH > LH - 24) { openSettings(); return; }   // the settings line along the bottom
     if (mode === 'title' && touchMode && openingKnown() && fy * LH > LH - 38) { playOpening(true, null); return; }   // and the opening, above it
+    if (mode === 'title' && touchMode && fy * LH > LH - (openingKnown() ? 52 : 38)) { openRecords(); return; }         // and the records, above that
     if (mode === 'title') beginTown();
     else if (mode === 'deepPick' || mode === 'deepOver' || mode === 'deepWin' || mode === 'deepChoose') deepTap(fx * LW, fy * LH);
     else if (mode === 'pause') {
@@ -8724,6 +8726,7 @@ body.ninth #tbN{display:flex}
       }
       if (edge('start', b(9))) { if (mode === 'play') setPause(true); else if (mode === 'pause') setPause(false); else if (mode === 'title') beginTown(); else if (mode === 'town') toTitle(); else if (mode === 'win' && winT > 2.5) toTown(cur); }
       if (mode === 'title' && edge('y', b(3)) && openingKnown() && !SKIT) playOpening(true, null);
+      if (mode === 'title' && edge('x', b(2)) && !SKIT) openRecords();
       if (mode === 'title' && edge('a', b(0))) beginTown();
       else if (mode === 'deepPick' || mode === 'deepOver' || mode === 'deepWin' || mode === 'deepChoose') {
         const key = deepKey;
@@ -9249,8 +9252,8 @@ body.ninth #tbN{display:flex}
     if (mode === 'title') {
       if (touchMode) uiPrompt('TAP', 'TO BEGIN', cx, y + 4, a);
       else uiPrompt('SPACE', 'TO BEGIN', cx, y + 4, a);
-      if (!touchMode) uiHint((openingKnown() ? [['V', 'THE OPENING']] : []).concat([['O', 'SETTINGS'], ['M', 'MUTE'], ['F', 'FULLSCREEN']]), cx, y + 4 + L7 * 1.5, a * 0.75);
-      else { ht('TAP HERE  -  SETTINGS', cx, LH - 14, UI.quiet, 'center', a * 0.75); if (openingKnown()) ht('TAP HERE  -  THE OPENING', cx, LH - 28, UI.quiet, 'center', a * 0.75); }
+      if (!touchMode) uiHint((openingKnown() ? [['V', 'THE OPENING']] : []).concat([['H', 'RECORDS'], ['O', 'SETTINGS'], ['M', 'MUTE'], ['F', 'FULLSCREEN']]), cx, y + 4 + L7 * 1.5, a * 0.75);
+      else { ht('TAP HERE  -  SETTINGS', cx, LH - 14, UI.quiet, 'center', a * 0.75); if (openingKnown()) ht('TAP HERE  -  THE OPENING', cx, LH - 28, UI.quiet, 'center', a * 0.75); ht('TAP HERE  -  RECORDS', cx, LH - (openingKnown() ? 42 : 28), UI.quiet, 'center', a * 0.75); }
     }
   }
   /* ------------------------------------------------------------ THE DEEP and THE CODEX
@@ -10401,6 +10404,7 @@ body.ninth #tbN{display:flex}
       halfText(); const sc = Math.max(1, Math.min(3, Math.floor(LH / 90), Math.floor((LW - 12) / (R.textWidth('DWELLER') * 2)))); ht('DWELLER', LW >> 1, Math.round(LH * 0.16), PAL.snow, 'center', 0.35, sc * 2);
     } else if (mode === 'title' || mode === 'town') {
       drawTown(ctx, dt);
+      if (recOpen && mode === 'title' && !setOpen) { recT += dt; drawRecords(ctx); }
     } else {
       const sh2 = OPT.shake ? shake : 0, sx = sh2 > 0 ? (Math.random() - 0.5) * sh2 * 1.2 : 0, sy = sh2 > 0 ? (Math.random() - 0.5) * sh2 * 1.2 : 0;
       const cxp = camX + sx, cyp = camY + sy;
