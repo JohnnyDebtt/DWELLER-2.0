@@ -14,7 +14,8 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <style>html,body{margin:0;height:100%;background:#07070c;color:#8a919e;font:14px ui-monospace,Menlo,Consolas,monospace;letter-spacing:.3em;display:flex;align-items:center;justify-content:center}a{color:#d6b98a}</style>
 <script>
-  // always open the newest build: a fresh query string makes the browser fetch the game again instead of using an old copy
-  location.replace('dist/dweller.html?v=' + Date.now());
+  // open this release's build. The address changes only when a new release is published, so between releases the
+  // browser keeps its copy of the game (fast to load), and a new release is fetched fresh the first time
+  location.replace('dist/dweller.html?v=16.9');
 </script>
-</head><body><a href="dist/dweller.html">DWELLER</a></body></html>
+</head><body><a href="dist/dweller.html?v=16.9">DWELLER</a></body></html>
