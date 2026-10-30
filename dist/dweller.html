@@ -3083,8 +3083,8 @@ body.ninth #tbN{display:flex}
     }
     // the eye: shut while it sleeps, dimmed under the SEEKER, white-hot as it flares; it glances toward the Dweller
     const lx = Math.max(-2, Math.min(2, Math.round((s.x - wx) / 60))), ly = Math.max(-1, Math.min(1, Math.round((s.y - wy) / 80)));
-    // the art's eyes sit a little left of centre; in the turning body they read better in the middle of the orb
-    const ex = gx - 54 + 9 + (s.bWake ? lx : 0), ey = gy - 54 - 1 + (s.bWake ? ly : 0);
+    // the eyes where the Guardian's own art has them: in the dark of the orb, a little left of its middle
+    const ex = gx - 54 + (s.bWake ? lx : 0), ey = gy - 54 + (s.bWake ? ly : 0);
     ctx.globalAlpha = !s.bWake ? 0.2 : ecl ? 0.28 : 1;
     ctx.drawImage(GA.eyes, ex, ey);
     if (B.flare.k > 0.2) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = B.flare.k; ctx.drawImage(GA.eyes, ex, ey); ctx.globalCompositeOperation = 'source-over'; }
