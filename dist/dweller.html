@@ -1156,6 +1156,9 @@ body.ninth #tbN{display:flex}
     ctx.drawImage(cv, sx * TS, sy * TS, TS, TS, px, py, TS, TS);
   }
 
+  // the time the drawing is at, between two ticks (main.js sets it while it draws; null: at the tick itself)
+  let RTICK = null;
+  function setRenderTick(t) { RTICK = t === null || !Number.isFinite(t) ? null : t; }
   const CH = 32;       // chunk size in tiles
   const chunks = new Map();
   function chunkCanvas(w, cx, cy, ahead) {
@@ -3873,7 +3876,7 @@ body.ninth #tbN{display:flex}
         for (const H of hubs.values()) {
           if (!vis(H.x - 240, H.y - 140, 480, 280)) continue;
           for (const m of H.rings.values()) for (let i = 0; i < 220; i += 2) { const a = i / 220 * Math.PI * 2; ctx.fillStyle = 'rgba(141,120,200,0.2)'; ctx.fillRect(Math.round(m.cx + Math.cos(a) * m.rx - camX), Math.round(m.cy + Math.sin(a) * m.ry - camY), 1, 1); }
-          const X = H.x - camX, Y = H.y - camY, rr = 10, turn = s.t / 1536 * Math.PI * 2;
+          const X = H.x - camX, Y = H.y - camY, rr = 10, turn = (RTICK !== null ? RTICK : s.t) / 1536 * Math.PI * 2;
           for (let j = -rr; j <= rr; j++) for (let i = -rr; i <= rr; i++) {
             const q = Math.abs(i) + Math.abs(j); if (q > rr) continue;
             const lit = (i * Math.cos(turn) - j * Math.sin(turn)) / rr;
@@ -3882,7 +3885,7 @@ body.ninth #tbN{display:flex}
           ctx.fillStyle = '#fff'; ctx.fillRect(Math.round(X - 3), Math.round(Y - 3), 2, 1);
         }
         for (let i = 0; i < w.movers.length; i++) {
-          const m = w.movers[i], [mx, my] = D.moverAt(m, s.t);
+          const m = w.movers[i], [mx, my] = D.moverAt(m, RTICK !== null ? RTICK : s.t);
           if (!vis(mx - 6, my - 6, m.w + 12, 16)) continue;
           drawShelf(ctx, st, Math.round(mx - camX), Math.round(my - camY), m.w, SHELF_OF[st] || 2, time, [i * 11, 7]);
         }
@@ -5452,6 +5455,7 @@ body.ninth #tbN{display:flex}
   }
 
   global.DwellerRender = {
+    setRenderTick, get renderTick() { return RTICK; },
     setCoat, get coat() { return COAT; }, COATS, drawSpool,
     PAL, load, prepare, drawScene, drawText, textWidth, textSprite, spawn, updateParticles, markTether, tickTethers,
     COAT_SRC, SHEETS, IMG, parts, SHARDS, THEMES, drawGem, drawShard, drawMini, drawPortrait, shade, bakeSet, bakeSetSteps, heartbeat, shrinkArt, shrinkSteps,
@@ -11449,11 +11453,13 @@ body.ninth #tbN{display:flex}
       if (e && !tPrevE) townInteract(false);
       tPrevE = e;
       if (mode !== was) return;             // a door was taken
+      TIP.ok = true; TIP.s = tS; TIP.x = tS.x; TIP.y = tS.y;
       townStep(inp);
       still = inp === 0 && tS.onG && Math.abs(tS.vx) < 1 ? still + stepDt : 0;
       tAcc -= stepDt; n++;
     }
     if (n >= 12) tAcc = 0;
+    TIP.a = Math.max(0, Math.min(1, tAcc / stepDt));
     if (P.core && !P.archSeen && tS.cmp && mode === 'town') {
       const px = tS.x + 2.5, dir = Math.sign(T.GREAT.x - px) || 1, dist = Math.abs(T.GREAT.x - px);
       const tx = dist < 50 ? T.GREAT.x - 10 : px + dir * 46, ty = groundY(tx) - 18 + Math.sin(gameTime * 3) * 2;
@@ -11461,7 +11467,8 @@ body.ninth #tbN{display:flex}
       tS.cmpX = leadX; tS.cmpY = leadY;
     } else { leadX = leadY = null; }
     R.updateParticles(dt);
-    const t = townCamTarget(), kx = 1 - Math.exp(-dt * 5.5), ky = 1 - Math.exp(-dt * 4.5);
+    let t; { const ip = tipIn(); try { t = townCamTarget(); } finally { if (ip) tipOut(); } }
+    const kx = 1 - Math.exp(-dt * 5.5), ky = 1 - Math.exp(-dt * 4.5);
     if (window.__townCam !== undefined) { t[0] = Math.max(0, Math.min(T.WPX - LW, window.__townCam - LW / 2)); }   // (for pictures of the town)
     tcamX += (t[0] - tcamX) * kx; tcamY += (t[1] - tcamY) * ky;
     const nn = townNear(), key = nn ? nn.k + (nn.i !== undefined ? nn.i : nn.q ? nn.q.id : '') : '';
@@ -11512,7 +11519,8 @@ body.ninth #tbN{display:flex}
     for (const w of text.split(' ')) { const t = ln ? ln + ' ' + w : w; if (R.textWidth(t) > max && ln) { out.push(ln); ln = w; } else ln = t; }
     if (ln) out.push(ln); return out;
   }
-  function drawTown(ctx, dt) {
+  function drawTown(ctx, dt) { const ip = tipIn(); try { drawTownAt(ctx, dt); } finally { if (ip) tipOut(); } }
+  function drawTownAt(ctx, dt) {
     if (candIgn && !candIgn.snd && gameTime >= candIgn.t0) { candIgn.snd = true; A.Live.sfx('hush', { v: 0.6 }); }   // a candle catches by the door
     const camY0 = T.GY - LH * 0.8;
     const sx = shake > 0 && OPT.shake ? (Math.random() - 0.5) * shake : 0;
@@ -12754,6 +12762,60 @@ body.ninth #tbN{display:flex}
   }
 
   let ninthShown = false;
+  /* ---- drawing between the ticks. The world moves 96 times a second; a screen shows 60, 120 or 144 frames. Drawn at
+     the last tick only, the Dweller goes 1 tick one frame and 2 the next (at 60), or not at all on some frames (at 120
+     and 144), and the eye reads that unevenness as stutter. So each frame draws things where they are between the last
+     two ticks: the Dweller and its companion, the lights that move or turn, the Orrery's planks, and the camera follows
+     that. Only the drawing sees it: the simulation never does, so every jump, its timing and everything that decides
+     anything are exactly as they were. Whatever moves further in one tick than anything can (a respawn, a checkpoint, a
+     light taken up, a new room) is drawn where it is, unblended */
+  const IP = { on: true, ok: false, w: null, s: null, a: 0, x: 0, y: 0, cx: 0, cy: 0, t: 0, n: 0, L: new Float64Array(0), keep: new Float64Array(0), k: [0, 0, 0, 0, 0], inn: false };   // (k: the real values while the blended ones are in, kept as they were)
+  const IP_FAR = 12, IP_LFAR = 40, IP_TURN = 0.5;   // (px a tick, for the Dweller and companion; for a light; radians a tick)
+  function ipSnap() {   // just before a tick: where everything is now
+    IP.ok = true; IP.w = world; IP.s = S;
+    IP.x = S.x; IP.y = S.y; IP.cx = S.cmpX; IP.cy = S.cmpY; IP.t = S.t;
+    const ls = world.lights, n = ls.length;
+    if (IP.L.length < n * 3) { IP.L = new Float64Array(n * 3); IP.keep = new Float64Array(n * 3); }
+    for (let i = 0; i < n; i++) { const l = ls[i]; IP.L[i * 3] = l.x; IP.L[i * 3 + 1] = l.y; IP.L[i * 3 + 2] = typeof l.ang === 'number' ? l.ang : NaN; }
+    IP.n = n;
+  }
+  const ipNear = (p, c, far) => Number.isFinite(p) && Number.isFinite(c) && Math.abs(c - p) <= far;
+  // put the blended places in, for the camera or the drawing; ipOut puts the real ones back
+  function ipIn() {
+    if (!IP.on || !IP.ok || IP.inn || IP.w !== world || IP.s !== S || !world || !S || mode === 'town' || mode === 'title') return false;
+    const a = IP.a, K = IP.k;
+    K[0] = S.x; K[1] = S.y; K[2] = S.cmpX; K[3] = S.cmpY;
+    if (ipNear(IP.x, S.x, IP_FAR) && ipNear(IP.y, S.y, IP_FAR)) { S.x = IP.x + (K[0] - IP.x) * a; S.y = IP.y + (K[1] - IP.y) * a; }
+    if (ipNear(IP.cx, S.cmpX, IP_FAR) && ipNear(IP.cy, S.cmpY, IP_FAR)) { S.cmpX = IP.cx + (K[2] - IP.cx) * a; S.cmpY = IP.cy + (K[3] - IP.cy) * a; }
+    const ls = world.lights, n = Math.min(IP.n, ls.length), L = IP.L, V = IP.keep;
+    for (let i = 0; i < n; i++) {
+      const l = ls[i], o = i * 3, x = l.x, y = l.y, g = l.ang;
+      V[o] = x; V[o + 1] = y; V[o + 2] = typeof g === 'number' ? g : NaN;
+      if ((x !== L[o] || y !== L[o + 1]) && ipNear(L[o], x, IP_LFAR) && ipNear(L[o + 1], y, IP_LFAR)) { l.x = L[o] + (x - L[o]) * a; l.y = L[o + 1] + (y - L[o + 1]) * a; }
+      if (typeof g === 'number' && g !== L[o + 2] && ipNear(L[o + 2], g, IP_TURN)) l.ang = L[o + 2] + (g - L[o + 2]) * a;
+    }
+    K[4] = n;
+    R.setRenderTick(S.t - IP.t === 1 ? IP.t + a : null);    // (the Orrery's planks turn with the time between too)
+    IP.inn = true;
+    return true;
+  }
+  function ipOut() {
+    const K = IP.k, V = IP.keep, ls = world.lights;
+    S.x = K[0]; S.y = K[1]; S.cmpX = K[2]; S.cmpY = K[3];
+    for (let i = 0, n = K[4]; i < n; i++) { const l = ls[i], o = i * 3; l.x = V[o]; l.y = V[o + 1]; if (V[o + 2] === V[o + 2]) l.ang = V[o + 2]; }
+    R.setRenderTick(null);
+    IP.inn = false;
+  }
+  // the town's own walker the same way (only its place: the town's companion is led by the frame, not the tick)
+  const TIP = { ok: false, s: null, a: 0, x: 0, y: 0, kx: 0, ky: 0, inn: false };
+  function tipIn() {
+    if (!IP.on || !TIP.ok || TIP.inn || TIP.s !== tS || !tS) return false;
+    TIP.kx = tS.x; TIP.ky = tS.y;
+    if (ipNear(TIP.x, tS.x, IP_FAR) && ipNear(TIP.y, tS.y, IP_FAR)) { tS.x = TIP.x + (TIP.kx - TIP.x) * TIP.a; tS.y = TIP.y + (TIP.ky - TIP.y) * TIP.a; }
+    TIP.inn = true; return true;
+  }
+  function tipOut() { tS.x = TIP.kx; tS.y = TIP.ky; TIP.inn = false; }
+
   function frame(now) {
     requestAnimationFrame(frame);
     { const nr = touchMode && ninthReady(); if (nr !== ninthShown) { ninthShown = nr; document.body.classList.toggle('ninth', nr); } }
@@ -12772,11 +12834,12 @@ body.ninth #tbN{display:flex}
         let n = 0;
         const stepDt = 1 / D.TICK;
         const maxN = 12 * Math.max(1, speedMul);
-        while (simAcc >= stepDt && n < maxN) { simStep(); simAcc -= stepDt; n++; }
+        while (simAcc >= stepDt && n < maxN) { ipSnap(); simStep(); simAcc -= stepDt; n++; }
         if (n >= maxN) simAcc = 0;
+        IP.a = Math.max(0, Math.min(1, simAcc / stepDt));   // (how far on from the last tick toward the next this frame is)
         R.tickTethers(dt);
         R.updateParticles(dt);
-        updateCamera(dt);
+        { const ip = ipIn(); try { updateCamera(dt); } finally { if (ip) ipOut(); } }
         if (mode === 'play') updateSection();
         if (ARCH && mode === 'play') archFrame(dt);
         if (mode === 'win') winT += dt;
@@ -12797,7 +12860,7 @@ body.ninth #tbN{display:flex}
         shake = Math.max(0, shake - dt * 6); flash = Math.max(0, flash - dt * 1.6);
         townFrame(dt);
       }
-      render(dt);
+      { const ip = ipIn(); try { render(dt); } finally { if (ip) ipOut(); } }
     } catch (e) {
       err = String(e && e.stack || e);
       console.error(e);
@@ -13045,6 +13108,7 @@ body.ninth #tbN{display:flex}
     // debug / test hooks
     window.__dweller = {
       get state() { return S; }, get world() { return world; }, get mode() { return mode; }, get scale() { return [SC, LW, LH]; }, get level() { return cur; }, get progress() { return P; },
+      get blend() { return IP.on; }, set blend(v) { IP.on = !!v; },   // (tests: the drawing between ticks, on or off)
       start(fresh) { startLevel(cur < 0 ? 0 : cur, !!fresh); },
       startLevel(i, fresh) { startLevel(i, fresh === undefined ? true : !!fresh); },
       map() { toTown(); }, title() { toTitle(); }, get cam() { return [camX, camY, SC]; }, town(f) { toTown(f); }, get townState() { return tS; }, get townCam() { return [tcamX, tcamY]; }, get near() { return near; }, interact(f) { townInteract(!!f); }, teleportTown(x, y) { tS.x = x; tS.y = y; snapTown(); },
