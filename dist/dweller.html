@@ -11404,51 +11404,51 @@ body.ninth #tbN{display:flex}
   let leadX = null, leadY = null;
   const LINES = {
     collector: () => [
-      'THE WELL IS DEEPER THAN IT LOOKS', 'I KEEP WHAT THE LIGHT LEAVES BEHIND', 'DON\'T STAND UNDER THE LAMPS TOO LONG',
-      'SOME SEEKERS SLEEP WHERE NOBODY LOOKS',
-    ].concat(P.wellUsed ? ['YOU WOKE THE ONE DOWN THERE. GOOD'] : []),
+      'THE WELL IS DEEPER THAN IT LOOKS.', 'I KEEP WHAT THE LIGHT LEAVES BEHIND.', 'DON\'T STAND UNDER THE LAMPS TOO LONG.',
+      'SOME SEEKERS SLEEP WHERE NOBODY LOOKS.',
+    ].concat(P.wellUsed ? ['YOU WOKE THE ONE DOWN THERE. GOOD.'] : []),
     // the weaver: coats for those who have earned one. Until the Guardian falls he has nothing for you
-    weaver: () => P.core ? (coatWaiting() ? ['FINALLY. SOMETHING WORTH WEARING. TRY IT ON'] : ['EVERY COAT I MAKE IS CUT FROM SOMEWHERE DOWN THERE', 'GO DEEPER. COME BACK. I WILL HAVE SOMETHING']) : ['NICE CLOAK. DID YOU FIND IT IN A DITCH', 'THAT RAG? I DON\'T DRESS NOBODIES. GO DO SOMETHING'],
+    weaver: () => P.core ? (coatWaiting() ? ['FINALLY. SOMETHING WORTH WEARING. TRY IT ON.'] : ['EVERY COAT I MAKE IS CUT FROM SOMEWHERE DOWN THERE.', 'GO DEEPER. COME BACK. I WILL HAVE SOMETHING.']) : ['NICE CLOAK. DID YOU FIND IT IN A DITCH.', 'THAT RAG? I DON\'T DRESS NOBODIES. GO DO SOMETHING.'],
     exiled: () => [
-      'THEY SENT ME UP. I DON\'T GO DOWN ANYMORE', 'EVERY DOOR IN THIS TOWN GOES FURTHER DOWN', 'THE MOUNTAIN WAS HERE BEFORE THE TOWN. SO WAS THE DOOR',
-      'IF THE TREES BLINK, STAND STILL', 'NOBODY LIGHTS THE LAMPS. NOBODY WANTS TO BE SEEN',
-    ].concat(P.beaten[1] && !P.comp ? ['THE MYCELIUM HAS A FALSE WALL. SOMETHING SLEEPS BEHIND IT', 'THE MYCELIUM HAS A FALSE WALL. SOMETHING SLEEPS BEHIND IT'] : []).concat(count() >= 3 ? ['YOUR DOORS ARE BURNING NICELY'] : [])
-     .concat(count() >= NL && !P.core ? ['THE GREAT DOOR IS HUMMING. GO ON'] : []),
+      'THEY SENT ME UP. I DON\'T GO DOWN ANYMORE.', 'EVERY DOOR IN THIS TOWN GOES FURTHER DOWN.', 'THE MOUNTAIN WAS HERE BEFORE THE TOWN. SO WAS THE DOOR.',
+      'IF THE TREES BLINK, STAND STILL.', 'NOBODY LIGHTS THE LAMPS. NOBODY WANTS TO BE SEEN.',
+    ].concat(P.beaten[1] && !P.comp ? ['THE MYCELIUM HAS A FALSE WALL. SOMETHING SLEEPS BEHIND IT.', 'THE MYCELIUM HAS A FALSE WALL. SOMETHING SLEEPS BEHIND IT.'] : []).concat(count() >= 3 ? ['YOUR DOORS ARE BURNING NICELY.'] : [])
+     .concat(count() >= NL && !P.core ? ['THE GREAT DOOR IS HUMMING. GO ON.'] : []),
     // the silent one speaks only once the Guardian is gone, and always in this order
-    monk: () => P.core ? (P.archSeen ? [] : ['GO BACK THROUGH THE DOOR. IT KEPT SOMETHING FOR YOU']).concat(['YOU BROKE THE GUARDIAN', 'IT WAS NOT KEEPING YOU OUT', 'IT WAS KEEPING SOMETHING IN', 'GO BACK DOWN IF YOU LIKE. IT IS LISTENING NOW', 'WHERE IT HUNG THERE IS AN ARCHIVE NOW. AND A WAY DOWN']) : ['...'],
+    monk: () => P.core ? (P.archSeen ? [] : ['GO BACK THROUGH THE DOOR. IT KEPT SOMETHING FOR YOU.']).concat(['YOU BROKE THE GUARDIAN.', 'IT WAS NOT KEEPING YOU OUT.', 'IT WAS KEEPING SOMETHING IN.', 'GO BACK DOWN IF YOU LIKE. IT IS LISTENING NOW.', 'WHERE IT HUNG THERE IS AN ARCHIVE NOW. AND A WAY DOWN.']) : ['...'],
   };
   /* the residents notice what you did. Each keeps a memory of what it has already remarked on; when there is something
      new, that is the first thing it says when you walk up, once, and then it goes back to its usual lines */
   function noteEvent(e) { P.evSeq = (P.evSeq || 0) + 1; P.ev = Object.assign({ seq: P.evSeq }, e); saveProgress(); }
   function heard(id, key) { return !!(P.heard && P.heard[id] && P.heard[id].includes(key)); }
   function hear(id, key) { P.heard = P.heard || {}; (P.heard[id] = P.heard[id] || []).push(key); if (P.heard[id].length > 60) P.heard[id].shift(); saveProgress(); }
-  const SMELL = { 1: 'SPORES. IN THE HEM. DISGUSTING', 2: 'YOU ARE GLITTERING. IT IS GLASS. IT IS IN EVERYTHING', 4: 'YOU SMELL OF ASH. STAY AWAY FROM MY CLOTH', 5: 'WHY ARE YOU DAMP. DO NOT ANSWER THAT' };
+  const SMELL = { 1: 'SPORES. IN THE HEM. DISGUSTING.', 2: 'YOU ARE GLITTERING. IT IS GLASS. IT IS IN EVERYTHING.', 4: 'YOU SMELL OF ASH. STAY AWAY FROM MY CLOTH.', 5: 'WHY ARE YOU DAMP. DO NOT ANSWER THAT.' };
   function reactive(id) {
     const e = P.ev, ek = e ? 'ev:' + e.seq : '', pick = (key, text) => heard(id, key) ? null : { key, text };
     const opts = [];
     if (id === 'collector') {
-      if (e && e.kind === 'deep' && e.spool) opts.push(pick(ek, 'YOU BROUGHT BACK THREAD. THE WEAVER WILL PRETEND HE ISN\'T PLEASED'));
-      for (const m of [30, 20, 10]) if (P.codex.length >= m) { opts.push(pick('arch' + m, P.codex.length + ' IN YOUR ARCHIVE NOW. I HAD MORE ONCE. I KEEP FEWER NOW')); break; }
+      if (e && e.kind === 'deep' && e.spool) opts.push(pick(ek, 'YOU BROUGHT BACK THREAD. THE WEAVER WILL PRETEND HE ISN\'T PLEASED.'));
+      for (const m of [30, 20, 10]) if (P.codex.length >= m) { opts.push(pick('arch' + m, P.codex.length + ' IN YOUR ARCHIVE NOW. I HAD MORE ONCE. I KEEP FEWER NOW.')); break; }
       if (P.comp && P.seekerId >= 1) {
         const g = gradeOf(P.seekerId);
-        if (g === 'S') opts.push(pick('tierS:' + P.seekerId, 'THAT ONE YOU CARRY. S TIER. KEEP IT CLOSE'));
-        else if (P.core && (g === 'C' || g === 'D')) opts.push(pick('tierLow:' + P.seekerId, 'THAT LITTLE ONE WILL NOT SAVE YOU. THE ARCHIVE HAS BETTER'));
+        if (g === 'S') opts.push(pick('tierS:' + P.seekerId, 'THAT ONE YOU CARRY. S TIER. KEEP IT CLOSE.'));
+        else if (P.core && (g === 'C' || g === 'D')) opts.push(pick('tierLow:' + P.seekerId, 'THAT LITTLE ONE WILL NOT SAVE YOU. THE ARCHIVE HAS BETTER.'));
       }
     } else if (id === 'exiled' && e) {
-      if (e.kind === 'deep') opts.push(pick(ek, e.won ? 'THE BOTTOM. YOU SAW THE BOTTOM. WHAT WAS THERE' : e.best ? 'DEEPER THAN LAST TIME. IT NOTICED, YOU KNOW' : 'ROOM ' + e.room + '. THAT IS WHERE IT GOT ME TOO'));
-      else if (e.quit) opts.push(pick(ek, 'YOU CAME BACK UP EARLY. SMART. I DID TOO. ONCE'));
-      else if (e.won && e.deaths === 0) opts.push(pick(ek, 'NOT ONCE? THEN YOU WERENT LOOKING CLOSELY'));
-      else if (e.won && e.deaths >= 8) opts.push(pick(ek, e.deaths + ' TIMES THE LIGHT FOUND YOU DOWN THERE. I STOPPED AT THREE'));
+      if (e.kind === 'deep') opts.push(pick(ek, e.won ? 'THE BOTTOM. YOU SAW THE BOTTOM. WHAT WAS THERE.' : e.best ? 'DEEPER THAN LAST TIME. IT NOTICED, YOU KNOW.' : 'ROOM ' + e.room + '. THAT IS WHERE IT GOT ME TOO.'));
+      else if (e.quit) opts.push(pick(ek, 'YOU CAME BACK UP EARLY. SMART. I DID TOO. ONCE.'));
+      else if (e.won && e.deaths === 0) opts.push(pick(ek, 'NOT ONCE? THEN YOU WERENT LOOKING CLOSELY.'));
+      else if (e.won && e.deaths >= 8) opts.push(pick(ek, e.deaths + ' TIMES THE LIGHT FOUND YOU DOWN THERE. I STOPPED AT THREE.'));
     } else if (id === 'weaver') {
       if (e && e.kind === 'level' && SMELL[e.lv]) opts.push(pick(ek, SMELL[e.lv]));
       if (P.core && !coatWaiting()) {
         const open = coatsOpen(), newest = open[open.length - 1];
-        if (open.length > 1 && newest.id !== P.coat) opts.push(pick('still:' + newest.id, 'STILL IN THAT? I MADE YOU SOMETHING BETTER'));
-        if (COATS.findIndex(c => c.id === P.coat) >= COATS.length - 3) opts.push(pick('suits:' + P.coat, 'HM. IT SUITS YOU. DON\'T TELL ANYONE I SAID THAT'));
+        if (open.length > 1 && newest.id !== P.coat) opts.push(pick('still:' + newest.id, 'STILL IN THAT? I MADE YOU SOMETHING BETTER.'));
+        if (COATS.findIndex(c => c.id === P.coat) >= COATS.length - 3) opts.push(pick('suits:' + P.coat, 'HM. IT SUITS YOU. DON\'T TELL ANYONE I SAID THAT.'));
       }
     } else if (id === 'monk' && P.core) {
-      for (const [key, ok, text] of [['mw1', P.deepWins >= 1, 'YOU CAME BACK FROM THE BOTTOM. FEW DO'],
-        ['mw10', P.deepWins >= 10, 'TEN TIMES TO THE BOTTOM. IT KNOWS YOUR STEP NOW'], ['mw35', P.deepWins >= 35, 'THERE IS NOTHING LEFT DOWN THERE IT HAS NOT SHOWN YOU. OR SO IT LETS YOU THINK']])
+      for (const [key, ok, text] of [['mw1', P.deepWins >= 1, 'YOU CAME BACK FROM THE BOTTOM. FEW DO.'],
+        ['mw10', P.deepWins >= 10, 'TEN TIMES TO THE BOTTOM. IT KNOWS YOUR STEP NOW.'], ['mw35', P.deepWins >= 35, 'THERE IS NOTHING LEFT DOWN THERE IT HAS NOT SHOWN YOU. OR SO IT LETS YOU THINK.']])
         if (ok && !heard(id, key)) { opts.push({ key, text }); break; }
     }
     return opts.find(o => o) || null;
