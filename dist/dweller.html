@@ -1159,7 +1159,7 @@ body.ninth #tbN{display:flex}
   const CH = 32;       // chunk size in tiles
   const chunks = new Map();
   function chunkCanvas(w, cx, cy, ahead) {
-    const key = cx + ',' + cy;
+    const key = cy * 65536 + cx;   // (a number, not text: no new string for every look-up, every frame)
     let c = chunks.get(key);
     if (c) { if (c._paint && !ahead) { paintRows(c._paint, 1e9); c._paint = null; } return c; }
     c = document.createElement('canvas'); c.width = CH * TS; c.height = CH * TS;
@@ -1605,31 +1605,162 @@ body.ninth #tbN{display:flex}
     lw = W; lh = H;
     lc = document.createElement('canvas'); lc.width = W; lc.height = H;
     lctx = lc.getContext('2d', { willReadFrequently: true });
+    trackLit(lctx, W, H);
     ocv = document.createElement('canvas'); ocv.width = W; ocv.height = H;
     octx = ocv.getContext('2d');
     oimg = octx.createImageData(W, H); o32 = new Uint32Array(oimg.data.buffer);
     tcv = document.createElement('canvas'); tcv.width = W; tcv.height = H; tctx = tcv.getContext('2d');
     LM.cv = null;
   }
+  /* which bands of the light buffer were drawn into this frame. The buffer starts black and light only adds to it, so
+     outside what was drawn it is exactly black; reading back just the drawn spans gives the same numbers as reading the
+     whole of it, with a fraction of the memory made (reading the whole buffer every frame made Chrome stop for a full
+     clean-up of memory several times a second, which showed as a hitch). Anything drawn some other way marks it all */
+  const LB = 8, LK = 4, LKS = LK + 1, LGAP = 6, LIT = { W: 0, H: 0, nb: 0, all: false, sc: null, sx0: null, sx1: null, sy0: null, sbw: null, rd: [], px0: null, px1: null, pt: null, pn: 0, has: false };
+  const LPT = new Float64Array(4);   // the path's pen and where its subpath began: x, y, start x, start y (kept unboxed)
+  function litReset() { LIT.all = false; LIT.sc.fill(0); for (let i = 0; i < LIT.pn; i++) { const k = LIT.pt[i]; LIT.px0[k] = 1e9; LIT.px1[k] = -1e9; } LIT.pn = 0; LIT.has = false; }
+  // a span [a, z) of band b is lit: kept sorted, merged with any it touches or nearly touches, at most LK to a band
+  function litSpan(b, a, z) {
+    a = Math.max(0, Math.floor(a)); z = Math.min(LIT.W, Math.ceil(z)); if (!(a < z)) return;
+    const S0 = LIT.sx0, S1 = LIT.sx1, o = b * LKS; let n = LIT.sc[b], i = 0;
+    while (i < n && S0[o + i] < a) i++;
+    for (let j = n; j > i; j--) { S0[o + j] = S0[o + j - 1]; S1[o + j] = S1[o + j - 1]; }
+    S0[o + i] = a; S1[o + i] = z; n++;
+    // merge what overlaps or nearly touches
+    let w = 0; for (let r = 1; r < n; r++) { if (S0[o + r] <= S1[o + w] + LGAP) { if (S1[o + r] > S1[o + w]) S1[o + w] = S1[o + r]; } else { w++; S0[o + w] = S0[o + r]; S1[o + w] = S1[o + r]; } }
+    n = w + 1;
+    // too many: join the two with the smallest gap between them
+    while (n > LK) { let g = 1e9, k = 0; for (let r = 0; r < n - 1; r++) { const d = S0[o + r + 1] - S1[o + r]; if (d < g) { g = d; k = r; } } if (S1[o + k + 1] > S1[o + k]) S1[o + k] = S1[o + k + 1]; for (let r = k + 1; r < n - 1; r++) { S0[o + r] = S0[o + r + 1]; S1[o + r] = S1[o + r + 1]; } n--; }
+    LIT.sc[b] = n;
+  }
+  function litBad(v) { return !(v > -1e7 && v < 1e7); }   // (NaN or a coordinate far off: read it all)
+  // the path being drawn: how far it reaches, band by band
+  function litTouch(b, a, z) { if (b < 0 || b >= LIT.nb) return; if (LIT.px0[b] === 1e9) LIT.pt[LIT.pn++] = b; if (a < LIT.px0[b]) LIT.px0[b] = a; if (z > LIT.px1[b]) LIT.px1[b] = z; }
+  function litEdge(x0, y0, x1, y1) {
+    if (litBad(x0) || litBad(y0) || litBad(x1) || litBad(y1)) { LIT.all = true; return; }
+    const ylo = Math.min(y0, y1) - 2, yhi = Math.max(y0, y1) + 2;
+    for (let b = Math.max(0, Math.floor(ylo / LB)), e = Math.min(LIT.nb - 1, Math.floor(yhi / LB)); b <= e; b++) {
+      const t0 = b * LB - 2, t1 = b * LB + LB + 2;   // (the band, and a little either side of it)
+      let a, z;
+      if (y0 === y1) { a = Math.min(x0, x1); z = Math.max(x0, x1); }
+      else { const u0 = Math.max(0, Math.min(1, (t0 - y0) / (y1 - y0))), u1 = Math.max(0, Math.min(1, (t1 - y0) / (y1 - y0))), xa = x0 + (x1 - x0) * u0, xb = x0 + (x1 - x0) * u1; a = Math.min(xa, xb); z = Math.max(xa, xb); }
+      litTouch(b, a - 2, z + 2);
+    }
+  }
+  function litDisc(cx, cy, r) {
+    if (litBad(cx) || litBad(cy) || litBad(r)) { LIT.all = true; return; }
+    for (let b = Math.max(0, Math.floor((cy - r - 2) / LB)), e = Math.min(LIT.nb - 1, Math.floor((cy + r + 2) / LB)); b <= e; b++) {
+      const t0 = b * LB - 2, t1 = b * LB + LB + 2, dy = cy < t0 ? t0 - cy : cy > t1 ? cy - t1 : 0;
+      if (dy >= r + 2) continue;
+      const hw = dy < r ? Math.sqrt(r * r - dy * dy) : 0;
+      litTouch(b, cx - hw - 2, cx + hw + 2);
+    }
+  }
+  function litFillPath() { for (let i = 0; i < LIT.pn; i++) { const b = LIT.pt[i]; litSpan(b, LIT.px0[b], LIT.px1[b]); } }
+  function trackLit(c, W, H) {
+    const nb = Math.ceil(H / LB);
+    LIT.W = W; LIT.H = H; LIT.nb = nb; LIT.sc = new Int32Array(nb); LIT.sx0 = new Float64Array(nb * LKS); LIT.sx1 = new Float64Array(nb * LKS);
+    LIT.sy0 = new Int32Array(nb * LKS); LIT.sbw = new Int32Array(nb * LKS); LIT.rd = new Array(nb * LKS).fill(null);
+    LIT.px0 = new Float64Array(nb).fill(1e9); LIT.px1 = new Float64Array(nb).fill(-1e9); LIT.pt = new Int32Array(nb); LIT.pn = 0;
+    const P = CanvasRenderingContext2D.prototype;
+    const beginPath = P.beginPath, moveTo = P.moveTo, lineTo = P.lineTo, arc = P.arc, closePath = P.closePath, fill = P.fill, fillRect = P.fillRect;
+    const reset = () => { for (let i = 0; i < LIT.pn; i++) { const b = LIT.pt[i]; LIT.px0[b] = 1e9; LIT.px1[b] = -1e9; } LIT.pn = 0; LIT.has = false; };
+    const closeSub = () => { if (LIT.has && (LPT[0] !== LPT[2] || LPT[1] !== LPT[3])) litEdge(LPT[0], LPT[1], LPT[2], LPT[3]); };
+    c.beginPath = function () { reset(); return beginPath.call(this); };
+    c.moveTo = function (x, y) { closeSub(); LPT[0] = LPT[2] = x; LPT[1] = LPT[3] = y; LIT.has = true; return moveTo.call(this, x, y); };
+    c.lineTo = function (x, y) { if (LIT.has) litEdge(LPT[0], LPT[1], x, y); else { LPT[2] = x; LPT[3] = y; LIT.has = true; } LPT[0] = x; LPT[1] = y; return lineTo.call(this, x, y); };
+    c.arc = function (x, y, r, a0, a1, ccw) {
+      litDisc(x, y, r);
+      const bx = x + r * Math.cos(a0), by = y + r * Math.sin(a0);
+      if (LIT.has) litEdge(LPT[0], LPT[1], bx, by); else { LPT[2] = bx; LPT[3] = by; LIT.has = true; }
+      LPT[0] = x + r * Math.cos(a1); LPT[1] = y + r * Math.sin(a1);
+      return arc.call(this, x, y, r, a0, a1, ccw);
+    };
+    c.closePath = function () { closeSub(); LPT[0] = LPT[2]; LPT[1] = LPT[3]; return closePath.call(this); };
+    c.fill = function () { if (arguments.length && typeof arguments[0] !== 'string') LIT.all = true; else { closeSub(); litFillPath(); } return fill.apply(this, arguments); };
+    c.fillRect = function (x, y, w, h) {
+      const x0 = Math.min(x, x + w), x1 = Math.max(x, x + w), y0 = Math.min(y, y + h), y1 = Math.max(y, y + h);
+      if (litBad(x0) || litBad(x1) || litBad(y0) || litBad(y1)) LIT.all = true;
+      else for (let b = Math.max(0, Math.floor((y0 - 2) / LB)), e = Math.min(LIT.nb - 1, Math.floor((y1 + 2) / LB)); b <= e; b++) litSpan(b, x0 - 2, x1 + 2);
+      return fillRect.call(this, x, y, w, h);
+    };
+    // anything else that paints, or moves where painting lands: the whole buffer is read that frame
+    for (const k of ['stroke', 'strokeRect', 'drawImage', 'putImageData', 'fillText', 'strokeText', 'rect', 'roundRect', 'ellipse', 'arcTo', 'quadraticCurveTo', 'bezierCurveTo', 'translate', 'scale', 'rotate', 'transform', 'setTransform', 'resetTransform', 'clip']) {
+      const f = P[k]; if (typeof f !== 'function') continue;
+      c[k] = function () { LIT.all = true; return f.apply(this, arguments); };
+    }
+  }
+  // read the lit spans; span k of band b is [sx0, sx1), its pixels rd[b*LKS+k], a row y of it at ((y - sy0) * sbw + x - sx0) * 4
+  function litRead(c) {
+    const W = LIT.W, H = LIT.H, nb = LIT.nb, R = LIT.rd;
+    if (LIT.all) { const d = c.getImageData(0, 0, W, H).data; for (let b = 0; b < nb; b++) { const o = b * LKS; LIT.sc[b] = 1; LIT.sx0[o] = 0; LIT.sx1[o] = W; LIT.sy0[o] = 0; LIT.sbw[o] = W; R[o] = d; } return; }
+    for (let b = 0; b < nb; b++) for (let k = 0, n = LIT.sc[b]; k < n; k++) {
+      const o = b * LKS + k, x0 = LIT.sx0[o], bw = LIT.sx1[o] - x0;
+      R[o] = c.getImageData(x0, b * LB, bw, Math.min(LB, H - b * LB)).data; LIT.sy0[o] = b * LB; LIT.sbw[o] = bw;
+    }
+  }
+  function lightCheck(W, H, cx0, cy0, sep, amb, darkBGR, w, lm) {
+    const C = window.__lpCheck, d = lctx.getImageData(0, 0, W, H).data; let o = 0, bad = 0;
+    for (let y = 0; y < H; y++) {
+      const by = (y & 3) * 4, ty = Math.floor((cy0 + y) / 6);
+      for (let x = 0; x < W; x++, o++) {
+        const i = o * 4;
+        let L = d[i]; if (d[i + 1] > L) L = d[i + 1]; if (d[i + 2] > L) L = d[i + 2];
+        let q = Math.floor(L / 255 * STEPS + (BAYER[by + (x & 3)] + 0.5) / 16) / STEPS;
+        if (q > 1) q = 1;
+        const am = sep && D.solidAt(w, Math.floor((cx0 + x) / 6), ty) ? AMBIENT : amb;
+        const a = 1 - (am + (1 - am) * q);
+        if (o32[o] !== ((((a * 250) << 24) | darkBGR) >>> 0)) bad++;
+        if (lm && lm[o] !== (((q > 0.66 ? 255 : (q * 386) | 0) << 24) >>> 0)) bad++;
+      }
+    }
+    let rd = 0, calls = 0; for (let b = 0; b < LIT.nb; b++) for (let k = 0; k < LIT.sc[b]; k++) { rd += (LIT.sx1[b * LKS + k] - LIT.sx0[b * LKS + k]) * Math.min(LB, H - b * LB); calls++; }
+    C.calls = (C.calls || 0) + calls;
+    C.n = (C.n || 0) + 1; C.bad = (C.bad || 0) + bad; C.read = (C.read || 0) + rd / (W * H); if (LIT.all) C.all = (C.all || 0) + 1;
+  }
   /* where the light is, as a mask: the Foundry's far gears fade out of it, so they are seen in the gloom between the
      lamps and never as shapes cut across the light in front of them */
   const LM = { cv: null, cx: null, img: null, d: null, on: false };
   let tcv = null, tctx = null;
 
-  function visPoly(w, ox, oy, r, a0, a1, n) {
-    const pts = [];
+  /* x.toFixed(3) in a colour, kept: pre + x.toFixed(3) + ')' is the same text every time for the same thousandth, so the
+     strings are made once and kept, rather than new ones every frame for the collector. Only a value well clear of a
+     half-thousandth uses what is kept (there toFixed's rounding and this one's agree exactly); anything else, and
+     anything outside 0..4, is made as it always was */
+  const A3C = new Map(), RGBAP = new Map();
+  function a3(pre, x) {
+    const p = x * 1000;
+    if (p >= 0 && p <= 4000) {
+      const fl = Math.floor(p), fr = p - fl;
+      if (fr < 0.4999 || fr > 0.5001) {
+        const n = fr < 0.5 ? fl : fl + 1;
+        let c = A3C.get(pre); if (c === undefined) { if (A3C.size >= 256) return pre + x.toFixed(3) + ')'; c = new Array(4002); A3C.set(pre, c); }
+        let t = c[n]; if (t === undefined) t = c[n] = pre + x.toFixed(3) + ')';
+        return t;
+      }
+    }
+    return pre + x.toFixed(3) + ')';
+  }
+  function rgbaP(rgb) {   // ('rgba(' + rgb + ',', kept for a colour given as text; anything else is made fresh, as before)
+    if (typeof rgb !== 'string') return 'rgba(' + rgb + ',';
+    let t = RGBAP.get(rgb); if (t === undefined) { t = 'rgba(' + rgb + ','; if (RGBAP.size < 256) RGBAP.set(rgb, t); } return t;
+  }
+
+  // (given an array of the right length, it is filled in place rather than a new one made, every frame)
+  function visPoly(w, ox, oy, r, a0, a1, n, out) {
+    const pts = out && out.length === (n + 1) * 2 ? out : new Array((n + 1) * 2);
     const step = (a1 - a0) / n;
     for (let i = 0; i <= n; i++) {
       const a = a0 + step * i, dx = Math.cos(a), dy = Math.sin(a);
       const d = D.castRay(w, ox, oy, dx, dy, r);
-      pts.push(ox + dx * (d + 0.6), oy + dy * (d + 0.6));
+      pts[i * 2] = ox + dx * (d + 0.6); pts[i * 2 + 1] = oy + dy * (d + 0.6);
     }
     return pts;
   }
 
   function radialGrad(ctx, x, y, r, alpha) {
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    for (let i = 0; i < STOPS.length; i++) g.addColorStop(STOPS[i][0], 'rgba(255,255,255,' + (STOPS[i][1] * alpha).toFixed(3) + ')');
+    for (let i = 0; i < STOPS.length; i++) g.addColorStop(STOPS[i][0], a3('rgba(255,255,255,', STOPS[i][1] * alpha));
     return g;
   }
 
@@ -1640,6 +1771,7 @@ body.ninth #tbN{display:flex}
     ctx.closePath(); ctx.fill();
   }
 
+  const BEAM_SHRINK = [1, 0.84, 0.62], BEAM_AL = [0.34, 0.33, 0.33], WATCH_LAYERS = [[1.0, 0.30], [0.82, 0.34], [0.62, 0.36]];
   function drawHazardLight(ctx, w, l, camX, camY, W, H) {
     const rr = l.reach;
     if (l.x + rr < camX || l.x - rr > camX + W || l.y + rr < camY || l.y - rr > camY + H) return;
@@ -1649,31 +1781,34 @@ body.ninth #tbN{display:flex}
       // per-column rays along the beam direction, drawn as a soft rectangle
       const cols = Math.max(4, Math.ceil(l.w / 1.5));
       const hw = l.w / 2;
-      const pts = [];
-      const far = [];
+      // (the arrays are the beam's own, kept and refilled: the same numbers, without new ones every frame)
+      const B = l._bm && l._bm.cols === cols ? l._bm : (l._bm = { cols, pts: new Array((cols + 1) * 2), far: new Array((cols + 1) * 2), poly: [null, null, null] });
+      const pts = B.pts, far = B.far;
       for (let i = 0; i <= cols; i++) {
         const v = -hw + (i / cols) * l.w;
         const sx = l.x + l.nx * v, sy = l.y + l.ny * v;
         const d = D.castRay(w, sx, sy, l.dx, l.dy, l.len);
-        pts.push(sx, sy); far.push(sx + l.dx * (d + 0.5), sy + l.dy * (d + 0.5));
+        pts[i * 2] = sx; pts[i * 2 + 1] = sy; far[i * 2] = sx + l.dx * (d + 0.5); far[i * 2 + 1] = sy + l.dy * (d + 0.5);
       }
       for (let layer = 0; layer < 3; layer++) {
-        const shrink = [1, 0.84, 0.62][layer], al = [0.34, 0.33, 0.33][layer] * a;
-        const poly = [];
-        const lo = Math.round((1 - shrink) / 2 * cols), hi = cols - lo;
-        for (let i = lo; i <= hi; i++) poly.push(pts[i * 2], pts[i * 2 + 1]);
-        for (let i = hi; i >= lo; i--) poly.push(far[i * 2], far[i * 2 + 1]);
+        const shrink = BEAM_SHRINK[layer], al = BEAM_AL[layer] * a;
+        const lo = Math.round((1 - shrink) / 2 * cols), hi = cols - lo, pn = (hi - lo + 1) * 4;
+        const poly = B.poly[layer] && B.poly[layer].length === pn ? B.poly[layer] : (B.poly[layer] = new Array(pn));
+        let q = 0;
+        for (let i = lo; i <= hi; i++) { poly[q++] = pts[i * 2]; poly[q++] = pts[i * 2 + 1]; }
+        for (let i = hi; i >= lo; i--) { poly[q++] = far[i * 2]; poly[q++] = far[i * 2 + 1]; }
         const g = ctx.createLinearGradient(l.x - camX, l.y - camY, l.x + l.dx * l.len - camX, l.y + l.dy * l.len - camY);
-        g.addColorStop(0, 'rgba(255,255,255,' + al.toFixed(3) + ')'); g.addColorStop(1, 'rgba(255,255,255,' + (al * 0.55).toFixed(3) + ')');
+        g.addColorStop(0, a3('rgba(255,255,255,', al)); g.addColorStop(1, a3('rgba(255,255,255,', al * 0.55));
         ctx.fillStyle = g; fillPoly(ctx, poly, camX, camY, false);
       }
       return;
     }
     if (l.t === 'watch') {
       const n = Math.max(24, Math.round(l.half * 2 * l.r / 5));
-      const layers = [[1.0, 0.30], [0.82, 0.34], [0.62, 0.36]];
-      for (const [f, al] of layers) {
-        const pts = visPoly(w, l.x, l.y, l.r, l.ang - l.half * f, l.ang + l.half * f, n);
+      const V = l._wv || (l._wv = [null, null, null]);
+      for (let k = 0; k < 3; k++) {
+        const f = WATCH_LAYERS[k][0], al = WATCH_LAYERS[k][1];
+        const pts = V[k] = visPoly(w, l.x, l.y, l.r, l.ang - l.half * f, l.ang + l.half * f, n, V[k]);
         ctx.fillStyle = radialGrad(ctx, l.x - camX, l.y - camY, l.r, al * a);
         fillPoly(ctx, pts, camX, camY, true, l.x, l.y);
       }
@@ -1682,17 +1817,18 @@ body.ninth #tbN{display:flex}
     if (l.t === 'flood') {
       const fy = Math.round(l.fy - camY);
       if (fy <= 0) return;
-      ctx.fillStyle = 'rgba(255,255,255,' + (0.95 * a).toFixed(3) + ')'; ctx.fillRect(0, 0, W, Math.min(H, fy));
-      const g = ctx.createLinearGradient(0, fy, 0, fy + 24); g.addColorStop(0, 'rgba(255,255,255,' + (0.9 * a).toFixed(3) + ')'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = a3('rgba(255,255,255,', 0.95 * a); ctx.fillRect(0, 0, W, Math.min(H, fy));
+      const g = ctx.createLinearGradient(0, fy, 0, fy + 24); g.addColorStop(0, a3('rgba(255,255,255,', 0.9 * a)); g.addColorStop(1, 'rgba(255,255,255,0)');
       ctx.fillStyle = g; ctx.fillRect(0, fy, W, 24);
       return;
     }
     if (l.boss) l._poly = null;
-    // lamp / orb
+    // lamp / orb (one that moves, or the Guardian's, is cast again every frame, into the same array)
     let pts = l._poly;
     if (!pts || l.move) {
       const n = Math.max(40, Math.min(220, Math.round(l.r * 2.4)));
-      pts = visPoly(w, l.x, l.y, l.r, 0, Math.PI * 2, n);
+      if (l.move || l.boss) pts = l._vbuf = visPoly(w, l.x, l.y, l.r, 0, Math.PI * 2, n, l._vbuf);
+      else pts = visPoly(w, l.x, l.y, l.r, 0, Math.PI * 2, n);
       if (!l.move) l._poly = pts;
     }
     ctx.fillStyle = radialGrad(ctx, l.x - camX, l.y - camY, l.r, a);
@@ -1712,6 +1848,7 @@ body.ninth #tbN{display:flex}
     ensureLight(W, H);
     lctx.globalCompositeOperation = 'source-over'; lctx.fillStyle = '#000'; lctx.fillRect(0, 0, W, H);
     lctx.globalCompositeOperation = 'lighter';
+    litReset();
     const lights = w.lights;
     for (let i = 0; i < lights.length; i++) {
       const l = lights[i];
@@ -1746,8 +1883,8 @@ body.ninth #tbN{display:flex}
     if (Gm.lift) Gm.lift(lctx, camX, camY, softDisc);   // a room that lights itself (the Codex)
     // quantize
     const darkBGR = (TH.dark[2] << 16) | (TH.dark[1] << 8) | TH.dark[0], amb = TH.amb || AMBIENT;   // (the darkest worlds keep a little more of the cave)
-    const id = lctx.getImageData(0, 0, W, H); const d = id.data;
-    const dark = (0xFF << 24) | (16 << 16) | (8 << 8) | 5;      // ABGR: r=5 g=8 b=16
+    litRead(lctx);
+    const LSC = LIT.sc, LS0 = LIT.sx0, LS1 = LIT.sx1, LSY = LIT.sy0, LSW = LIT.sbw, LRD = LIT.rd;
     // the darkest worlds (amb) keep more of the open cave than of the rock, so the rock stands out against it
     const sep = amb !== AMBIENT, cx0 = Math.round(camX), cy0 = Math.round(camY);
     LM.on = TH.style === 'foundry' && !Gm.back;
@@ -1755,10 +1892,14 @@ body.ninth #tbN{display:flex}
     const lm = LM.on ? LM.d : null;
     let o = 0;
     for (let y = 0; y < H; y++) {
-      const by = (y & 3) * 4, ty = Math.floor((cy0 + y) / 6);
+      const by = (y & 3) * 4, ty = Math.floor((cy0 + y) / 6), b = (y / LB) | 0, sn = b * LKS + LSC[b];
+      // the lit spans of this row, one after another (black between them, where nothing was drawn)
+      let sk = b * LKS, rx0 = W, rx1 = W, d = null, ro = 0;
+      if (sk < sn) { rx0 = LS0[sk]; rx1 = LS1[sk]; d = LRD[sk]; ro = ((y - LSY[sk]) * LSW[sk] - rx0) * 4; }
       for (let x = 0; x < W; x++, o++) {
-        const i = o * 4;
-        let L = d[i]; if (d[i + 1] > L) L = d[i + 1]; if (d[i + 2] > L) L = d[i + 2];
+        if (x >= rx1) { sk++; if (sk < sn) { rx0 = LS0[sk]; rx1 = LS1[sk]; d = LRD[sk]; ro = ((y - LSY[sk]) * LSW[sk] - rx0) * 4; } else { rx0 = rx1 = W; } }
+        let L = 0;
+        if (x >= rx0) { const i = ro + x * 4; L = d[i]; if (d[i + 1] > L) L = d[i + 1]; if (d[i + 2] > L) L = d[i + 2]; }
         let q = Math.floor(L / 255 * STEPS + (BAYER[by + (x & 3)] + 0.5) / 16) / STEPS;
         if (q > 1) q = 1;
         const am = sep && D.solidAt(w, Math.floor((cx0 + x) / 6), ty) ? AMBIENT : amb;
@@ -1767,6 +1908,7 @@ body.ninth #tbN{display:flex}
         if (lm) lm[o] = (q > 0.66 ? 255 : (q * 386) | 0) << 24;
       }
     }
+    if (window.__lpCheck) lightCheck(W, H, cx0, cy0, sep, amb, darkBGR, w, lm);   // (tests only: the old whole read, compared)
     octx.putImageData(oimg, 0, 0);
     if (lm) LM.cx.putImageData(LM.img, 0, 0);
     ctx.drawImage(ocv, 0, 0);
@@ -1873,17 +2015,17 @@ body.ninth #tbN{display:flex}
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     // light spilling out onto the floor and up the rock around it
     const sp = ctx.createRadialGradient(cx, fy - 8, 0, cx, fy - 8, 46);
-    sp.addColorStop(0, 'rgba(' + rgb + ',' + (0.22 * k).toFixed(3) + ')'); sp.addColorStop(1, 'rgba(' + rgb + ',0)');
+    sp.addColorStop(0, a3(rgbaP(rgb), 0.22 * k)); sp.addColorStop(1, 'rgba(' + rgb + ',0)');
     ctx.fillStyle = sp; ctx.fillRect(cx - 46, fy - 54, 92, 60);
     // the glowing surface inside the arch: brightest low down, slow bands rising through it
     for (let y = 0; y < ih; y++) {
       const u = y / ih, arch = y < 4 ? [3, 1, 1, 0][y] : 0, band = 0.5 + 0.5 * Math.sin(y * 0.9 - time * 3);
-      ctx.fillStyle = 'rgba(' + rgb + ',' + ((0.28 + 0.4 * u + 0.12 * band) * k).toFixed(3) + ')';
+      ctx.fillStyle = a3(rgbaP(rgb), (0.28 + 0.4 * u + 0.12 * band) * k);
       ctx.fillRect(x0 + arch, top + y, iw - 2 * arch, 1);
     }
-    ctx.fillStyle = 'rgba(255,255,255,' + (0.25 * k).toFixed(3) + ')'; ctx.fillRect(cx - 1, top + 5, 2, ih - 6);
+    ctx.fillStyle = a3('rgba(255,255,255,', 0.25 * k); ctx.fillRect(cx - 1, top + 5, 2, ih - 6);
     // motes drifting up out of it
-    for (let i = 0; i < 8; i++) { const u = (time * 0.3 + i / 8) % 1; ctx.fillStyle = 'rgba(' + rgb + ',' + (0.8 * (1 - u)).toFixed(3) + ')'; ctx.fillRect(x0 + 1 + ((i * 5) % (iw - 2)), Math.round(fy - 2 - u * 34), 1, 1); }
+    for (let i = 0; i < 8; i++) { const u = (time * 0.3 + i / 8) % 1; ctx.fillStyle = a3(rgbaP(rgb), 0.8 * (1 - u)); ctx.fillRect(x0 + 1 + ((i * 5) % (iw - 2)), Math.round(fy - 2 - u * 34), 1, 1); }
     ctx.restore();
     // the frame: two dark pillars and an arch of fitted stone, runes on it lit in the same colour
     const st0 = '#1c1f28', st1 = '#2c303c', st2 = '#3d4252';
@@ -1893,7 +2035,7 @@ body.ninth #tbN{display:flex}
     ctx.fillStyle = st1; ctx.fillRect(x0 - 2, top - 1, iw + 4, 2); ctx.fillRect(x0 + 1, top - 2, iw - 2, 1); ctx.fillRect(x0 - 3, top + 1, 2, 1); ctx.fillRect(x0 + iw + 1, top + 1, 2, 1);
     ctx.fillStyle = st2; ctx.fillRect(x0 + 1, top - 2, iw - 2, 1);
     ctx.fillStyle = st0; ctx.fillRect(x0 - 4, fy - 2, 5, 2); ctx.fillRect(x0 + iw - 1, fy - 2, 5, 2);        // the feet
-    ctx.fillStyle = 'rgba(' + rgb + ',' + (0.75 * k).toFixed(3) + ')';
+    ctx.fillStyle = a3(rgbaP(rgb), 0.75 * k);
     ctx.fillRect(cx - 1, top - 2, 2, 1);                                                                   // the keystone
     for (let i = 0; i < 4; i++) { if ((Math.floor(time * 1.5) + i) % 4 === 0) continue; ctx.fillRect(x0 - 2, top + 5 + i * 4, 1, 2); ctx.fillRect(x0 + iw + 1, top + 7 + i * 4, 1, 2); }
   }
@@ -1916,7 +2058,7 @@ body.ninth #tbN{display:flex}
     const light = 'rgb(' + c.light + ')';
     if (t > 0.2) {
       ctx.save(); ctx.globalCompositeOperation = 'lighter';
-      const g = ctx.createRadialGradient(cx, top - 2, 0, cx, top - 2, 28); g.addColorStop(0, 'rgba(' + c.light + ',' + (0.42 * Math.min(1, t)).toFixed(3) + ')'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      const g = ctx.createRadialGradient(cx, top - 2, 0, cx, top - 2, 28); g.addColorStop(0, a3(rgbaP(c.light), 0.42 * Math.min(1, t))); g.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = g; ctx.fillRect(cx - 28, top - 30, 56, 42); ctx.restore();
     }
     if (t >= 0.66) {
@@ -2105,7 +2247,7 @@ body.ninth #tbN{display:flex}
       if (post) {
         const sx = Math.round(l.x - camX), sy = Math.round(sunk[1] - camY), k = Math.max(0.15, l.k), r = 16 + 8 * k;
         ctx.save(); ctx.globalCompositeOperation = 'lighter';
-        const g = ctx.createRadialGradient(sx, sy + 2, 0, sx, sy + 2, r); g.addColorStop(0, 'rgba(' + TH.glowRGB + ',' + (0.45 * k).toFixed(3) + ')'); g.addColorStop(1, 'rgba(0,0,0,0)');
+        const g = ctx.createRadialGradient(sx, sy + 2, 0, sx, sy + 2, r); g.addColorStop(0, a3(rgbaP(TH.glowRGB), 0.45 * k)); g.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = g; ctx.fillRect(sx - r, sy + 2 - r, r * 2, r * 2);
         ctx.restore();
       }
@@ -2213,7 +2355,7 @@ body.ninth #tbN{display:flex}
     const P = (c, px, py, ww, hh) => { ctx.fillStyle = c; ctx.fillRect(Math.round(px), Math.round(py), ww || 1, hh || 1); };
     const lo = TH.stal[0], hi = TH.stal[1], L0 = TH.lamp[0], L1 = TH.lamp[1], L2 = TH.lamp[2], dk = '#05060a';
     const ca = Math.cos(ang), sa = Math.sin(ang);
-    const burn = (px, py) => { if (hot <= 0) return; ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(px, py, 0, px, py, 14); g.addColorStop(0, 'rgba(255,235,200,' + (0.7 * hot).toFixed(3) + ')'); g.addColorStop(1, 'rgba(255,200,140,0)'); ctx.fillStyle = g; ctx.fillRect(px - 14, py - 14, 28, 28); ctx.globalCompositeOperation = 'source-over'; };
+    const burn = (px, py) => { if (hot <= 0) return; ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(px, py, 0, px, py, 14); g.addColorStop(0, a3('rgba(255,235,200,', 0.7 * hot)); g.addColorStop(1, 'rgba(255,200,140,0)'); ctx.fillStyle = g; ctx.fillRect(px - 14, py - 14, 28, 28); ctx.globalCompositeOperation = 'source-over'; };
     if (style === 'almond') {
       // an eye of flesh set in the rock: an almond between heavy lids, a slit pupil that narrows as it sweeps and opens wide on you
       for (let j = -6; j <= 6; j++) for (let i = -10; i <= 10; i++) { const e = (i * i) / 100 + (j * j) / 36; if (e <= 1) P(e > 0.72 ? lo : eyeMix(lo, dk, 0.4), x + i, y + j); }
@@ -2337,7 +2479,7 @@ body.ninth #tbN{display:flex}
       const pulse = 0.75 + 0.25 * Math.sin(time * 40);
       ctx.globalCompositeOperation = 'lighter';
       const gr = ctx.createRadialGradient(px, py, 0, px, py, 14);
-      gr.addColorStop(0, 'rgba(255,235,200,' + (0.75 * hot * pulse).toFixed(3) + ')'); gr.addColorStop(1, 'rgba(255,200,140,0)');
+      gr.addColorStop(0, a3('rgba(255,235,200,', 0.75 * hot * pulse)); gr.addColorStop(1, 'rgba(255,200,140,0)');
       ctx.fillStyle = gr; ctx.fillRect(px - 14, py - 14, 28, 28);
       ctx.globalCompositeOperation = 'source-over';
       ctx.fillStyle = '#fff'; ctx.fillRect(px - 2, py - 2, 5, 5);
@@ -2397,7 +2539,7 @@ body.ninth #tbN{display:flex}
     if (k > 0.02 && k < 0.5) {
       ctx.save(); ctx.globalCompositeOperation = 'lighter';
       const r = 6 + 10 * k, g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      g.addColorStop(0, 'rgba(' + TH.glowRGB + ',' + (0.5 * k).toFixed(3) + ')'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      g.addColorStop(0, a3(rgbaP(TH.glowRGB), 0.5 * k)); g.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = g; ctx.fillRect(cx - r, cy - r, r * 2, r * 2); ctx.restore();
     }
     ctx.save();
@@ -3145,7 +3287,7 @@ body.ninth #tbN{display:flex}
     const far = pass === 'glow';                         // (the far layer is drawn in the glow pass, masked and faint)
     const px = (c, x, y, ww, hh) => { if (far && LAYER && !open(x + (ww || 1) / 2, y + (hh || 1) / 2)) return; ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), ww || 1, hh || 1); };
     let LAYER = false;
-    const glow = (x, y, r, rgb, a) => { const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, 'rgba(' + rgb + ',' + a.toFixed(3) + ')'); g.addColorStop(1, 'rgba(' + rgb + ',0)'); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); };
+    const glow = (x, y, r, rgb, a) => { const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, a3(rgbaP(rgb), a)); g.addColorStop(1, 'rgba(' + rgb + ',0)'); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); };
     if (kind === 'foundry') {
       if (pass === 'glow') {
         LAYER = true; ctx.globalAlpha = 0.45;
@@ -3197,7 +3339,7 @@ body.ninth #tbN{display:flex}
       if (pass === 'back') {
         // the dark itself beats
         const hb = heartSlow(time);
-        ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(90,24,50,' + (0.06 * hb).toFixed(3) + ')'; ctx.fillRect(0, 0, W, H); ctx.globalCompositeOperation = 'source-over';
+        ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = a3('rgba(90,24,50,', 0.06 * hb); ctx.fillRect(0, 0, W, H); ctx.globalCompositeOperation = 'source-over';
       }
       if (pass === 'glow') {
         LAYER = true; ctx.globalAlpha = 0.3;
@@ -3370,7 +3512,7 @@ body.ninth #tbN{display:flex}
     let made = false;
     for (let r = 1; r <= 2; r++) for (let cy = cy0 - r; cy <= cy1 + r; cy++) for (let cx = cx0 - r; cx <= cx1 + r; cx++) {
       if ((cy > cy0 - r && cy < cy1 + r && cx > cx0 - r && cx < cx1 + r) || cx < 0 || cy < 0 || cx >= nW || cy >= nH) continue;   // (the ring r only)
-      let c = chunks.get(cx + ',' + cy);
+      let c = chunks.get(cy * 65536 + cx);
       if (c && !c._paint) continue;
       if (!c) { if (made) continue; made = true; c = chunkCanvas(w, cx, cy, true); }
       const left = BUDGET - (performance.now() - t0); if (left <= 0) return;
@@ -3721,8 +3863,13 @@ body.ninth #tbN{display:flex}
       }
       // platforms going round (the Orrery): the paths of the rings faint, a hub of crystal, the planks themselves
       if (w.movers && w.movers.length) {
-        const hubs = new Map();
-        for (const m of w.movers) { const k = m.cx + ',' + m.cy; if (!hubs.has(k)) hubs.set(k, { x: m.cx, y: m.cy, rings: new Map() }); hubs.get(k).rings.set(m.rx + ',' + m.ry, m); }
+        // (the hubs and their rings never change in a level: grouped once, not every frame)
+        let hubs = w._hubs;
+        if (!hubs || w._hubsOf !== w.movers) {
+          hubs = new Map();
+          for (const m of w.movers) { const k = m.cx + ',' + m.cy; if (!hubs.has(k)) hubs.set(k, { x: m.cx, y: m.cy, rings: new Map() }); hubs.get(k).rings.set(m.rx + ',' + m.ry, m); }
+          w._hubs = hubs; w._hubsOf = w.movers;
+        }
         for (const H of hubs.values()) {
           if (!vis(H.x - 240, H.y - 140, 480, 280)) continue;
           for (const m of H.rings.values()) for (let i = 0; i < 220; i += 2) { const a = i / 220 * Math.PI * 2; ctx.fillStyle = 'rgba(141,120,200,0.2)'; ctx.fillRect(Math.round(m.cx + Math.cos(a) * m.rx - camX), Math.round(m.cy + Math.sin(a) * m.ry - camY), 1, 1); }
@@ -3773,7 +3920,7 @@ body.ninth #tbN{display:flex}
         for (let y = Math.max(-v.ext[k], Math.floor(camY - y0) - 2); y < Math.min(hh, camY + H - y0 + 2); y++) {
           const m = ((y + v.ext[k]) % 8 + 8) % 8; if (m === 0 || m > 4) continue;
           const gl = Math.pow(Math.max(0, Math.sin((y0 + y) * 0.05 - time * 1.1 + k)), 16);
-          ctx.fillStyle = 'rgba(255,214,170,' + (0.16 + 0.55 * gl).toFixed(3) + ')'; ctx.fillRect(cx - 1, Math.round(y0 + y - camY), 1, 1);
+          ctx.fillStyle = a3('rgba(255,214,170,', 0.16 + 0.55 * gl); ctx.fillRect(cx - 1, Math.round(y0 + y - camY), 1, 1);
         }
       }
     }
@@ -3812,7 +3959,7 @@ body.ninth #tbN{display:flex}
         for (let i = 0; i < n; i++) {
           const ph = (time * (0.6 + hash2(i, 3) * 0.5) + hash2(i, 9)) % 1;
           const xx = Math.round(x0 + (i + 0.5) * ww / n + Math.sin(time * 2 + i) * 1 - camX), yy = Math.round(y0 + hh - ph * hh - camY);
-          ctx.fillStyle = 'rgba(' + TH.glowRGB + ',' + (0.25 * (1 - ph)).toFixed(3) + ')'; ctx.fillRect(xx, yy, 1, 3);
+          ctx.fillStyle = a3(rgbaP(TH.glowRGB), 0.25 * (1 - ph)); ctx.fillRect(xx, yy, 1, 3);
         }
         ctx.globalCompositeOperation = 'source-over';
         continue;
@@ -3824,7 +3971,7 @@ body.ninth #tbN{display:flex}
       }
       const x0 = v[0] * TS, y0 = v[1] * TS, ww = v[2] * TS, hh = v[3] * TS, ex = v.vext, tot = hh + ex;
       if (!vis(x0, y0, ww, tot)) continue;
-      const X0 = x0 - camX, Y0 = y0 - camY, ash = (a) => 'rgba(214,202,196,' + Math.max(0, a).toFixed(3) + ')';
+      const X0 = x0 - camX, Y0 = y0 - camY, ash = (a) => a3('rgba(214,202,196,', Math.max(0, a));
       const edge = (sx) => Math.min(1, Math.min(sx, 1 - sx) * 5);
       // below the vent the air is still: a few specks of ash drift up lazily from what it rises out of
       for (let i = 0, n = Math.round(ww * ex / 70); i < n; i++) {
@@ -3912,7 +4059,7 @@ body.ninth #tbN{display:flex}
   function hushGlow(ctx, x, y, r, a) {
     if (a <= 0.01) return;
     const o = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'lighter';
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, 'rgba(' + TH.glowRGB + ',' + a.toFixed(3) + ')'); g.addColorStop(1, 'rgba(' + TH.glowRGB + ',0)');
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, a3(rgbaP(TH.glowRGB), a)); g.addColorStop(1, 'rgba(' + TH.glowRGB + ',0)');
     ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); ctx.globalCompositeOperation = o;
   }
   // a thread of light from a glass stone to a beam it stills: a spark runs along it when the stone is pressed (in about a
@@ -3921,7 +4068,7 @@ body.ninth #tbN{display:flex}
     const dx = x1 - x0, dy = y1 - y0, d = Math.hypot(dx, dy); if (d < 6 || d > 420) return;
     const o = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'lighter';
     const n = Math.floor(d / 3), run = el / 30;
-    ctx.fillStyle = 'rgba(' + TH.glowRGB + ',' + (0.16 * held).toFixed(3) + ')';
+    ctx.fillStyle = a3(rgbaP(TH.glowRGB), 0.16 * held);
     for (let i = 1; i < n && i / n <= run; i++) ctx.fillRect(Math.round(x0 + dx * i / n), Math.round(y0 + dy * i / n), 1, 1);
     if (run < 1) for (let k = 0; k < 5; k++) {
       const u = run - k * 0.03; if (u < 0) continue;
@@ -4359,14 +4506,14 @@ body.ninth #tbN{display:flex}
       if (!D.solidAt(w, tx, ty) || visSolid(w, tx, ty - 1)) continue;      // (under a false wall the floor stays hidden)
       const d = Math.hypot(tx * TS + 3 - cx, ty * TS - cy); if (d > R || inKill(w, tx * TS + 3, ty * TS - 1)) continue;   // (nor the floor under the dark)
       const a = 0.26 * Math.pow(1 - d / R, 1.6); if (a < 0.02) continue;
-      ctx.fillStyle = 'rgba(' + col + ',' + a.toFixed(3) + ')'; ctx.fillRect(Math.round(tx * TS - camX), Math.round(ty * TS - camY), TS, 1);
+      ctx.fillStyle = a3(rgbaP(col), a); ctx.fillRect(Math.round(tx * TS - camX), Math.round(ty * TS - camY), TS, 1);
     }
     for (const r of T.oneway || []) {
       if (r[1] < ty0 || r[1] > ty1 || r[0] + r[2] < tx0 || r[0] > tx1) continue;
       for (let k = 0; k < r[2]; k++) {
         const tx = r[0] + k, d = Math.hypot(tx * TS + 3 - cx, r[1] * TS - cy); if (d > R || visSolid(w, tx, r[1] - 1) || visSolid(w, tx, r[1]) || inKill(w, tx * TS + 3, r[1] * TS - 1)) continue;
         const a = 0.26 * Math.pow(1 - d / R, 1.6); if (a < 0.02) continue;
-        ctx.fillStyle = 'rgba(' + col + ',' + a.toFixed(3) + ')'; ctx.fillRect(Math.round(tx * TS - camX), Math.round(r[1] * TS - camY), TS, 1);
+        ctx.fillStyle = a3(rgbaP(col), a); ctx.fillRect(Math.round(tx * TS - camX), Math.round(r[1] * TS - camY), TS, 1);
       }
     }
   }
@@ -4500,14 +4647,14 @@ body.ninth #tbN{display:flex}
       }
       // the shaft it lets down onto the chest
       const br = 0.8 + 0.2 * Math.sin(time * 0.9), X = Dd.lx - camX, Y = Dd.ly - camY, BX = Dd.cx - camX, BY = Dd.fy - 13 - camY;   // (it stops over the chest)
-      const g = ctx.createLinearGradient(0, Y, 0, BY); g.addColorStop(0, 'rgba(200,180,255,0)'); g.addColorStop(0.45, 'rgba(215,195,250,' + (0.06 * br).toFixed(3) + ')'); g.addColorStop(0.85, 'rgba(255,228,170,' + (0.1 * br).toFixed(3) + ')'); g.addColorStop(1, 'rgba(255,228,170,0)');
+      const g = ctx.createLinearGradient(0, Y, 0, BY); g.addColorStop(0, 'rgba(200,180,255,0)'); g.addColorStop(0.45, a3('rgba(215,195,250,', 0.06 * br)); g.addColorStop(0.85, a3('rgba(255,228,170,', 0.1 * br)); g.addColorStop(1, 'rgba(255,228,170,0)');
       ctx.globalAlpha = 1; ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(X - 10, Y); ctx.lineTo(X + 10, Y); ctx.lineTo(BX + 9, BY); ctx.lineTo(BX - 9, BY); ctx.closePath(); ctx.fill();
     } else if (Dd.th === 'foundry') {
       const [hx, fy] = Dd.hearth, ph = (time / 3.2) % 1, flare = ph < 0.18 ? ph / 0.18 : Math.pow(1 - (ph - 0.18) / 0.82, 1.6), X = hx - camX, Y = fy - camY;
-      const g = ctx.createRadialGradient(X, Y - 3, 0, X, Y - 3, 34); g.addColorStop(0, 'rgba(255,120,45,' + (0.18 + 0.22 * flare).toFixed(3) + ')'); g.addColorStop(1, 'rgba(255,90,30,0)'); ctx.fillStyle = g; ctx.fillRect(X - 34, Y - 37, 68, 40);
+      const g = ctx.createRadialGradient(X, Y - 3, 0, X, Y - 3, 34); g.addColorStop(0, a3('rgba(255,120,45,', 0.18 + 0.22 * flare)); g.addColorStop(1, 'rgba(255,90,30,0)'); ctx.fillStyle = g; ctx.fillRect(X - 34, Y - 37, 68, 40);
       for (let x = -13; x < 13; x += 2) {
         const h1 = hash2(x + 100, 7), h2 = hash2(x + 100, 13), k2 = Math.max(0, Math.min(1, 0.25 + 0.45 * h1 + 0.35 * flare + 0.15 * Math.sin(time * (1 + h2 * 2) + h1 * 9)));
-        ctx.fillStyle = k2 > 0.85 ? 'rgba(255,230,150,0.9)' : k2 > 0.6 ? 'rgba(255,150,60,0.75)' : 'rgba(200,70,30,' + (0.3 + 0.4 * k2).toFixed(3) + ')';
+        ctx.fillStyle = k2 > 0.85 ? 'rgba(255,230,150,0.9)' : k2 > 0.6 ? 'rgba(255,150,60,0.75)' : a3('rgba(200,70,30,', 0.3 + 0.4 * k2);
         ctx.fillRect(Math.round(X + x), Math.round(Y - 2 - (h2 > 0.6 ? 1 : 0)), 2, 1 + (h1 > 0.7 ? 1 : 0));
       }
       if (Math.random() < 0.05 + 0.3 * flare) Dd.sparks.push({ x: hx - 10 + Math.random() * 20, y: fy - 4, vy: -(30 + Math.random() * 30), t: time, ph: Math.random() * 6.28 });
@@ -4683,7 +4830,7 @@ body.ninth #tbN{display:flex}
       if (x1 <= x0 || sy > H + 4 || sy < -40) continue;
       ctx.globalCompositeOperation = 'lighter';
       const g = ctx.createLinearGradient(0, sy - 14, 0, sy + 26);
-      g.addColorStop(0, 'rgba(220,40,80,0)'); g.addColorStop(0.35, 'rgba(220,40,80,' + (0.05 + 0.3 * hb).toFixed(3) + ')'); g.addColorStop(1, 'rgba(160,20,60,0)');
+      g.addColorStop(0, 'rgba(220,40,80,0)'); g.addColorStop(0.35, a3('rgba(220,40,80,', 0.05 + 0.3 * hb)); g.addColorStop(1, 'rgba(160,20,60,0)');
       ctx.fillStyle = g; ctx.fillRect(x0, sy - 14, x1 - x0, 40);
       ctx.globalAlpha = Math.min(1, 0.15 + 0.6 * hb); ctx.fillStyle = '#ff5c84'; ctx.fillRect(x0, sy, x1 - x0, 1);
       const ph = (time % BEAT90) / BEAT90, cx = q.cx * TS - camX, R = ph * 220;
@@ -4749,7 +4896,7 @@ body.ninth #tbN{display:flex}
       if (!D.solidAt(w, tx, ty)) continue;
       const cxp = tx * TS + 3, cyp = ty * TS + 3, dd = Math.hypot(cxp - SX, cyp - SY); if (dd > R) continue;
       const px = Math.round(tx * TS - camX), py = Math.round(ty * TS - camY); if (px < -TS || px > W || py < -TS || py > H) continue;
-      ctx.fillStyle = 'rgba(255,80,70,' + (0.5 * Math.pow(1 - dd / R, 1.5) * gl).toFixed(3) + ')';
+      ctx.fillStyle = a3('rgba(255,80,70,', 0.5 * Math.pow(1 - dd / R, 1.5) * gl);
       if (!D.solidAt(w, tx, ty - 1) && cyp > SY) ctx.fillRect(px, py, TS, 1);
       if (!D.solidAt(w, tx, ty + 1) && cyp < SY) ctx.fillRect(px, py + TS - 1, TS, 1);
       if (!D.solidAt(w, tx - 1, ty) && cxp > SX) ctx.fillRect(px, py, 1, TS);
@@ -4768,11 +4915,11 @@ body.ninth #tbN{display:flex}
     ctx.fillStyle = 'rgba(46,70,92,0.62)'; ctx.fillRect(X, Y, Wd, Hd);
     ctx.fillStyle = 'rgba(150,184,204,0.75)'; ctx.fillRect(X, Y, Wd, 1);
     ctx.globalCompositeOperation = 'lighter';
-    for (let i = 0; i < Wd; i += 2) { const sh = Math.sin(i * 0.31 + time * 0.9) + Math.sin(i * 0.13 - time * 0.6); if (sh > 1.1) { ctx.fillStyle = 'rgba(255,90,80,' + (0.25 * (sh - 1.1) * gl).toFixed(3) + ')'; ctx.fillRect(X + i, Y + 1 + (i % 3 ? 1 : 2), 2, 1); } }
+    for (let i = 0; i < Wd; i += 2) { const sh = Math.sin(i * 0.31 + time * 0.9) + Math.sin(i * 0.13 - time * 0.6); if (sh > 1.1) { ctx.fillStyle = a3('rgba(255,90,80,', 0.25 * (sh - 1.1) * gl); ctx.fillRect(X + i, Y + 1 + (i % 3 ? 1 : 2), 2, 1); } }
     A.rings = A.rings.filter(rg => time - rg.t < 1.2 && time >= rg.t);
     for (const rg of A.rings) {
       const k = (time - rg.t) / 1.2, rr = (rg.big ? 26 : 14) * k;
-      ctx.fillStyle = 'rgba(190,220,236,' + ((1 - k) * (rg.big ? 0.8 : 0.5)).toFixed(3) + ')';
+      ctx.fillStyle = a3('rgba(190,220,236,', (1 - k) * (rg.big ? 0.8 : 0.5));
       for (const sd of [-1, 1]) { const px = Math.round(rg.x + sd * rr - camX); if (px >= X && px < X + Wd) ctx.fillRect(px, Y, 2, 1); }
     }
     ctx.globalCompositeOperation = o;
@@ -4937,13 +5084,13 @@ body.ninth #tbN{display:flex}
       if (x1 <= x0 || sy > H + 4 || sy < -80) continue;
       // the heat over the coals
       const g = ctx.createLinearGradient(0, sy - 70, 0, sy + 6);
-      g.addColorStop(0, 'rgba(255,120,40,0)'); g.addColorStop(1, 'rgba(255,110,40,' + (0.08 + 0.2 * flare).toFixed(3) + ')');
+      g.addColorStop(0, 'rgba(255,120,40,0)'); g.addColorStop(1, a3('rgba(255,110,40,', 0.08 + 0.2 * flare));
       ctx.fillStyle = g; ctx.fillRect(x0, sy - 70, x1 - x0, 76);
       // the coals: a bed of them, each glowing in its own time, all of them brighter on the breath
       for (let x = Math.floor(x0 / 2) * 2; x < x1; x += 2) {
         const wx = Math.floor((x + camX) / 2), h1 = hash2(wx, 7), h2 = hash2(wx, 13);
         const k2 = Math.max(0, Math.min(1, 0.25 + 0.45 * h1 + 0.35 * flare + 0.15 * Math.sin(time * (1 + h2 * 2) + h1 * 9)));
-        ctx.fillStyle = k2 > 0.85 ? 'rgba(255,230,150,0.9)' : k2 > 0.6 ? 'rgba(255,150,60,0.75)' : 'rgba(200,70,30,' + (0.3 + 0.4 * k2).toFixed(3) + ')';
+        ctx.fillStyle = k2 > 0.85 ? 'rgba(255,230,150,0.9)' : k2 > 0.6 ? 'rgba(255,150,60,0.75)' : a3('rgba(200,70,30,', 0.3 + 0.4 * k2);
         ctx.fillRect(x, sy - (h2 > 0.6 ? 1 : 0), 2, 1 + (h1 > 0.7 ? 1 : 0));
       }
     }
@@ -5108,7 +5255,7 @@ body.ninth #tbN{display:flex}
       if ((l.t === 'lamp' || l.t === 'orb') && !(l.boss && l.boss !== 'flare')) {
         if (l.k < 0.02) continue;
         const gr = ctx.createRadialGradient(l.x - camX, l.y - camY, 0, l.x - camX, l.y - camY, l.r * 0.5);
-        gr.addColorStop(0, 'rgba(' + TH.glowRGB + ',' + (0.16 * l.k * l.I).toFixed(3) + ')'); gr.addColorStop(1, 'rgba(' + TH.glowRGB + ',0)');
+        gr.addColorStop(0, a3(rgbaP(TH.glowRGB), 0.16 * l.k * l.I)); gr.addColorStop(1, 'rgba(' + TH.glowRGB + ',0)');
         ctx.fillStyle = gr; ctx.fillRect(l.x - l.r * 0.5 - camX, l.y - l.r * 0.5 - camY, l.r, l.r);
       }
     }
@@ -5142,7 +5289,7 @@ body.ninth #tbN{display:flex}
         const cx = s.cmpX - camX, cy = s.cmpY - camY;
         ctx.globalCompositeOperation = 'lighter';
         const gr = ctx.createRadialGradient(cx, cy, 5, cx, cy, 13);
-        gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.35, 'rgba(' + TH.glowRGB + ',' + (0.45 * kk).toFixed(3) + ')'); gr.addColorStop(1, 'rgba(' + TH.glowRGB + ',0)');
+        gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.35, a3(rgbaP(TH.glowRGB), 0.45 * kk)); gr.addColorStop(1, 'rgba(' + TH.glowRGB + ',0)');
         ctx.fillStyle = gr; ctx.fillRect(cx - 14, cy - 14, 28, 28);
         ctx.globalCompositeOperation = 'source-over';
       }
