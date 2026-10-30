@@ -692,7 +692,8 @@ body.ninth #tbN{display:flex}
     if (low) {
       if (s.roll > 0) {
         const k = s.roll / C.ROLLT;
-        const sp = C.CRAWL + (C.ROLLV - C.CRAWL) * Math.min(1, k * 1.6);
+        // whatever makes you run faster makes you roll faster by the same amount (never slower: the town's water only slows the run)
+        const sp = (C.CRAWL + (C.ROLLV - C.CRAWL) * Math.min(1, k * 1.6)) * (M.run > 1 ? M.run : 1);
         s.vx = s.rollDir * sp;
       } else {
         s.vx = dirIn * C.CRAWL; if (dirIn) s.face = dirIn;
