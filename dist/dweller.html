@@ -2322,6 +2322,25 @@ body.ninth #tbN{display:flex}
   // (what looks like rock counts as rock: nothing hangs from or stands on a false wall's hidden side)
   function openUp(w, tx, ty, lim) { let k = 0; while (k < lim && !visSolid(w, tx, ty - k - 1) && !shelfAt(w, tx, ty - k - 1)) k++; return k; }
   function openDown(w, tx, ty, lim) { let k = 0; while (k < lim && !visSolid(w, tx, ty + k + 1)) k++; return k; }
+  /* a crane lamp's trolley runs dead level along the roof, at the height of the roof's high line over its run,
+     so it slides behind the stones that hang down (the rock is drawn over it) instead of riding over them; where the
+     roof is a little higher than that line, a short stem holds it to the rock */
+  function craneTrolley(ctx, w, l, camX, camY) {
+    let C = l._glide;
+    if (!C) {
+      const m = l.move, xa = Math.floor(Math.min(l.bx, l.bx + m.dx)) - 4, xb = Math.ceil(Math.max(l.bx, l.bx + m.dx)) + 4, ty = Math.floor(l.by / TS), n = xb - xa + 1;
+      const R = new Float64Array(n), V = [];
+      for (let i = 0; i < n; i++) { const top = openUp(w, Math.floor((xa + i) / TS), ty, 90); R[i] = top >= 90 ? NaN : (ty - top) * TS; if (top < 90) V.push(R[i]); }
+      V.sort((p, q) => p - q);
+      C = l._glide = { xa, n, R, Y: V.length ? V[Math.floor(V.length * 0.2)] : NaN };
+    }
+    if (C.Y !== C.Y) return;
+    const i = Math.max(0, Math.min(C.n - 1, Math.round(l.x) - C.xa)), ry = C.R[i];
+    const rx = Math.round(l.x - camX), y = Math.round(C.Y - camY), y1 = Math.round(l.y - camY) - 4;
+    if (ry === ry && C.Y - ry >= 1) { ctx.fillStyle = TH.near; ctx.fillRect(rx, Math.round(ry - camY) - 1, 1, y - Math.round(ry - camY) + 1); }
+    ctx.fillStyle = TH.stal[1]; ctx.fillRect(rx - 3, y, 7, 2); ctx.fillStyle = TH.near; ctx.fillRect(rx - 2, y + 2, 5, 1);
+    if (y1 > y + 3) { ctx.fillStyle = TH.near; ctx.fillRect(rx, y + 3, 1, y1 - y - 3); ctx.fillStyle = TH.far[0]; ctx.fillRect(rx + 1, y + 3, 1, Math.max(0, y1 - y - 4)); }
+  }
   /* a cord from the underside of the rock above (x, y) down to y - gap, drawn into the rock a pixel so it never floats */
   function drawCord(ctx, w, wx, wy, camX, camY, gap, lit) {
     const tx = Math.floor(wx / TS), ty = Math.floor(wy / TS), top = openUp(w, tx, ty, 90);
@@ -5285,12 +5304,8 @@ body.ninth #tbN{display:flex}
       if (l.boss || l.x < camX - 60 || l.x > camX + W + 60 || l.y < camY - 60 || l.y > camY + H + 60) continue;
       if (l.t === 'watch') drawWatcher(ctx, l, camX, camY, time, false, 0, null, w);
       else if (l.t === 'orb' && TH.style === 'foundry' && l.move && l.move.k === 'line' && l.move.dy === 0) {
-        // a lamp on a crane: it runs on a trolley along the roof
-        if (drawCord(ctx, w, l.x, l.y, camX, camY, 4)) {
-          const tx = Math.floor(l.x / TS), ty = Math.floor(l.y / TS), top = openUp(w, tx, ty, 90);
-          const ry = Math.round((ty - top) * TS - camY), rx = Math.round(l.x - camX);
-          ctx.fillStyle = TH.stal[1]; ctx.fillRect(rx - 3, ry, 7, 2); ctx.fillStyle = TH.near; ctx.fillRect(rx - 2, ry + 2, 5, 1);
-        }
+        // a lamp on a crane: it runs on a trolley, level, along the roof
+        craneTrolley(ctx, w, l, camX, camY);
       }
       else if (l.t === 'lamp' && l.col !== 'rainbow' && l.col !== 'shard') drawLampCrystal(ctx, w, l, camX, camY, time, false);
     }
