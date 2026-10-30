@@ -7299,21 +7299,21 @@ body.ninth #tbN{display:flex}
     'Battery Pack': [{ cd: 0.6 }, 'RECHARGES VERY QUICKLY'],
   };
 
-  /* ---- the upgrades offered between rooms (pick one of three); they last for the rest of the run */
+  /* ---- the upgrades offered between rooms (pick one of three); they last for the rest of the run (each can be taken up to its max) */
   const UPGRADES = [
-    { id: 'cloak', name: 'THICK CLOAK', text: 'LIGHT BURNS YOU MORE SLOWLY', m: { burn: 0.85 }, max: 3 },
-    { id: 'breath', name: 'DEEP BREATH', text: 'YOU COOL FASTER IN THE DARK', m: { regen: 1.3 }, max: 3 },
-    { id: 'feet', name: 'QUICK FEET', text: 'YOU RUN A LITTLE FASTER', m: { run: 1.06 }, max: 2 },
-    { id: 'spring', name: 'SPRING', text: 'YOU JUMP A LITTLE HIGHER', m: { jump: 1.05 }, max: 2 },
-    { id: 'wind', name: 'SECOND WIND', text: 'ONE MORE JUMP IN MID-AIR', m: { air: 1 }, max: 1 },
-    { id: 'eclipse', name: 'LONG ECLIPSE', text: 'YOUR SEEKER HOLDS THE DARK LONGER', m: { hold: 1.3 }, max: 2 },
-    { id: 'charge', name: 'QUICK CHARGE', text: 'YOUR SEEKER RECHARGES FASTER', m: { cd: 0.75 }, max: 2 },
-    { id: 'sight', name: 'FAR SIGHT', text: 'YOUR SEEKER REACHES FURTHER', m: { reach: 1.3 }, max: 2 },
-    { id: 'ward', name: 'WARD', text: 'THE NEXT FULL BURN IS TAKEN FROM YOU', m: { shield: 1 }, max: 2, rare: 0.3 },   // uncommon: in about one offer in ten
-    { id: 'still', name: 'STILLNESS', text: 'THE FIRST LIGHT IN EVERY ROOM SPARES YOU A MOMENT', m: { grace: 2.5 }, max: 1 },
-    { id: 'feather', name: 'FEATHER', text: 'YOU FALL MORE SLOWLY', m: { fall: 0.8 }, max: 2 },
-    // very rare: it turns up in about one offer in twenty, once a run
-    { id: 'life', name: 'ANOTHER LIFE', text: 'ONE MORE SPARE LIFE FOR THIS RUN', m: {}, max: 1, rare: 0.05 },
+    { id: 'cloak', name: 'THICK CLOAK', text: 'LIGHT BURNS YOU MORE SLOWLY', m: { burn: 0.85 }, max: 4 },
+    { id: 'breath', name: 'DEEP BREATH', text: 'YOU COOL FASTER IN THE DARK', m: { regen: 1.3 }, max: 4 },
+    { id: 'feet', name: 'QUICK FEET', text: 'YOU RUN A LITTLE FASTER', m: { run: 1.06 }, max: 3 },
+    { id: 'spring', name: 'SPRING', text: 'YOU JUMP A LITTLE HIGHER', m: { jump: 1.05 }, max: 3 },
+    { id: 'wind', name: 'SECOND WIND', text: 'ONE MORE JUMP IN MID-AIR', m: { air: 1 }, max: 2 },
+    { id: 'eclipse', name: 'LONG ECLIPSE', text: 'YOUR SEEKER HOLDS THE DARK LONGER', m: { hold: 1.3 }, max: 3 },
+    { id: 'charge', name: 'QUICK CHARGE', text: 'YOUR SEEKER RECHARGES FASTER', m: { cd: 0.75 }, max: 3 },
+    { id: 'sight', name: 'FAR SIGHT', text: 'YOUR SEEKER REACHES FURTHER', m: { reach: 1.3 }, max: 3 },
+    { id: 'ward', name: 'WARD', text: 'THE NEXT FULL BURN IS TAKEN FROM YOU', m: { shield: 1 }, max: 3, rare: 0.3 },   // uncommon: in about one offer in ten
+    { id: 'still', name: 'STILLNESS', text: 'THE FIRST LIGHT IN EVERY ROOM SPARES YOU A MOMENT', m: { grace: 2.5 }, max: 2 },
+    { id: 'feather', name: 'FEATHER', text: 'YOU FALL MORE SLOWLY', m: { fall: 0.8 }, max: 3 },
+    // very rare: it turns up in about one offer in twenty, twice a run at most
+    { id: 'life', name: 'ANOTHER LIFE', text: 'ONE MORE SPARE LIFE FOR THIS RUN', m: {}, max: 2, rare: 0.05 },
   ];
 
   const ADD = { shield: 1, air: 1, rare: 1, lives: 1 };
@@ -8413,7 +8413,7 @@ body.ninth #tbN{display:flex}
     // the night over everything, then the lights
     ctx.fillStyle = 'rgba(4,6,14,0.16)'; ctx.fillRect(0, 0, LW, LH);
     drawLights(ctx, st, camX, camY);
-    if (st.showPlayer !== false && !(inShaft && s.y + 3 > GY - 12)) { if (flooded && s.y + 3 > WATERY) ctx.globalAlpha = 0.35; R.drawPlayer(ctx, s, camX, camY, 'visor', 0); ctx.globalAlpha = 1; }
+    if (st.showPlayer !== false && !(inShaft && s.y + 3 > GY - 12)) { if (flooded && s.y + 3 > WLV) ctx.globalAlpha = 0.35; R.drawPlayer(ctx, s, camX, camY, 'visor', 0); ctx.globalAlpha = 1; }
     // snow, drifting slowly
     for (const f of snow) {
       f.y += f.v * (st.dt || 0) / 240; if (f.y > 1) { f.y -= 1; f.x = Math.random(); }
@@ -8457,6 +8457,9 @@ body.ninth #tbN{display:flex}
   /* once its sleeper is woken the well cave floods to half its height: a still, dark pool. Rings spread where the
      Dweller goes in or out and where the drops from the roots land; under the surface everything turns dim and teal */
   const WATERY = (WELL.room[2] + 4) * TS, WX0 = WELL.room[0] * TS, WX1 = WELL.room[1] * TS, WBOT = WELL.room[3] * TS;
+  // (the level it stands at: WATERY, or lower while it is still rising after the sleeper wakes; see main.js)
+  let WLV = WATERY;
+  function setWater(y) { WLV = y; }
   const RIP = [];
   function ripple(x, big, time) { RIP.push({ x: Math.round(x), t: time, big: big ? 1 : 0 }); if (RIP.length > 24) RIP.shift(); }
   /* the water remembers: one glint on its surface for each sliver you have found, its colour; stand under one and it
@@ -8464,7 +8467,7 @@ body.ninth #tbN{display:flex}
   const MEMX = [-56, -38, -20, 18, 36, 54].map(d => WELLX + d);   // (three each side of the rope, clear of it)
   const SHC = ['#ef5b5b', '#f39a4c', '#f1d663', '#6ad890', '#5ca8f2', '#a77cff'];
   function drawMemories(ctx, camX, camY, time, P, near) {
-    if (!P || !P.beaten) return;
+    if (!P || !P.beaten || WLV < WATERY - 0.5 || WLV > WATERY + 0.5) return;      // (the glints come once the water is all in)
     const top = WATERY - camY;
     MEMX.forEach((X, k) => {
       if (!P.beaten[k]) return;
@@ -8480,7 +8483,8 @@ body.ninth #tbN{display:flex}
   }
   function drawWater(ctx, camX, camY, time, P, near) {
     drawMemories(ctx, camX, camY, time, P, near);
-    const top = WATERY - camY, h = WBOT - WATERY;
+    const top = Math.round(WLV - camY), h = WBOT - Math.round(WLV);
+    if (h <= 0) return;
     for (let X = WX0; X < WX1; X++) {
       const k = X - WX0, off = Math.sin(k * 0.35 + time * 0.9) + 0.6 * Math.sin(k * 0.13 - time * 0.5) > 1.0 ? 1 : 0;
       const x = X - camX, y = top + off;
@@ -8849,10 +8853,10 @@ body.ninth #tbN{display:flex}
       ctx.globalAlpha = 1;
       const P2 = WELLFX.puddle;
       WELLFX.tips.forEach(([tx, ty], i) => {
-        const per = 3.1 + (i % 4) * 0.9, u = (time + i * 1.7) % per, wet = st.rareUsed && ty < WATERY, fall = wet ? WATERY - ty : P2 ? Math.max(4, (P2.y - ty)) : 30, ft = Math.sqrt(fall / 90);
+        const per = 3.1 + (i % 4) * 0.9, u = (time + i * 1.7) % per, wet = st.rareUsed && ty < WLV, fall = wet ? WLV - ty : P2 ? Math.max(4, (P2.y - ty)) : 30, ft = Math.sqrt(fall / 90);
         if (u < 0.9) { ctx.globalAlpha = u / 0.9; ctx.fillStyle = '#6f8288'; ctx.fillRect(tx - camX, ty - camY, 1, 1); ctx.globalAlpha = 1; }
         else if (u < 0.9 + ft) { const v = u - 0.9; ctx.fillStyle = '#8aa0a6'; ctx.fillRect(tx - camX, Math.round(ty + 90 * v * v) - camY, 1, 2); }
-        else if (wet) { const v = (u - 0.9 - ft) / 0.9; if (v < 1) { const d = Math.round(1 + v * 5); ctx.globalAlpha = (1 - v) * 0.5; ctx.fillStyle = '#8fb4b0'; ctx.fillRect(tx - d - 1 - camX, WATERY - 1 - camY, 2, 1); ctx.fillRect(tx + d - camX, WATERY - 1 - camY, 2, 1); ctx.globalAlpha = 1; } }
+        else if (wet) { const v = (u - 0.9 - ft) / 0.9; if (v < 1) { const d = Math.round(1 + v * 5); ctx.globalAlpha = (1 - v) * 0.5; ctx.fillStyle = '#8fb4b0'; ctx.fillRect(tx - d - 1 - camX, Math.round(WLV) - 1 - camY, 2, 1); ctx.fillRect(tx + d - camX, Math.round(WLV) - 1 - camY, 2, 1); ctx.globalAlpha = 1; } }
         else if (u < 0.9 + ft + 0.5) { const v = (u - 0.9 - ft) / 0.5, fyy = ty + fall; ctx.globalAlpha = 1 - v; ctx.fillStyle = '#7f969c'; ctx.fillRect(tx - 1 - Math.round(v * 3) - camX, fyy - 1 - camY, 1, 1); ctx.fillRect(tx + 1 + Math.round(v * 3) - camX, fyy - 1 - camY, 1, 1); ctx.fillRect(tx - Math.round(v * 5) - camX, fyy - camY, Math.round(v * 10) + 1, 1); ctx.globalAlpha = 1; }
       });
     }
@@ -8982,7 +8986,7 @@ body.ninth #tbN{display:flex}
   }
 
   global.DwellerTown = {
-    build, draw, signText, GY, W, H, TS, WPX, HPX, DOORS, GREAT, RES, WELLX, RAREX, RAREY, WELL, WATERY, MEMX, ripple, doorShape, groundAt, candle,
+    build, draw, signText, GY, W, H, TS, WPX, HPX, DOORS, GREAT, RES, WELLX, RAREX, RAREY, WELL, WATERY, WBOT, setWater, waterY: () => WLV, MEMX, ripple, doorShape, groundAt, candle,
     get world() { return TW; },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
@@ -11415,7 +11419,7 @@ body.ninth #tbN{display:flex}
   const T = window.DwellerTown;
   let tWet = false, tBub = 0;    // in the flooded well, and when its next bubble rises
   let tW = null, tS = null, tcamX = 0, tcamY = 0, tAcc = 0, tPrevE = false, still = 0;
-  let near = null, nearKey = '', townMsg = '', townMsgT = 99, titleOut = 99, bootFade = 0, rareCardT = 99;
+  let near = null, nearKey = '', townMsg = '', townMsgT = 99, titleOut = 99, bootFade = 0, rareCardT = 99, wellFillT = 99;
   const talk = {};
   let leadX = null, leadY = null;
   const LINES = {
@@ -11516,7 +11520,7 @@ body.ninth #tbN{display:flex}
   function townNear() {
     const px = tS.x + 2.5, feet = tS.y + tS.h;
     // in the flooded well: a sliver's glint on the water over you
-    if (P.wellUsed && feet > T.WATERY && feet > T.GY + 20) for (let k = 0; k < 6; k++) if (P.beaten[k] && Math.abs(px - T.MEMX[k]) < 6) return { k: 'memory', i: k, x: T.MEMX[k], y: T.WATERY - 22 };
+    if (P.wellUsed && T.waterY() === T.WATERY && feet > T.WATERY && feet > T.GY + 20) for (let k = 0; k < 6; k++) if (P.beaten[k] && Math.abs(px - T.MEMX[k]) < 6) return { k: 'memory', i: k, x: T.MEMX[k], y: T.WATERY - 22 };
     // (once the sleeper has woken the well floods, and its glints are all there is to see: nothing more to say about the cave)
     if (feet > T.GY + 20) return !P.wellUsed && Math.abs(px - T.RAREX) < 14 && feet > T.RAREY - 8 ? { k: 'rare', x: T.RAREX, y: T.RAREY - 34 } : null;
     for (const d of T.DOORS) {
@@ -11567,18 +11571,19 @@ body.ninth #tbN{display:flex}
     const id = rareChoice();
     P.wellOld = 0; P.seekerId = id; P.wellUsed = true; if (!P.codex.includes(id)) P.codex.push(id); if (P.core) P.archNew = true; saveProgress();
     R.setSeeker(id);
-    A.Live.sfx('seeker'); flash = 0.6; rareCardT = 0;
+    A.Live.sfx('seeker'); flash = 0.6; rareCardT = 0; wellFillT = 0;
     for (let i = 0; i < 60; i++) { const a = Math.random() * 6.283, sp = 10 + Math.random() * 45; R.spawn(T.RAREX, T.RAREY - 16, Math.cos(a) * sp, Math.sin(a) * sp - 10, 0.8 + Math.random(), i % 2 ? '#5daa99' : '#d5f8fc', 1, 10, true); }
   }
 
   /* the flooded well: wading slows the Dweller by a quarter and it sinks slowly; going in or out splashes */
   const WATERM = D.mods({ run: 0.75, fall: 0.45 });
-  function townWet() { return !!P.wellUsed && tS.y + tS.h / 2 > T.WATERY && tS.y + tS.h > (T.WELL.room[2] + 1) * D.TS; }
+  const WELLFILL = 9;
+  function townWet() { return !!P.wellUsed && tS.y + tS.h / 2 > T.waterY() && tS.y + tS.h > (T.WELL.room[2] + 1) * D.TS; }
   function splash(out) {
     const x = tS.x + 2.5, v = Math.min(1, 0.45 + Math.abs(tS.vy) / 200);
     A.Live.sfx(out ? 'splashOut' : 'splash', { v });
     T.ripple(x, true, gameTime);
-    for (let i = 0; i < (out ? 8 : 14); i++) R.spawn(x + (Math.random() - 0.5) * 6, T.WATERY - 1, (Math.random() - 0.5) * 50, -30 - Math.random() * 50 * v, 0.4 + Math.random() * 0.4, i % 3 ? '#5f8a88' : '#8fb4b0', 1, 260);
+    for (let i = 0; i < (out ? 8 : 14); i++) R.spawn(x + (Math.random() - 0.5) * 6, T.waterY() - 1, (Math.random() - 0.5) * 50, -30 - Math.random() * 50 * v, 0.4 + Math.random() * 0.4, i % 3 ? '#5f8a88' : '#8fb4b0', 1, 260);
   }
   function townStep(inp) {
     const wet = townWet();
@@ -11586,7 +11591,7 @@ body.ninth #tbN{display:flex}
     if (wet !== tWet) { splash(!wet); tWet = wet; A.Live.muffle(wet); }
     if (wet && (tBub -= 1 / D.TICK) <= 0) {
       tBub = 0.8 + Math.random() * 1.6;
-      const by = tS.y + 3, life = Math.max(0.2, (by - T.WATERY) / 16);
+      const by = tS.y + 3, life = Math.max(0.2, (by - T.waterY()) / 16);
       R.spawn(tS.x + 2.5 + tS.face * 2, by, (Math.random() - 0.5) * 3, -16, life, '#7fa8a4', 1, 0);
       T.ripple(tS.x + 2.5 + tS.face * 2, false, gameTime + life);    // (its ring waits until the bubble gets there)
     }
@@ -11613,6 +11618,8 @@ body.ninth #tbN{display:flex}
     if (!tW) { tW = T.build(); townSpawn(); }
     if (SKIT) { tAcc = 0; return; }          // (the town waits while a memory plays)
     mapT += dt; townMsgT += dt; rareCardT += dt; titleOut += dt; bootFade += dt;
+    // once the sleeper wakes the well fills: the water creeps up from the floor to its level over WELLFILL seconds
+    wellFillT += dt; { const u = Math.min(1, wellFillT / WELLFILL), k = u * u * (3 - 2 * u); T.setWater(T.WBOT - (T.WBOT - T.WATERY) * k); }
     const stepDt = 1 / D.TICK;
     tAcc += dt; let n = 0;
     while (tAcc >= stepDt && n < 12) {
@@ -11920,7 +11927,8 @@ body.ninth #tbN{display:flex}
     mode = 'deepPick'; deepT = 0; syncTouchUI();
   }
   function deepTake() {
-    const u = deepOffer[deepSel]; if (!u) return;
+    const u = deepOffer[deepSel];
+    if (!u) { if (!deepOffer.length) { A.Live.sfx('ui'); loadDeepRoom(RUN.i + 1); } return; }   // every gift already taken: nothing to choose, so go on down
     RUN.picks.push(u.id); if (u.m.shield) RUN.shields += u.m.shield;
     if (u.id === 'life') { RUN.lives++; RUN.livesMax++; }
     A.Live.sfx('check');
@@ -11973,7 +11981,7 @@ body.ninth #tbN{display:flex}
   }
   function deepKey(code) {
     if (mode === 'deepPick') {
-      if (code === 'KeyR' && RUN.rerolls > 0 && deepT > 0.6) { RUN.rerolls--; deepOffer = DP.offer(Math.random, RUN.picks, deepOffer.length); deepSel = Math.min(deepSel, deepOffer.length - 1); deepT = 0.3; A.Live.sfx('check'); return; }   // SPARE GEAR
+      if (code === 'KeyR' && RUN.rerolls > 0 && deepOffer.length && deepT > 0.6) { RUN.rerolls--; deepOffer = DP.offer(Math.random, RUN.picks, deepOffer.length); deepSel = Math.min(deepSel, deepOffer.length - 1); deepT = 0.3; A.Live.sfx('check'); return; }   // SPARE GEAR
       if (['ArrowLeft', 'KeyA'].includes(code)) { deepSel = Math.max(0, deepSel - 1); A.Live.sfx('ui'); }
       else if (['ArrowRight', 'KeyD'].includes(code)) { deepSel = Math.min(deepOffer.length - 1, deepSel + 1); A.Live.sfx('ui'); }
       else if (['Enter', 'Space', 'KeyE', 'KeyZ', 'KeyK'].includes(code) && deepT > 0.6) deepTake();
@@ -12022,8 +12030,9 @@ body.ninth #tbN{display:flex}
     return deepOffer.map((u, i) => ({ x: x0 + i * (w + gap), y: y0, w, h, u }));
   }
   function deepTap(x, y) {
-    if (mode === 'deepPick' && RUN && RUN.rerolls > 0 && y > LH - 34 && y < LH - 22) { deepKey('KeyR'); return; }
+    if (mode === 'deepPick' && RUN && RUN.rerolls > 0 && deepOffer.length && y > LH - 34 && y < LH - 22) { deepKey('KeyR'); return; }
     if (mode === 'deepPick') {
+      if (!deepOffer.length) { if (deepT > 0.6) deepTake(); return; }
       const c = pickCards().findIndex(c => x >= c.x && x < c.x + c.w && y >= c.y && y < c.y + c.h);
       if (c < 0) return;
       if (c === deepSel && deepT > 0.6) deepTake(); else { deepSel = c; A.Live.sfx('ui'); }
@@ -12638,7 +12647,7 @@ body.ninth #tbN{display:flex}
     if (mode === 'deepPick') {
       uiMark(ctx, cx, Math.round(LH * 0.12) - 9, '#9fb8bc', 1, a);
       ht('ROOM ' + (RUN.i + 1) + ' CLEARED', cx, Math.round(LH * 0.12), PAL.snow, 'center', a, 2);
-      ht('TAKE ONE GIFT FOR THE WAY DOWN', cx, Math.round(LH * 0.12) + Math.ceil(14 * HS) + 6, '#9fb8bc', 'center', a);
+      ht(deepOffer.length ? 'TAKE ONE GIFT FOR THE WAY DOWN' : 'YOU CARRY EVERY GIFT THE DEEP CAN GIVE', cx, Math.round(LH * 0.12) + Math.ceil(14 * HS) + 6, '#9fb8bc', 'center', a);
       for (const [i, c] of pickCards().entries()) {
         const sel = i === deepSel;
         // each gift in a cloud of the smoke, its lines faint
@@ -12657,10 +12666,12 @@ body.ninth #tbN{display:flex}
         ht(c.u.name, c.x + c.w / 2, c.y + 20, sel ? PAL.gold : PAL.snow, 'center', a);
         wrap(c.u.text, (c.w - 8) / HS).forEach((l, k) => ht(l, c.x + c.w / 2, c.y + 22 + L7 * (k + 1.3), '#aab4c0', 'center', a));
       }
-      const have = RUN.picks.map(id => DP.UPGRADES.find(u => u.id === id).name);
+      const cnt = new Map(); for (const id of RUN.picks) cnt.set(id, (cnt.get(id) || 0) + 1);   // (a gift taken more than once: its name and how many)
+      const have = [...cnt].map(([id, n]) => DP.UPGRADES.find(u => u.id === id).name + (n > 1 ? ' X' + n : ''));
       if (have.length) wrap('SO FAR  ' + have.join('  -  '), (LW - 24) / HS).forEach((l, k) => ht(l, cx, Math.round(LH * 0.32) + 68 + k * L7, '#5d6474', 'center', a));
-      uiHint(touchMode ? 'TAP A GIFT, TAP AGAIN TO TAKE IT' : [['ARROWS', 'CHOOSE'], ['SPACE', 'TAKE IT']], cx, LH - 14, a);
-      if (RUN.rerolls > 0) ht((touchMode ? 'TAP HERE' : 'R') + '  -  SPARE GEAR  -  NEW GIFTS, ONCE', cx, LH - 28, '#d6aa60', 'center', a * 0.85);
+      if (!deepOffer.length) uiHint(touchMode ? 'TAP  -  GO ON DOWN' : [['SPACE', 'GO ON DOWN']], cx, LH - 14, a);
+      else uiHint(touchMode ? 'TAP A GIFT, TAP AGAIN TO TAKE IT' : [['ARROWS', 'CHOOSE'], ['SPACE', 'TAKE IT']], cx, LH - 14, a);
+      if (RUN.rerolls > 0 && deepOffer.length) ht((touchMode ? 'TAP HERE' : 'R') + '  -  SPARE GEAR  -  NEW GIFTS, ONCE', cx, LH - 28, '#d6aa60', 'center', a * 0.85);
     } else if (mode === 'deepOver') {
       const base = RUN && DEEPROOMS.find(r => r.id === RUN.rooms[RUN.i]) || {}, head = RUN && RUN.gaveUp ? 'YOU TURNED BACK' : S.why === 'void' ? 'THE DARK TOOK YOU' : 'THE LIGHT FOUND YOU';
       const lines = [['ROOM ' + (RUN ? RUN.i + 1 : 0) + ' OF ' + DP.ROOMS_PER_RUN + '   ' + DP.roomName(base.id) + '   -   ' + DP.STRATUM_NAMES[base.stratum || 0], '#9fb8bc'],
