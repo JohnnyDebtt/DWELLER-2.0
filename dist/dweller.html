@@ -1584,6 +1584,80 @@ body.ninth #tbN{display:flex}
     for (let i = 0; i < 10; i++) { const u = (time * 0.5 + i / 10) % 1, sx = x0 + ((i * 41) % Math.max(1, w)) + Math.sin(time * 2 + i) * 2, sy = y0 + h * 0.8 - u * (h + 18); ctx.globalAlpha = A * Math.sin(u * Math.PI); P('#c8ffd8', sx, sy); }
     ctx.restore();
   }
+  /* the way into the Core: veins of light in its rock, running toward the Guardian, a pulse travelling along each
+     (the veins themselves drawn once onto a canvas the size of the level; only the pulses each frame); the arena's
+     light spilling through the door, breathing with the Guardian's slow heart, dust drawn toward it; and the slivers
+     you have still to set circling you in their colours until you are in the arena */
+  const CWAY = { w: null, veins: null, cv: null };
+  function coreWay(ctx, w, s, camX, camY, W, H, time) {
+    const B = w.boss, P = (c, x, y, ww, hh) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), ww || 1, hh || 1); };
+    if (CWAY.w !== w) {
+      CWAY.w = w; CWAY.veins = [];
+      let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+      for (let tries = 0; tries < 9000 && CWAY.veins.length < 320; tries++) {
+        const tx = Math.floor(rnd() * w.W), ty = Math.floor(rnd() * w.H);
+        if (!D.solidAt(w, tx, ty) || !D.solidAt(w, tx, ty - 2) || !D.solidAt(w, tx, ty + 2)) continue;
+        let x = tx * TS + 3, y = ty * TS + 3, ang = Math.atan2(B.y - y, B.x - x); const pts = [];
+        for (let k = 0; k < 170; k++) {
+          ang += (rnd() - 0.5) * 0.7; const a2 = Math.atan2(B.y - y, B.x - x); ang += (a2 - ang) * 0.08;
+          x += Math.cos(ang) * 1.5; y += Math.sin(ang) * 1.5;
+          if (!D.solidAt(w, Math.floor(x / TS), Math.floor(y / TS))) break;
+          pts.push(Math.round(x), Math.round(y));
+        }
+        if (pts.length > 24) {
+          let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (let i = 0; i < pts.length; i += 2) { x0 = Math.min(x0, pts[i]); x1 = Math.max(x1, pts[i]); y0 = Math.min(y0, pts[i + 1]); y1 = Math.max(y1, pts[i + 1]); }
+          CWAY.veins.push({ pts, ph: rnd() * 10, x0, y0, x1, y1 });
+        }
+      }
+      // the veins at rest, once
+      CWAY.cv = document.createElement('canvas'); CWAY.cv.width = w.W * TS; CWAY.cv.height = w.H * TS;
+      const vx = CWAY.cv.getContext('2d'); vx.globalAlpha = 0.16; vx.fillStyle = '#7f90cc';
+      const TW = 96, tc = Math.ceil(CWAY.cv.width / TW); CWAY.TW = TW; CWAY.tc = tc; CWAY.has = new Uint8Array(tc * Math.ceil(CWAY.cv.height / TW));
+      for (const v of CWAY.veins) for (let i = 0; i < v.pts.length; i += 2) { vx.fillRect(v.pts[i], v.pts[i + 1], 1, 1); CWAY.has[Math.floor(v.pts[i + 1] / TW) * tc + Math.floor(v.pts[i] / TW)] = 1; }   // (and which squares of it hold any)
+    }
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    // the veins (the view's part of them), and the pulses running along them toward the Guardian
+    {   // only the squares of it in view that hold any vein
+      const TW = CWAY.TW, tc = CWAY.tc, cw = CWAY.cv.width, chh = CWAY.cv.height;
+      for (let ty = Math.max(0, Math.floor(camY / TW)), ty1 = Math.min(Math.ceil(chh / TW) - 1, Math.floor((camY + H) / TW)); ty <= ty1; ty++)
+        for (let tx = Math.max(0, Math.floor(camX / TW)), tx1 = Math.min(tc - 1, Math.floor((camX + W) / TW)); tx <= tx1; tx++) {
+          if (!CWAY.has[ty * tc + tx]) continue;
+          const sx = tx * TW, sy = ty * TW, sw = Math.min(TW, cw - sx), sh = Math.min(TW, chh - sy);
+          ctx.drawImage(CWAY.cv, sx, sy, sw, sh, Math.round(sx - camX), Math.round(sy - camY), sw, sh);
+        }
+    }
+    for (const v of CWAY.veins) {
+      if (v.x1 < camX - 2 || v.x0 > camX + W + 2 || v.y1 < camY - 2 || v.y0 > camY + H + 2) continue;
+      const q = v.pts, n = q.length / 2, c = ((time * 0.22 + v.ph) % 1.6) * n, half = n / 9;
+      for (let i = Math.max(0, Math.ceil(c - half)), e = Math.min(n - 1, Math.floor(c + half)); i <= e; i++) {
+        const X = q[i * 2] - camX, Y = q[i * 2 + 1] - camY; if (X < 0 || Y < 0 || X >= W || Y >= H) continue;
+        const hot = Math.max(0, 1 - Math.abs(i / n - c / n) * 9); if (hot < 0.2) continue;      // (its faint tail is the resting vein's own)
+        ctx.globalAlpha = 0.8 * hot; P(hot > 0.4 ? '#eef2ff' : '#7f90cc', X, Y);
+        if (hot > 0.7) { ctx.globalAlpha = 0.35 * hot; P('#b8c6ff', X - 1, Y - 1, 3, 3); }
+      }
+    }
+    // the arena's light, through the door, breathing with the Guardian's slow heart
+    const L = w.level, doorX = ((L.sections && L.sections[1] ? L.sections[1].x0 : 64) * TS), floorY = L.spawn ? L.spawn.y : 552;
+    const dx = doorX - camX + 10, dy = floorY - 26 - camY, hb = 0.6 + 0.4 * Math.pow(Math.max(0, Math.sin(time * 1.4)), 6);
+    if (dx > -200 && dx < W + 200) {
+      const g = ctx.createRadialGradient(dx, dy, 4, dx, dy, 150); g.addColorStop(0, a3('rgba(190,205,255,', 0.32 * hb)); g.addColorStop(1, 'rgba(190,205,255,0)');
+      ctx.globalAlpha = 1; ctx.fillStyle = g; ctx.fillRect(dx - 150, dy - 150, 300, 300);
+      for (let i = 0; i < 40; i++) {                 // dust drawn toward it
+        const u = (time * 0.08 + i * 0.137) % 1, X = dx - 300 + u * 300, Y = dy - 20 + Math.sin(i * 2.1) * 26 + Math.sin(time + i) * 3;
+        ctx.globalAlpha = 0.5 * Math.sin(u * Math.PI); P('#c8d2ff', X, Y);
+      }
+    }
+    // the slivers still to set, circling you, until you are in the arena
+    if (s.x < doorX + 30 && !s.dead) {
+      const cx = s.x + 2.5 - camX, cy = s.y + 4 - camY, set = s.bP || 0;
+      for (let k = set; k < 6; k++) {
+        const a = time * 1.1 + k / 6 * 6.283, X = cx + Math.cos(a) * 14, Y = cy + Math.sin(a) * 5 - 2, front = Math.sin(a) > 0;
+        const g2 = ctx.createRadialGradient(X, Y, 0, X, Y, 8); g2.addColorStop(0, SHARDS[k]); g2.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g2; ctx.globalAlpha = front ? 0.5 : 0.2; ctx.fillRect(X - 8, Y - 8, 16, 16);
+        ctx.globalAlpha = front ? 1 : 0.5; P(SHARDS[k], X - 1, Y - 2, 3, 1); P(SHARDS[k], X - 1, Y - 1, 3, 3); P(SHARDS[k], X, Y + 2); P('#ffffff', X, Y - 1);
+      }
+    }
+    ctx.restore();
+  }
   /* ---- a relic in its hollow (relic.js draws the relic itself). pass 'back': the hollow, its pedestal and the relic,
      behind the false wall; 'glow': over the dark, the wall's tells while it stands (a faint seam of cracks, a little dust,
      and with a Spore Map, near it, its cracks blazing), and the relic's own light once the wall is down */
@@ -5255,6 +5329,7 @@ body.ninth #tbN{display:flex}
     if (!Gm.back) drawAmbience(ctx, w, camX, camY, W, H, time, 'glow', Gm.dt || 0);
     drawPits(ctx, w, camX, camY, W, H, time, true);
     drawSense(ctx, w, s, camX, camY, W, H);
+    if (TH === THEMES.core && w.boss) coreWay(ctx, w, s, camX, camY, W, H, sceneTime);
     drawFeatures(ctx, w, s, camX, camY, W, H, time, true);
     drawSets(ctx, w, s, camX, camY, W, H, time, 'glow');
     if (w.level.deepFinal) drawDeepDress(ctx, w, s, camX, camY, W, H, time, 'glow');
@@ -6208,80 +6283,108 @@ body.ninth #tbN{display:flex}
       s.connect(hp); hp.connect(g); g.connect(this.musicBus); const r = c.createGain(); r.gain.value = 0.4; g.connect(r); r.connect(this.revSend);
       s.start(t, this.rnd() * 2); s.stop(t + dur + 0.08);
     }
+    /* THE CORE, the finale. The war drums and the strings of the Guardian's fight, and over them the whole descent come
+       back: each sliver you set brings its world's theme into the fight in that world's own voice (the ice flute, the
+       kalimba, the glass, the brass, the reed, the voice), sung in the Core's key, the newest leading and the ones
+       before answering it, until with all six they sing together over the choir. Asleep, the Heart's beat slows and the
+       opening's call sounds far off. When it stumbles, everything falls away but the call on the piano; when it breaks,
+       the call is finished at last, each world singing one note of it in turn, and answered on the piano, over a
+       major chord (the town's) */
+    coreQuote(k) {      // the first half of world k's theme, its degrees as they are (sung in the Core's own scale)
+      if (!this._cq) this._cq = ['descent', 'mycelium', 'glass', 'foundry', 'ember', 'heart'].map(id => PIECES[id].themeA.filter(q => q[0] < 64));
+      return this._cq[k];
+    }
+    coreVoice(k, t, f, vel, dur) {
+      if (k === 0) this.flute(t, f * 2, 0.05 * vel, dur);
+      else if (k === 1) { this.kalimba(t, fold(f * 2, 300, 900), 0.7 * vel); this.deepLead(t, f, 0.04 * vel, dur, false); }
+      else if (k === 2) { this.glassLead(t, f * 2, 0.04 * vel, dur); this.glassPing(t, f * 4, 0.45 * vel, 1.6); }
+      else if (k === 3) this.brass(t, [f, f / 2], 0.07 * vel, dur);
+      else if (k === 4) this.reed(t, f * 2, 0.06 * vel, dur, 4.2);
+      else { this.sung(t, f * 2, 0.045 * vel, dur, 'ah'); this.sung(t, f, 0.03 * vel, dur, 'oo'); }
+    }
     score_core(t, n, e) {
       const b = Live.boss || { p: 0 }, P = b.wake ? b.p : -1, r = this.rnd, H = STEP / 2;
       const p = n % 64, s8 = p % 8, round = Math.floor(n / 64);
       const i_ = [0, 2, 4], VI = [5, 7, 9], iv = [3, 5, 7], V = [4, 6.5, 8], VII = [6, 8, 10];
       const PROG = P >= 3 && round % 2 === 1 ? [i_, VII, VI, V] : [i_, VI, iv, V];
       const ch = PROG[Math.floor(p / 16)], next = PROG[(Math.floor(p / 16) + 1) % 4];
-      if (b.burst) {                                   // after it shatters: only the fall, and a long chord
-        if (this._cP !== 'burst') { this._cP = 'burst'; this.crash(t, 1.4); this.taiko(t, 1, 30); }
-        if (n % 16 === 0) [0, 4, 5].forEach((d, j) => this.bell(t + j * 0.05, fold(F0 * this.pick(d) * 8, 300, 900), 0.6, 6));
-        if (n % 4 === 0) this.noiseHit(t, BEAT * 2, 'highpass', 900, 5200, 0.05, 0.7, BEAT);
+      const MAJ = [1, 5 / 4, 3 / 2], T = F0 * this.fl.tr;
+      if (b.burst) {
+        // it breaks: the crash, then the call finished at last, one world to each note, answered on the piano, over the
+        // town's major chord; then only bells, and the chord held
+        if (this._cP !== 'burst') {
+          this._cP = 'burst'; this._cB = n; this.crash(t, 1.4); this.taiko(t, 1, 30);
+          this.chordPad(t + BEAT * 2, MAJ.map(m => T * m * 4), BEAT * 24, 'choir', 0.045); this.chordPad(t + BEAT * 2, MAJ.map(m => T * m * 2), BEAT * 24, 'strings', 0.03);
+          const CALLN = [[0, 0], [4, 1], [8, 2], [12, 4]];
+          CALLN.forEach(([at, d], j) => this.coreVoice(j, t + BEAT * 4 + at * STEP, this.dn(d, 2), 1, STEP * (j === 3 ? 16 : 5)));
+          this.coreVoice(4, t + BEAT * 4 + 12 * STEP, this.dn(4, 1), 0.8, STEP * 16); this.coreVoice(5, t + BEAT * 4 + 12 * STEP, this.dn(4, 2), 0.8, STEP * 16);
+          for (const [at, d, len] of [[24, 5, 4], [28, 4, 4], [32, 2, 4], [36, 1, 4], [40, 0, 20]]) this.cinePiano(t + BEAT * 4 + at * STEP, T * [1, 9 / 8, 5 / 4, 171 / 128, 3 / 2, 27 / 16][d] * 4, 0.16, Math.max(3, STEP * len * 1.5), this.musicBus);
+          this.pluckBass(t + BEAT * 4, T, 0.6, BEAT * 20);
+        }
+        const k = n - this._cB;
+        if (k > 40 && k % 16 === 0 && k < 200) this.chordPad(t, MAJ.map(m => T * m * 4), STEP * 16, 'oo', 0.03);
+        if (k > 24 && k % 6 === 0 && r() < 0.6) this.bell(t, fold(T * MAJ[Math.floor(r() * 3)] * 16, 600, 2200), 0.22, 5);
         return;
       }
-      if (b.die) {                                     // the heart stumbles; the horns hold a chord that will not resolve
-        if (this._cP !== 'die') { this._cP = 'die'; this.brass(t, [this.dn(0, 2), this.dn(1, 2), this.dn(5, 2), this.dn(6.5, 2)], 0.09, BEAT * 6); this.crash(t, 1); }
-        if (r() < 0.55) { this.thump(t + r() * STEP * 0.5, 46, 0.7, 0.4); this.thump(t + 0.12 + r() * 0.1, 46, 0.45, 0.3); }
-        if (r() < 0.5) this.spic(t, this.dn([0, 1, 5, 6.5][Math.floor(r() * 4)], 2 + Math.floor(r() * 2)), 0.05);
-        this.noiseHit(t, STEP, 'bandpass', 3000 + 2000 * r(), 800, 0.06, 2, 0.002);
+      if (b.die) {                                     // it stumbles: the horns hold a chord that will not resolve, and the call on the piano
+        if (this._cP !== 'die') {
+          this._cP = 'die'; this.brass(t, [this.dn(0, 2), this.dn(1, 2), this.dn(5, 2), this.dn(6.5, 2)], 0.09, BEAT * 6); this.crash(t, 1);
+          for (const [at, d, len] of CALL) this.cinePiano(t + BEAT * 2 + at * STEP, this.dn(d, 3), 0.16, Math.max(3, STEP * len * 1.4), this.musicBus);
+        }
+        if (r() < 0.45) { this.thump(t + r() * STEP * 0.5, 46, 0.6, 0.4); this.thump(t + 0.12 + r() * 0.1, 46, 0.38, 0.3); }
+        if (r() < 0.3) this.spic(t, this.dn([0, 1, 5, 6.5][Math.floor(r() * 4)], 2 + Math.floor(r() * 2)), 0.04);
         return;
       }
-      // a sliver set: a great hit on the next step
-      if (this._cP !== undefined && typeof this._cP === 'number' && P > this._cP && P >= 1) { this.taiko(t, 1, 30); this.crash(t, 1.2); this.brass(t, i_.map((d, k) => this.dn(d, k ? 2 : 1)), 0.11, BEAT * 3); }
+      // a sliver set: a great hit, and that world's voice sounds once, alone, high over it
+      if (this._cP !== undefined && typeof this._cP === 'number' && P > this._cP && P >= 1) {
+        this.taiko(t, 1, 30); this.crash(t, 1.2); this.brass(t, i_.map((d, k) => this.dn(d, k ? 2 : 1)), 0.11, BEAT * 3);
+        const q = this.coreQuote(P - 1); this.coreVoice(P - 1, t + BEAT, this.dn(q[0][1], 3), 1.1, STEP * 8);
+        this._cRound = round + 1;                    // (its theme leads from the next round)
+      }
       this._cP = P;
-      if (P < 0) {                                     // asleep: its heart, a low string held, a backwards swell now and then
-        if (n % 8 === 0) { this.thump(t, 48, 0.32, 0.5); this.thump(t + 0.2, 48, 0.18, 0.32); }
+      if (P < 0) {                                     // asleep: the Heart's beat slowing, a low string, the call far off
+        if (n % 8 === 0) { this.thump(t, 48, 0.32, 0.5); this.thump(t + 0.24, 48, 0.16, 0.32); }
         if (n % 32 === 0) this.pluckBass(t, this.dn(0, 0), 0.4, STEP * 30);
         if (n % 32 === 26) this.revSwell(t + STEP * 6, this.dn(5, 3), 0.03, STEP * 6);
-        if (r() < 0.04) this.bell(t, this.dn([1, 5, 6.5][Math.floor(r() * 3)], 4), 0.25, 3);
+        if (n % 128 === 64) for (const [at, d, len] of CALL) this.flute(t + at * STEP, this.dn(d, 4), 0.016, STEP * len);
+        if (r() < 0.03) this.bell(t, this.dn([1, 5, 6.5][Math.floor(r() * 3)], 4), 0.2, 3);
         return;
       }
       const v = 0.85 + 0.15 * e;
       // the choir under it all
       if (p % 16 === 0) this.deepPad(t, ch.map((d, k) => this.dn(d, k ? 2 : 1)).concat(P >= 4 ? [this.dn(ch[0], 3)] : []), STEP * 16, Math.min(3, 1 + Math.floor(P / 2)));
-      // the strings: sixteenths on the root, its octave and fifth (in octaves from the fifth sliver)
+      if (P >= 6 && p % 16 === 0) this.chordPad(t, ch.map(d => this.dn(d, 3)), STEP * 16, 'choir', 0.035);
+      // the strings: sixteenths on the root, its octave and fifth
       const OST = [0, 0, 7, 0, 0, 0, 4, 0, 0, 0, 7, 0, 3, 0, 4, 2];
       for (let k = 0; k < 2; k++) {
-        const q = OST[(s8 * 2 + k) % 16], f = this.dn(ch[0] + q, 1);
-        const acc = (s8 * 2 + k) % 4 === 0 ? 1 : 0.7;
+        const q = OST[(s8 * 2 + k) % 16], f = this.dn(ch[0] + q, 1), acc = (s8 * 2 + k) % 4 === 0 ? 1 : 0.7;
         this.spic(t + k * H, f, 0.07 * acc * v);
         if (P >= 5) this.spic(t + k * H, f * 2, 0.035 * acc * v);
       }
-      // the low root under the strings on every chord, and a pulse on each bar
       if (p % 16 === 0) this.pluckBass(t, this.dn(ch[0], 0), 0.75, STEP * 6);
       if (p % 8 === 4 || p % 8 === 7) this.pluckBass(t, this.dn(ch[0], 0), 0.45, STEP * 0.9);
-      // the war drums
+      // the war drums, and the snare
       if (s8 === 0) this.taiko(t, 0.75 * v, 32);
       if (s8 === 3) this.taiko(t + H, 0.45 * v, 36);
       if (s8 === 4) this.taiko(t, 0.55 * v, 34);
       if (s8 === 6 && P >= 2) this.taiko(t, 0.4 * v, 40);
-      if (P >= 4 && p >= 56) { this.taiko(t, 0.35, 44); this.taiko(t + H, 0.3, 46); }     // rolling into the next round
-      // the snare, and its ghosts
+      if (P >= 4 && p >= 56) { this.taiko(t, 0.35, 44); this.taiko(t + H, 0.3, 46); }
       if (P >= 2 && (s8 === 2 || s8 === 6)) this.snare(t, 0.9);
       if (P >= 4 && r() < 0.35) this.snare(t + H, 0.25);
-      // brass on every chord, and its call on the last beat of each pair of bars
-      if (P >= 1 && p % 16 === 0) this.brass(t, ch.map((d, k) => this.dn(d, 2 + (k === 0 ? 0 : 0))), 0.075, STEP * 3.5);
-      if (P >= 1 && p % 16 === 13) { this.brass(t, [this.dn(next[0], 2), this.dn(next[0] + 4, 2)], 0.05, H * 0.9); this.brass(t + H, [this.dn(next[0], 2), this.dn(next[0] + 4, 2)], 0.06, H * 0.9); }
-      // a crash at the head of each round, cymbals swelling into every chord in the last stage
+      if (P >= 1 && p % 16 === 0) this.brass(t, ch.map(d => this.dn(d, 2)), 0.06, STEP * 3.5);
       if (P >= 2 && p === 0) this.crash(t, 0.8);
       if (P >= 5 && p % 16 === 12) this.riser(t, STEP * 4, 0.05);
-      // the theme
-      if (P >= 3) {
-        const TH = round % 2 === 1
-          ? [[0, 7, 3], [3, 8, 1], [4, 7, 4], [8, 4, 6], [14, 6, 2], [16, 8, 6], [22, 7, 2], [24, 6, 4], [28, 4, 4], [32, 5, 6], [38, 4, 2], [40, 2, 4], [44, 4, 4], [48, 6.5, 4], [52, 8, 4], [56, 7, 8]]
-          : [[0, 4, 3], [3, 3, 1], [4, 4, 4], [8, 7, 6], [14, 6, 2], [16, 5, 6], [22, 4, 2], [24, 2, 4], [28, 4, 4], [32, 3, 6], [38, 5, 2], [40, 7, 4], [44, 5, 4], [48, 6.5, 4], [52, 8, 4], [56, 4, 8]];
-        for (const [at, d, len] of TH) {
-          if (at !== p) continue;
-          this.deepLead(t, this.dn(d, 2), 0.07, STEP * len, true);
-          if (P >= 4) { this.deepLead(t, this.dn(d, 3), 0.035, STEP * len, true, true); this.bell(t + STEP * 2, this.dn(d, 4), 0.3, 2); }
-        }
+      // the worlds come back: the newest sliver's theme leads every other round, and the ones before answer it in
+      // turn, an octave down; with all six, two sing at once, a world and the one three away from it
+      if (P >= 1 && (this._cRound === undefined || round >= this._cRound)) {
+        const lead = round % 2 === 0 ? P - 1 : (round >> 1) % P, under = P >= 6 ? (lead + 3) % 6 : P >= 2 && round % 2 === 0 ? (round >> 1) % (P - 1) : -1;
+        for (const [at, d, len] of this.coreQuote(lead)) if (at === p) this.coreVoice(lead, t, this.dn(d, 2), 1, STEP * len);
+        if (under >= 0) for (const [at, d, len] of this.coreQuote(under)) if (at === p && len >= 2) this.coreVoice(under, t, this.dn(d, 1), 0.6, STEP * len);
       }
       // a flare gathering: a rise into a crash as it fires
       if (b.warn >= 0 && b.warn < 40 && !this._cW) { this._cW = 1; this.riser(t, 0.6, 0.09); this.crash(t + 0.62, 1.1); this.taiko(t + 0.62, 0.9, 30); }
       if (b.warn < 0) this._cW = 0;
     }
-
     /* THE DEEP: the whole run is one piece. k is how far down the run you are (0 at the first room, 1 at the bottom) */
     /* each descent plays the Deep's score its own way: its own falling bell line, bass in nines, glass in elevens and
        reed phrases, chosen from the run's seed. The layers still arrive in the same order, so every run builds */
@@ -11039,8 +11142,9 @@ body.ninth #tbN{display:flex}
     } else if (mode === 'play') {
       if (e.code === 'KeyV' || e.code === 'KeyI') tryNinth();
       if (e.code === 'Escape' || e.code === 'KeyP') setPause(true);
-      // R: a new run of the level, from its start and with the clock at zero (not in The Deep, the Codex or its rooms)
-      if (e.code === 'KeyR' && !RUN && !ARCH && !KEPT && !RLM && cur >= 0 && cur < 100) { startLevel(cur, true); return; }
+      // R: a new run of the level, from its start and with the clock at zero (not in The Deep, the Codex or its rooms),
+      // once it has been held a moment (RHOLD): a tap does nothing
+      if (e.code === 'KeyR' && !e.repeat && canRestart()) { rHold = 0; return; }
     } else if (mode === 'pause') {
       const c = e.code;
       if (c === 'ArrowUp' || c === 'KeyW') pauseMove(-1);
@@ -11056,7 +11160,8 @@ body.ninth #tbN{display:flex}
     if (e.code === 'KeyM') A.Live.toggleMute();
     if (e.code === 'KeyF') toggleFull();
   });
-  addEventListener('keyup', (e) => { const k = KEYMAP[keyCode(e)]; if (k) { keys[k] = false; e.preventDefault(); } });
+  addEventListener('keyup', (e) => { if (e.code === 'KeyR') rHold = -1; const k = KEYMAP[keyCode(e)]; if (k) { keys[k] = false; e.preventDefault(); } });
+  addEventListener('blur', () => { rHold = -1; });   // (a release the page never heard cannot restart you later)
   addEventListener('blur', () => { for (const k in keys) keys[k] = false; releaseTouch(); if (mode === 'play') setPause(true); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) { releaseTouch(); if (mode === 'play') setPause(true); } });
   addEventListener('pagehide', () => releaseTouch());
@@ -11554,7 +11659,9 @@ body.ninth #tbN{display:flex}
   function htW(t, sc) { return R.textWidth(t) * (sc < 0 ? Math.max(1, HK - 1) / SC : HS * (sc || 1)); }   // sc -1: a step smaller than half size
   function halfText() { HK = Math.max(1, Math.round(SC / 2)); HS = HK / SC; HT.length = 0; ctxAlpha = 1; }
   function flushHT() {
-    for (const [t, x, y, col, al, a, sc] of HT) {
+    const veil = Math.min(1, Math.max(rDark * 1.2, rFade));       // (the words sink into the dark of R held, all but its own)
+    for (const [t, x, y, col, al, a0, sc] of HT) {
+      const a = veil > 0 && t !== 'BEGIN AGAIN' ? a0 * (1 - 0.97 * veil) : a0;
       if (a <= 0) continue;
       const sp = R.textSprite(t, col), k = sc < 0 ? Math.max(1, HK - 1) : HK * sc, w = sp.width * k;
       let X = x * SC; if (al === 'center') X -= w / 2; else if (al === 'right') X -= w;
@@ -11787,7 +11894,6 @@ body.ninth #tbN{display:flex}
     seekerCardT = 99; newBest = false;
     mode = 'play'; sectionIdx = -1;
     cardText = DP.roomName(RUN.rooms[i]) + '  -  ' + (i + 1) + ' OF ' + RUN.rooms.length; cardT = 0;   // the room's own name
-    if (i === 0 && RUN.relic) { deepMsg('SOMETHING HUMS DOWN HERE'); deepMsgT = -2.6; }          // the only clue a relic is hidden in this run
     snapCamera(); A.Live.sfx('start'); A.Live.setPaused(false); syncTouchUI();
   }
   function deepRoomDone() {
@@ -12865,6 +12971,10 @@ body.ninth #tbN{display:flex}
   }
   function tipOut() { tS.x = TIP.kx; tS.y = TIP.ky; TIP.inn = false; }
 
+  // R held: how long (seconds; -1 when not held), and how long it must be held to begin the level again
+  let rHold = -1, rDark = 0, rFade = 0;
+  const RHOLD = 0.6;
+  function canRestart() { return mode === 'play' && !RUN && !ARCH && !KEPT && !RLM && cur >= 0 && cur < 100; }
   function frame(now) {
     requestAnimationFrame(frame);
     { const nr = touchMode && ninthReady(); if (nr !== ninthShown) { ninthShown = nr; document.body.classList.toggle('ninth', nr); } }
@@ -12878,6 +12988,7 @@ body.ninth #tbN{display:flex}
       // the sliver scene owed at the end of this level gets its art ready a little at a time on the way (in the town,
       // all six, for the memories)
       if (!SKIT && window.DwellerSkits && DwellerSkits.warm) { if ((mode === 'play' || mode === 'win') && cur < 6) DwellerSkits.warm(cur); else if (mode === 'town') DwellerSkits.warm(-1); }
+      if (rHold >= 0) { if (!canRestart() || SKIT) rHold = -1; else if ((rHold += dt) >= RHOLD) { rHold = -1; startLevel(cur, true); rDark = 0; rFade = 1; } }
       if ((mode === 'play' || mode === 'win') && !SKIT) {   // the world holds still while a memory plays
         simAcc += dt * speedMul;
         let n = 0;
@@ -13122,6 +13233,17 @@ body.ninth #tbN{display:flex}
       if (cand.length) { const ca = a * Math.min(1, Math.max(0, (winT - 2.0) / 1.2)); yy += 4 * Z; cand.forEach((l, i) => ht(l, cx, yy + i * L7, '#6fd6e6', 'center', ca, Z)); }
       if (winT > 2.5) uiHint(touchMode ? 'TAP FOR THE TOWN' : core ? [['ENTER', 'TOWN']] : [['ENTER', 'TOWN'], ['R', 'AGAIN']], cx, y + h + 4 * Z, a, Z);
     }
+    // R being held: the dark closes in from the edges (the same dark that takes you), BEGIN AGAIN faint in it; let go
+    // and it draws back. Held to the end, the level begins again out of it (rFade: that dark lifting)
+    rDark = rHold > 0.08 && mode === 'play' ? Math.min(1, (rHold - 0.08) / (RHOLD - 0.08)) : Math.max(0, rDark - frameDt * 4);
+    if (rDark > 0.001) {
+      const u = rDark, R0 = Math.max(LW, LH) * 0.75, g = ctx.createRadialGradient(LW / 2, LH / 2, 0, LW / 2, LH / 2, R0);
+      g.addColorStop(0, 'rgba(5,5,10,' + (0.97 * u * u * u).toFixed(3) + ')'); g.addColorStop(0.5, 'rgba(5,5,10,' + (0.97 * Math.pow(u, 1.6)).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(5,5,10,' + Math.min(0.97, u * 1.4).toFixed(3) + ')');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, LW, LH);
+      if (u > 0.2) ht('BEGIN AGAIN', LW >> 1, Math.round(LH * 0.45), '#d6dbe4', 'center', 0.75 * Math.min(1, (u - 0.2) * 2.5));
+    }
+    if (rFade > 0) { ctx.globalAlpha = Math.min(1, rFade) * 0.97; ctx.fillStyle = '#05050a'; ctx.fillRect(0, 0, LW, LH); ctx.globalAlpha = 1; rFade = Math.max(0, rFade - frameDt * 1.6); }
   }
 
   function showError(msg) {
