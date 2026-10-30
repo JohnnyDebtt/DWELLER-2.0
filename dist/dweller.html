@@ -6327,7 +6327,7 @@ body.ninth #tbN{display:flex}
       else { this.sung(t, f * 2, 0.045 * vel, dur, 'ah'); this.sung(t, f, 0.03 * vel, dur, 'oo'); }
     }
     /* ---- the heavy rig for the Core: a great dark pad, spread wide left and right, each side through its own drive, a
-       driven synth bass under it, and a pumping distorted pad (all built once, on first use) */
+       driven synth bass under it (all built once, on first use) */
     heavyRig() {
       if (this._hv && this._hv.c === this.ctx) return this._hv;
       const c = this.ctx, curve = (k, asym) => { const a = new Float32Array(2048); for (let i = 0; i < 2048; i++) { const x = i / 1023.5 - 1 + (asym || 0); a[i] = Math.tanh(k * x) / Math.tanh(k); } return a; };
@@ -6346,7 +6346,7 @@ body.ninth #tbN{display:flex}
         return inp;
       };
       return (this._hv = { c, L: amp(1.8, 35, 2400, 220, 3, 0.16, -0.7, 0.85), R: amp(1.8, 35, 2300, 240, 3, 0.16, 0.7, 0.85),
-        bass: amp(3, 30, 1100, 160, 2, 0.15, 0, 0.04), pad: amp(2.2, 120, 2600, 900, 2, 0.05, 0, 0.5) });
+        bass: amp(3, 30, 1100, 160, 2, 0.15, 0, 0.04) });
     }
     /* the great dark pad: every note of the chord on detuned saws, a little apart on each side, opening slowly through
        its filter, warm in the low middle and left long in the hall. att: how slowly it swells in */
@@ -6370,14 +6370,6 @@ body.ninth #tbN{display:flex}
       const g2 = c.createGain(); this.env(g2, t, 0.004, vel * 0.55, dur); s.connect(g2); g2.connect(this.musicBus);
       for (const x of [o, s]) { x.start(t); x.stop(t + dur + 0.1); }
     }
-    hpad(t, freqs, dur, vel) {                       // a distorted pad, ducking on every beat as if the kick pushed it down
-      const c = this.ctx, hv = this.heavyRig(), g = c.createGain();
-      g.gain.setValueAtTime(0.0001, t);
-      for (let b = 0; b * BEAT < dur; b++) { const tb = t + b * BEAT; g.gain.setValueAtTime(0.0001, tb); g.gain.linearRampToValueAtTime(vel, tb + BEAT * 0.42); }
-      g.gain.setValueAtTime(vel, t + dur); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.4);
-      for (const f of freqs) for (const det of [-11, 10]) { const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = det; o.connect(g); o.start(t); o.stop(t + dur + 0.5); }
-      g.connect(hv.pad);
-    }
     hkick(t, vel) {                                  // a tight, heavy kick: a fast falling sine and a click
       const c = this.ctx, o = c.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(170, t); o.frequency.exponentialRampToValueAtTime(46, t + 0.055);
       const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.8 * vel, t + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.32);
@@ -6389,35 +6381,45 @@ body.ninth #tbN{display:flex}
       this.noiseHit(t, 0.5, 'bandpass', 1900, 1300, 0.07 * vel, 1.4, 0.002);
       this.noiseHit(t, 0.07, 'bandpass', 3400, 3400, 0.06 * vel, 9, 0.001);
     }
-    china(t, vel) { this.noiseHit(t, 0.9, 'bandpass', 4200, 2600, 0.11 * vel, 0.8, 0.002); this.noiseHit(t, 0.45, 'highpass', 7000, 9000, 0.05 * vel, 0.6, 0.002); }
-    /* THE CORE, played heavy: the same shape as before (asleep, awake, the six slivers, the worlds returning, the flare,
-       the stumble and the breaking), but on great dark pads, a driven bass and a metal kit, in the darkest minor.
-       The chords are on the Deep's minor: i bVI iv V, and in the breakdowns (every other round once three
-       slivers are set) i bII bVI V, the flat second a 17/16 over the root.
-         asleep   a low drone swelling, the Heart's slowing beat, metal scraping, the call far off
-         awake    half-time: the great pad on every chord, the kick and bass in the gaps, the snare on three, the pad pumping
-         1        the worlds' themes begin
-         2        full time: the kick and bass gallop, the snare on two and four, hats, a crash into every round
-         3        every other round drops into a breakdown on the flat second: the china on the beat
-         4        the double kick under the gallop, a fill into every round
-         5        a rise into every chord
-         6        the blast: everything at once, the choir over it
-       Each sliver set lands a great hit, the pad struck hard, and a bass dive; a flare gathering rises into a crash and a dive as it fires */
+    /* THE CORE, scored like a film's last battle: dark, heavy and relentless. Low strings drive a 3-3-2 ostinato in
+       sixteenths, war drums and a military snare under them, a dark choir, and on every chord change a braam (the
+       horns, a dark pad and a sub drop struck together). It keeps the fight's shape: asleep, awake, the six slivers, the
+       worlds' themes returning in their own voices, the flare, the stumble and the breaking.
+       The chords are on the Deep's minor: i bVI iv V, and every other round once three slivers are set i bII bVI V (the
+       flat second a 17/16 over the root). Every pitch is a ratio of the form X/2^N over the root, so all of it stays in
+       the Seeker's tuning.
+         asleep   a low drone, the war drum's slow heartbeat, a clock ticking, metal scraping, the call far off
+         awake    the low strings' ostinato, a braam on every chord, the taiko, the clock
+         1        the horns on every chord, and the worlds' themes begin
+         2        the strings in octaves, the snare on two and four, a crash into every round
+         3        every other round turns to the flat second, the taiko galloping in sixteenths
+         4        the choir chants on the accents, a snare roll into every round
+         5        the violins tremble high above, the horns take up the theme, rises into every chord
+         6        everything, a braam on every bar, the full choir over it
+       Each sliver set lands the greatest braam and that world's voice alone over it; a flare gathering rises into an
+       impact as it fires */
+    braam(t, f, vel, dur) {                          // horns, a dark pad and the sub, struck together, low and huge
+      this.brass(t, [f * 2, f * 3, f * 4], 0.11 * vel, dur);
+      this.brass(t, [f, f * 1.5], 0.09 * vel, dur);
+      this.darkPad(t, [f, f * 1.5, f * 2], dur, 0.42 * vel, 0.02);
+      this.hbass(t, f, 0.45 * vel, dur * 0.9, false);
+      this.hkick(t, 0.6 * vel); this.taiko(t, 0.6 * vel, 28);
+      this.noiseHit(t, 1.6, 'lowpass', 900, 120, 0.06 * vel, 0.7, 0.004);
+    }
     score_core(t, n, e) {
       const b = Live.boss || { p: 0 }, P = b.wake ? b.p : -1, r = this.rnd, H = STEP / 2;
       const p = n % 64, s8 = p % 8, round = Math.floor(n / 64), T = F0 * this.fl.tr;
       const MAJ = [1, 5 / 4, 3 / 2];
-      const RT = (d, o) => d === 'b2' ? T * 17 / 16 * Math.pow(2, o) : this.dn(d, o);            // a chord's root
-      const brk = P >= 3 && round % 2 === 1;                                                      // a breakdown round
-      const PROG = brk ? [0, 'b2', 5, 4] : [0, 5, 3, 4], ci = Math.floor(p / 16), cr = PROG[ci];
-      const TRI = { 0: [0, 2, 4], 5: [5, 7, 9], 3: [3, 5, 7], 4: [4, 6.5, 8], 'b2': ['b2', 3, 5] };
-      const chordF = (o) => TRI[cr].map((d, k) => RT(d, o + (k && typeof d === 'number' && d >= 7 ? 0 : 0)));
+      const RT = (d, o) => d === 'b2' ? T * 17 / 16 * Math.pow(2, o) : this.dn(d, o);
+      const alt = P >= 3 && round % 2 === 1;
+      const PROG = alt ? [0, 'b2', 5, 4] : [0, 5, 3, 4], cr = PROG[Math.floor(p / 16)];
+      const minor = cr === 0 || cr === 3, third = minor ? 19 / 16 : 5 / 4;
+      const chord = (o) => [RT(cr, o), RT(cr, o) * third, RT(cr, o) * 3 / 2];
       if (b.burst) {
-        // it breaks: one last chord rings out under the crash, then (as before) the call finished at last, one world to
-        // each note, answered on the piano, over the town's major chord; then only bells, and the chord held
+        // it breaks: one last braam under the crash, then the call finished at last, one world to each note, answered on
+        // the piano, over the town's major chord; then only bells, and the chord held
         if (this._cP !== 'burst') {
-          this._cP = 'burst'; this._cB = n; this.crash(t, 1.4); this.china(t, 1.2); this.hkick(t, 1); this.taiko(t, 1, 30);
-          this.darkPad(t, [RT(0, 0), RT(4, 0), RT(0, 1), RT(2, 1)], BEAT * 5, 0.6, 0.02); this.hbass(t, RT(0, 0), 0.5, BEAT * 5, true);
+          this._cP = 'burst'; this._cB = n; this.crash(t, 1.4); this.braam(t, RT(0, 0), 1, BEAT * 4);
           this.chordPad(t + BEAT * 2, MAJ.map(m => T * m * 4), BEAT * 24, 'choir', 0.045); this.chordPad(t + BEAT * 2, MAJ.map(m => T * m * 2), BEAT * 24, 'strings', 0.03);
           const CALLN = [[0, 0], [4, 1], [8, 2], [12, 4]];
           CALLN.forEach(([at, d], j) => this.coreVoice(j, t + BEAT * 4 + at * STEP, this.dn(d, 2), 1, STEP * (j === 3 ? 16 : 5)));
@@ -6430,71 +6432,74 @@ body.ninth #tbN{display:flex}
         if (k > 24 && k % 6 === 0 && r() < 0.6) this.bell(t, fold(T * MAJ[Math.floor(r() * 3)] * 16, 600, 2200), 0.22, 5);
         return;
       }
-      if (b.die) {                                     // it stumbles: one dark chord left hanging, the call on the piano
+      if (b.die) {                                     // it stumbles: the strings tremble on a chord that will not resolve, the call on the piano
         if (this._cP !== 'die') {
-          this._cP = 'die'; this.crash(t, 1); this.hkick(t, 1);
-          this.darkPad(t, [RT(0, 0), RT(4, 0), RT(0, 1), RT('b2', 2)], BEAT * 7, 0.5, 0.05); this.hbass(t, RT(0, 0), 0.45, BEAT * 7, false);
+          this._cP = 'die'; this.crash(t, 1); this.braam(t, RT(0, 0), 0.8, BEAT * 6);
+          this.brass(t + BEAT, [RT(0, 2), RT('b2', 2), RT(5, 2), RT(4, 2) * 15 / 16 * 2], 0.07, BEAT * 5);
           for (const [at, d, len] of CALL) this.cinePiano(t + BEAT * 2 + at * STEP, this.dn(d, 3), 0.16, Math.max(3, STEP * len * 1.4), this.musicBus);
         }
-        if (r() < 0.45) { this.hkick(t + r() * STEP * 0.5, 0.7); this.hkick(t + 0.12 + r() * 0.1, 0.45); }
+        if (n % 2 === 0) this.spic(t, RT('b2', 3), 0.025);
+        this.spic(t + H, RT(0, 3), 0.02);
+        if (r() < 0.35) { this.taiko(t + r() * STEP * 0.5, 0.6, 34); this.taiko(t + 0.14, 0.35, 38); }
         return;
       }
-      // a sliver set: the great hit (every drum, the pad struck hard, the bass diving), and that world's voice alone over it
+      // a sliver set: the greatest braam, every drum, and that world's voice alone over it
       if (this._cP !== undefined && typeof this._cP === 'number' && P > this._cP && P >= 1) {
-        this.hkick(t, 1); this.taiko(t, 1, 30); this.crash(t, 1.2); this.china(t, 1); this.hsnare(t, 1);
-        this.darkPad(t, [RT(0, 0), RT(4, 0), RT(0, 1), RT(2, 1), RT(4, 1)], BEAT * 3, 0.75, 0.01); this.hbass(t, RT(0, 0), 0.6, BEAT * 3, true);
+        this.braam(t, RT(0, 0), 1.25, BEAT * 4); this.crash(t, 1.3); this.hsnare(t, 1); this.taiko(t + 0.02, 1, 32);
+        this.chordPad(t, [RT(0, 3), RT(0, 3) * 19 / 16, RT(0, 3) * 3 / 2], BEAT * 4, 'choir', 0.05);
         const q = this.coreQuote(P - 1); this.coreVoice(P - 1, t + BEAT, this.dn(q[0][1], 3), 1.3, STEP * 8);
         this._cRound = round + 1;
       }
       this._cP = P;
-      if (P < 0) {                                     // asleep: a low drone, the Heart's beat slowing, metal scraping, the call far off
-        if (n % 8 === 0) { this.hkick(t, 0.5); this.hkick(t + 0.24, 0.28); }
-        if (n % 32 === 0) { this.hbass(t, RT(0, 0), 0.35, STEP * 30); this.darkPad(t + STEP * 4, [RT(0, 0), RT(0, 1)], STEP * 22, 0.2, 2.5); }
-        if (n % 32 === 24) this.darkPad(t, [RT('b2', 1)], STEP * 6, 0.1, 1.2);
-        if (n % 32 === 26) this.revSwell(t + STEP * 6, this.dn(5, 3), 0.03, STEP * 6);
-        if (n % 64 === 40) this.noiseHit(t, 2.4, 'bandpass', 600, 2400, 0.035, 6, 0.6);                 // metal, scraping
+      if (P < 0) {                                     // asleep: a low drone, the war drum's slow heartbeat, a clock, metal, the call far off
+        if (n % 8 === 0) { this.taiko(t, 0.45, 30); this.taiko(t + 0.26, 0.25, 32); }
+        if (n % 2 === 0) this.tick(t, 0.35, 5200);
+        if (n % 32 === 0) { this.darkPad(t, [RT(0, 0), RT(0, 1), RT(0, 1) * 3 / 2], STEP * 30, 0.22, 3); this.hbass(t, RT(0, 0), 0.3, STEP * 28); }
+        if (n % 32 === 24) this.revSwell(t + STEP * 8, RT('b2', 3), 0.035, STEP * 8);
+        if (n % 64 === 40) this.noiseHit(t, 2.4, 'bandpass', 600, 2400, 0.03, 6, 0.6);
         if (n % 128 === 64) for (const [at, d, len] of CALL) this.flute(t + at * STEP, this.dn(d, 4), 0.016, STEP * len);
         return;
       }
-      const v = 0.85 + 0.15 * e, full = P >= 2 && !brk;
-      // the choir and the pumping pad under it all
-      if (p % 16 === 0) this.deepPad(t, chordF(1).concat(P >= 4 ? [RT(cr, 3)] : []), STEP * 16, Math.min(3, 1 + Math.floor(P / 2)));
-      if (p % 16 === 0) this.hpad(t, chordF(2), STEP * 16, 0.05 + 0.02 * Math.min(P, 4) / 4);
-      if (P >= 6 && p % 16 === 0) this.chordPad(t, chordF(3), STEP * 16, 'choir', 0.04);
-      // the great pad, held through each chord; the bass struck where the chords used to ring (RING: where in the bar, in
-      // sixteenths, and how long), and the kick keeping the drive underneath (pat)
-      if (p % 16 === 0) this.darkPad(t, [RT(cr, 0)].concat(chordF(1), [RT(cr, 2)], P >= 4 ? [RT(cr, 2) * 3 / 2] : []), STEP * (brk ? 7.5 : 15.5), (0.42 + 0.03 * Math.min(P, 6)) * v, brk ? 0.05 : 0.18);
-      const HALF = [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0];       // half time: in the gaps
-      const BRK = [1, 0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 0, 1];        // the breakdown
-      const GAL = [1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1];        // the gallop
-      const pat = brk ? BRK : full ? GAL : HALF, fr = RT(cr, 0);
-      const RING = brk ? { 0: 3, 3: 3, 6: 3, 9: 3, 12: 4 } : full ? { 0: 6, 6: 2, 8: 6, 14: 2 } : { 0: 6, 6: 4, 10: 6 };
+      const v = 0.85 + 0.15 * e;
+      // on every chord: the braam (from 6, on every bar), the choir, the horns
+      if (p % 16 === 0 || (P >= 6 && p % 8 === 0)) this.braam(t, RT(cr, 0), (p % 16 === 0 ? 0.85 : 0.6) * v, STEP * 7);
+      if (p % 16 === 0) this.chordPad(t, chord(2), STEP * 16, 'choir', 0.03 + 0.004 * Math.min(P, 6));
+      if (P >= 6 && p % 16 === 0) this.chordPad(t, chord(3), STEP * 16, 'choir', 0.035);
+      if (P >= 1 && p % 16 === 8) this.brass(t, chord(1).concat([RT(cr, 2)]), 0.06, STEP * 7);
+      // the low strings: the 3-3-2 ostinato in sixteenths, accented, climbing on the accents; in octaves from 2
+      const ACC = [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0];
+      const OST = minor ? [1, 1, 1, 3 / 2, 1, 1, 13 / 8, 1, 1, 1, 1, 3 / 2, 1, 1, 19 / 16, 1] : [1, 1, 1, 3 / 2, 1, 1, 2, 1, 1, 1, 1, 3 / 2, 1, 1, 5 / 4, 1];
       for (let k = 0; k < 2; k++) {
-        const j = s8 * 2 + k, tt = t + k * H, first = p % 16 === 0 && k === 0;
-        if (first && P >= 1) this.hbass(tt, fr, 0.5, H * (brk ? 3 : 8));
-        else if (RING[j] !== undefined) this.hbass(tt, fr, j % 8 === 0 ? 0.42 : 0.32, H * RING[j]);
-        // the kick: with the old chug pattern, or (from 4, outside the breakdowns) every sixteenth
-        if (P >= 4 && full) this.hkick(tt, j % 4 === 0 ? 0.8 : 0.5);
-        else if (pat[j] || first) this.hkick(tt, j % 4 === 0 ? 0.85 : 0.6);
+        const j = s8 * 2 + k, tt = t + k * H, f = RT(cr, 1) * OST[j], a = ACC[j] ? 1 : 0.6;
+        this.spic(tt, f, 0.085 * a * v);
+        if (P >= 2) this.spic(tt, f * 2, 0.045 * a * v);
+        if (P >= 5) { this.spic(tt, RT(cr, 3) * (j % 4 < 2 ? 1 : 3 / 2), 0.018); this.spic(tt + H / 2, RT(cr, 3) * (j % 4 < 2 ? 1 : 3 / 2), 0.014); }   // the violins, trembling
+        if (ACC[j]) this.hbass(tt, RT(cr, 0), 0.3, H * 1.5);
+        // the taiko: on the accents; from 3 in the turned rounds, galloping in sixteenths
+        if (alt && P >= 3) this.taiko(tt, (ACC[j] ? 0.55 : 0.28) * v, ACC[j] ? 34 : 42);
+        else if (ACC[j] && (j === 0 || j === 6 || j === 8 || j === 14)) this.taiko(tt, 0.6 * v, j === 0 || j === 8 ? 32 : 38);
+        // the choir chanting on the accents (from 4)
+        if (P >= 4 && ACC[j] && k === 0) this.sung(tt, chord(2)[j % 3], 0.03, H * 1.6, 'ah');
       }
-      // the snare, the hats, the cymbals
-      if (full ? (s8 === 2 || s8 === 6) : s8 === 4) this.hsnare(t, 0.9);
-      if (P >= 6 && full) this.hsnare(t + H, 0.35);
-      if (full) { this.tick(t, 0.6, 7600); if (P >= 4) this.tick(t + H, 0.35, 8200); }
-      if (brk && s8 % 2 === 0) this.china(t, s8 === 0 ? 1 : 0.6);
-      if (P >= 2 && p === 0) { this.crash(t, 0.9); this.hkick(t, 1); }
-      if (P >= 4 && p >= 56 && !brk) { this.hsnare(t, 0.5); this.hsnare(t + H, 0.4); }
-      if (P >= 5 && p % 16 === 12) this.riser(t, STEP * 4, 0.05);
-      // the worlds come back, as before
+      // the clock, the snare, the cymbals, the rolls and rises
+      if (P <= 1) this.tick(t, 0.45, 5200);
+      if (P >= 2 && (s8 === 2 || s8 === 6)) this.hsnare(t, 0.85);
+      if (P >= 2 && r() < 0.3) this.snare(t + H, 0.22);
+      if (P >= 2 && p === 0) this.crash(t, 0.9);
+      if (P >= 4 && p >= 56) { const g = (p - 56) / 8; this.snare(t, 0.4 + 0.6 * g); this.snare(t + H, 0.45 + 0.6 * g); }
+      if (P >= 5 && p % 16 === 12) this.riser(t, STEP * 4, 0.06);
+      // the worlds come back: the newest sliver's theme leads every other round, the ones before answer it; from 5 the
+      // horns sing the lead's theme with it, an octave down
       if (P >= 1 && (this._cRound === undefined || round >= this._cRound)) {
         const lead = round % 2 === 0 ? P - 1 : (round >> 1) % P, under = P >= 6 ? (lead + 3) % 6 : P >= 2 && round % 2 === 0 ? (round >> 1) % (P - 1) : -1;
         for (const [at, d, len] of this.coreQuote(lead)) if (at === p) {
-          this.coreVoice(lead, t, this.dn(d, 2), 1.25, STEP * len);
+          this.coreVoice(lead, t, this.dn(d, 2), 1.3, STEP * len);
+          if (P >= 5) this.brass(t, [this.dn(d, 1), this.dn(d, 2)], 0.075, STEP * len);
         }
         if (under >= 0) for (const [at, d, len] of this.coreQuote(under)) if (at === p && len >= 2) this.coreVoice(under, t, this.dn(d, 1), 0.7, STEP * len);
       }
-      // a flare gathering: a rise into a crash, and a dive, as it fires
-      if (b.warn >= 0 && b.warn < 40 && !this._cW) { this._cW = 1; this.riser(t, 0.6, 0.09); this.crash(t + 0.62, 1.1); this.china(t + 0.62, 0.9); this.hkick(t + 0.62, 1); this.hbass(t + 0.62, RT(0, 1), 0.5, 1.1, true); }
+      // a flare gathering: a rise into an impact as it fires
+      if (b.warn >= 0 && b.warn < 40 && !this._cW) { this._cW = 1; this.riser(t, 0.6, 0.1); this.crash(t + 0.62, 1.1); this.braam(t + 0.62, RT(0, 0), 0.9, BEAT * 2); }
       if (b.warn < 0) this._cW = 0;
     }
     /* THE DEEP: the whole run is one piece. k is how far down the run you are (0 at the first room, 1 at the bottom) */
