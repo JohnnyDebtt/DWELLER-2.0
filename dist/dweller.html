@@ -931,8 +931,10 @@ body.ninth #tbN{display:flex}
     foundry: { style: 'foundry', amb: 0.6, rock: [18, 13, 11], bgTop: [60, 48, 42], bgBot: [66, 46, 38], far: ['#4c3c33', '#45362e'], mid: '#372a23', near: '#201915', tile: [[24, 18, 16], [128, 96, 78], [228, 200, 176]],
       tuft: ['#6b5546', '#c79a7c'], glow: '#c97a44', stal: ['#201915', '#5c4638'], lamp: ['#6b4a35', '#e8a878', '#ffdcbc'],
       orb: [[52, 30, 22], [214, 140, 96], [255, 236, 220]], glowRGB: '235,150,95', slit: '#e8a878', dark: [12, 7, 5], sheen: '#8c6c5c', pupil: '#ffdcbc', mote: [255, 170, 110] },
-    ember: { style: 'ember', amb: 0.6, rock: [20, 8, 11], bgTop: [62, 30, 37], bgBot: [72, 25, 32], far: ['#542a35', '#4b252f'], mid: '#3b1d25', near: '#210f14', tile: [[24, 11, 14], [142, 62, 70], [246, 184, 174]],
-      tuft: ['#7a3036', '#ff8f76'], glow: '#e8573f', stal: ['#210f14', '#6a2f36'], lamp: ['#7a2f2f', '#ff9078', '#ffd6ca'],
+    // (Ember Deep: ash and obsidian, grey-black rock with only its cracks burning; the cave as dark as the other worlds,
+    //  and everything a burning light reaches tinted warm, so the danger stands out of the grey)
+    ember: { style: 'ember', tint: true, tintA: 0.3, cracks: [0.24, 0.38, 0.14], rock: [20, 8, 11], bgTop: [44, 36, 38], bgBot: [46, 34, 34], far: ['#3e3234', '#382d2e'], mid: '#2c2224', near: '#161010', tile: [[18, 12, 12], [104, 76, 70], [244, 196, 176]],
+      tuft: ['#7a3036', '#ff8f76'], glow: '#e8573f', stal: ['#0e0a0a', '#4a3434'], lamp: ['#7a2f2f', '#ff9078', '#ffd6ca'],
       orb: [[60, 18, 20], [232, 110, 92], [255, 232, 224]], glowRGB: '255,112,82', slit: '#ff9078', dark: [14, 4, 6], sheen: '#a05e5e', pupil: '#ffd6ca', mote: [255, 120, 80] },
     heart: { style: 'heart', bgTop: [38, 26, 42], bgBot: [28, 20, 38], far: ['#3c283e', '#362438'], mid: '#2c1d31', near: '#1c1321', tile: [[24, 17, 27], [118, 98, 108], [238, 228, 214]],
       tuft: ['#8a4f7a', '#f4b0dc'], glow: '#e676c4', stal: ['#1c1321', '#6e5866'], lamp: ['#6a3a64', '#f2a6de', '#ffe4f6'],
@@ -1965,9 +1967,9 @@ body.ninth #tbN{display:flex}
       const l = lights[i];
       if (l.hazard) drawHazardLight(lctx, w, l, camX, camY, W, H);
     }
-    // (in the Foundry and Ember Deep the open cave is kept bright, so a light's reach is hard to tell from the cave
-    //  around it: there, everything a burning light reaches is also tinted warm over the scene)
-    const tint = !!TH.amb && TH.amb !== AMBIENT && !!TH.glowRGB;
+    // (in the Foundry the open cave is kept bright, so a light's reach is hard to tell from the cave around it; Ember
+    //  Deep's ash is grey: in both, everything a burning light reaches is also tinted warm over the scene)
+    const tint = ((!!TH.amb && TH.amb !== AMBIENT) || !!TH.tint) && !!TH.glowRGB;
     if (tint) {
       tctx.globalCompositeOperation = 'copy'; tctx.drawImage(lc, 0, 0);
       tctx.globalCompositeOperation = 'multiply'; tctx.fillStyle = 'rgb(' + TH.glowRGB + ')'; tctx.fillRect(0, 0, W, H);
@@ -2023,7 +2025,7 @@ body.ninth #tbN{display:flex}
     octx.putImageData(oimg, 0, 0);
     if (lm) LM.cx.putImageData(LM.img, 0, 0);
     ctx.drawImage(ocv, 0, 0);
-    if (tint) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.2; ctx.drawImage(tcv, 0, 0); ctx.restore(); }
+    if (tint) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = TH.tintA || 0.2; ctx.drawImage(tcv, 0, 0); ctx.restore(); }
   }
 
   /* ------------------------------------------------------------------ sprites in the world */
@@ -3423,10 +3425,11 @@ body.ninth #tbN{display:flex}
     const T = ECR.cv, par = 0.25;
     const tiles = () => { const ox = -(((camX * par) % T.width) + T.width) % T.width, oy = -(((camY * par) % T.height) + T.height) % T.height;
       for (let x = ox - T.width; x < W; x += T.width) for (let y = oy - T.height; y < H; y += T.height) { if (x + T.width < 0 || y + T.height < 0) continue; c.drawImage(T, Math.round(x), Math.round(y)); } };
-    c.globalAlpha = 0.13; tiles(); c.globalAlpha = 1;
+    const CR = TH.cracks || [0.13, 0.2, 0.12];   // (faint, in the heat's waves, and the glow from below)
+    c.globalAlpha = CR[0]; tiles(); c.globalAlpha = 1;
     const o = c.globalCompositeOperation; c.globalCompositeOperation = 'lighter';
-    for (let k = 0; k < 2; k++) { const bx = ((t * 14 + k * 320) % (W + 260)) - 130; c.save(); c.beginPath(); c.rect(bx - 60, 0, 120, H); c.clip(); c.globalAlpha = 0.2; tiles(); c.restore(); }
-    const g = c.createLinearGradient(0, H * 0.5, 0, H); g.addColorStop(0, 'rgba(255,80,30,0)'); g.addColorStop(1, 'rgba(230,80,40,0.12)'); c.fillStyle = g; c.fillRect(0, H * 0.5, W, H * 0.5);
+    for (let k = 0; k < 2; k++) { const bx = ((t * 14 + k * 320) % (W + 260)) - 130; c.save(); c.beginPath(); c.rect(bx - 60, 0, 120, H); c.clip(); c.globalAlpha = CR[1]; tiles(); c.restore(); }
+    const g = c.createLinearGradient(0, H * 0.5, 0, H); g.addColorStop(0, 'rgba(255,80,30,0)'); g.addColorStop(1, 'rgba(230,80,40,' + CR[2] + ')'); c.fillStyle = g; c.fillRect(0, H * 0.5, W, H * 0.5);
     c.globalCompositeOperation = o; c.globalAlpha = 1;
   }
   /* the far layer sits behind everything that is in the level: rock, shelves, vines, the dark, lamps, the Dweller and the
@@ -5413,6 +5416,7 @@ body.ninth #tbN{display:flex}
       else if (l.t === 'beam') drawBeamEmitter(ctx, l, camX, camY, time);
     }
     drawClaimed(ctx, w, s, camX, camY, time, true);
+    if (Gm.vision) Gm.vision(ctx, camX, camY, W, H);    // (a vision of the grey Dweller, after the dark, so it glows in it)
     if (!s.dead && !(s.won && s.wonT > 30)) {
       // only the visor stays visible in shadow
       const vis = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(time * 5.0));
@@ -7123,6 +7127,12 @@ body.ninth #tbN{display:flex}
           run(6.0, [0, 2, 1, 0], 0.045, 3, 0.6);
           spool(6.6);
         }
+      } else if (id === 'vision') {
+        // ---- a vision of the grey Dweller in a level: the music steps aside; a low minor chord swells in out of a breath,
+        //  a few far notes, and it all sinks away as he fades
+        air(0, 6, 900, 0.006, 'bandpass'); swell(0.8, n(2, 0), 0.03, 0.8);
+        pad(0.3, ch(I, 2), 4.6, 'oo', 0.018); pad(0.5, ch(I, 3), 4.2, 'glass', 0.008); bloom(0.4, n(1, 0), 0.03, 5.6);
+        run(1.4, [0, 2, 1], 0.045, 3, 0.9); pn(4.2, n(2, 4), 0.05, 5); pn(4.2, n(0, 5), 0.05, 5);
       } else if (id === 'guardian') {
         // ---- THE GUARDIAN'S CLOAK: the walls' slow dark pulse; steps; the smoke building; the eyes open on a low choir and a
         //  dread chord; the blink; the cloak comes out of the smoke on a rising line; it settles; the eyes close
@@ -7177,7 +7187,7 @@ body.ninth #tbN{display:flex}
       }
     }
     cine(id, t0, dest, sdest) {
-      if (/^(opening|ending|guardian|sliver[0-5]|cloak[0-5])$/.test(id)) return this.cine2(id, t0, dest, sdest);
+      if (/^(opening|ending|guardian|vision|sliver[0-5]|cloak[0-5])$/.test(id)) return this.cine2(id, t0, dest, sdest);
       const n = (o, i) => F0 * Math.pow(2, o) * PALETTE[i];
       sdest = sdest || dest;
       // (the first SEEKER's sounds, in the same dark hall as the other painted scenes)
@@ -11731,6 +11741,84 @@ body.ninth #tbN{display:flex}
     vign(c, W, H, 0.5);
   }
 
+  /* ---- visions of the grey Dweller in the levels: once in each world, as you pass one place, his ghost is there for a
+     few seconds doing what he did there, and what he left glows round him; then all of it fades. t: seconds since it
+     began (6 in all); X0: where it begins (the spot you pass), fy: the floor there, roof: the roof over it; c is the
+     level's own canvas, its view at (cx, cy). */
+  const VIS_T = 6, GH = { cv: null };
+  function vision(c, R, L, t, cx, cy, X0, fy, roof) {
+    if (t < 0 || t > VIS_T) return;
+    const e = sm(0, 0.8, t) * (1 - sm(4.8, VIS_T, t)), fl = 0.85 + 0.15 * Math.sin(t * 13) * Math.sin(t * 7.3);
+    c.save(); c.translate(-Math.round(cx), -Math.round(cy));
+    const ghost = (x, o) => { o = o || {}; const a = (o.a === undefined ? 1 : o.a) * e * fl; if (a <= 0.01) return; glowAt(c, x + 3, fy - 6, 18, '180,196,224', (0.4 * a).toFixed(3)); drawFig(c, R, t, x, fy, Object.assign({}, o, { alpha: 0.78 * a })); if (a > 0.3) drawFig(c, R, t + 0.08, x + (o.face < 0 ? 1 : -1), fy, Object.assign({}, o, { alpha: 0.18 * a })); };
+    const spiral = (x, y, col, a, R0, prog) => { const end = Math.PI * 5 * (prog === undefined ? 1 : prog); for (let q = 0; q < end; q += 0.12) { const r = R0 * q / (Math.PI * 5); c.globalAlpha = a; px(c, col, x + Math.cos(q) * r, y + Math.sin(q) * r); } c.globalAlpha = 1; };
+    const walkX = (x0, x1, t0, t1) => x0 + (x1 - x0) * sm(t0, t1, t), walking = (t0, t1) => t > t0 && t < t1 - 0.1;
+    if (L === 0) {            // I  the Descent: he walks the floor and his steps freeze into it; at the wall he scratches his spiral
+      const gx = walkX(X0 + 14, X0 + 106, 0.6, 3.6);
+      for (let k = 0; k < 7; k++) { const x = X0 + 28 + k * 11; if (gx < x - 2) continue; c.globalAlpha = 0.9 * e; px(c, '#203a52', x, fy - 1, 3, 1); px(c, '#a8d0ec', x, fy - 2, 3, 1); c.globalAlpha = 1; glowAt(c, x + 1, fy - 1, 5, '160,210,240', (0.2 * e).toFixed(3)); }
+      const sp = sm(3.7, 4.5, t); if (sp > 0) { spiral(X0 + 118, fy - 18, '#d8eefa', 0.9 * e, 5, sp); glowAt(c, X0 + 118, fy - 18, 14, '170,220,250', (0.35 * e * sp).toFixed(3)); }
+      ghost(gx, { walking: walking(0.6, 3.6) });
+    } else if (L === 1) {     // II  the Mycelium: he comes to a place and kneels; a ring of pale mushrooms opens round him, threads glowing under the floor
+      const RX = X0 + 70, gx = walkX(X0 + 30, RX - 3, 0.6, 2.0);
+      const bloom = (k) => sm(2.2 + k * 0.1, 2.7 + k * 0.1, t);
+      for (let k = 0; k < 7; k++) { const a = Math.PI * (0.1 + 0.8 * k / 6), pul = 0.5 + 0.5 * Math.sin(t * 4 - k); for (let i = 0; i < 14; i++) { c.globalAlpha = e * sm(2.2, 3.0, t) * 0.55 * (1 - i / 14) * (0.6 + 0.4 * pul); px(c, '#7fe0bc', RX + Math.cos(a) * i * 1.6, fy + 1 + Math.sin(a) * i * 0.5); } } c.globalAlpha = 1;
+      for (let k = 0; k < 9; k++) { const b = bloom(k); if (b <= 0) continue; const a = k / 9 * Math.PI * 2, x = RX + Math.cos(a) * 14, h = Math.round((2 + (k % 3)) * b); c.globalAlpha = e; px(c, '#3c5048', x, fy - h, 1, h); px(c, '#e8fff4', x - 1, fy - h - 1, 3, 1); c.globalAlpha = 1; glowAt(c, x, fy - h, 6, '160,250,220', (0.3 * e * b).toFixed(3)); }
+      c.globalAlpha = e * sm(2.4, 3.0, t); px(c, '#8a8e96', RX + 10, fy - 6, 2, 1); px(c, '#6a6e76', RX + 11, fy - 5, 1, 2); c.globalAlpha = 1;
+      ghost(gx, { walking: walking(0.6, 2.0), kneel: t > 2.0 && t < 4.6 });
+    } else if (L === 2) {     // III  the Glass Garden: a pane of glass, and in it a grey figure that is not you, its back to you; it turns, and looks; it turns away and walks off into the glass
+      const GX = X0 + 80, top = fy - 30, pa = e;
+      for (let y = top; y < fy; y++) for (let x = 0; x < 12; x++) { const ed = x === 0 || x === 11; c.globalAlpha = pa * (ed ? 0.7 : 0.3); px(c, ed ? '#d8ccff' : '#5a4a8c', GX + x, y); }
+      for (let y = top; y < fy; y += 2) { c.globalAlpha = pa * 0.25; px(c, '#e8deff', GX + 3 + ((y >> 1) % 3), y); } c.globalAlpha = 1;
+      glowAt(c, GX + 6, fy - 14, 22, '200,180,255', (0.25 * pa).toFixed(3));
+      c.save(); c.beginPath(); c.rect(GX + 1, top, 10, fy - top); c.clip();
+      const look = t > 2.4 && t < 3.6, gx = t < 3.8 ? GX + 3 : walkX(GX + 3, GX + 14, 3.8, 4.8);
+      ghost(gx, { face: look ? -1 : 1, walking: t > 3.8 && t < 4.7, a: sm(0.6, 1.4, t) * 0.85 });
+      c.restore();
+      if (look) glowAt(c, GX + 5, fy - 9, 5, '220,230,240', (0.4 * e).toFixed(3));
+    } else if (L === 3) {     // IV  the Foundry: under an iron block hung on a chain (his spiral stamped in it, the sliver's colours in its seam),
+      //  he works at an anvil: three blows on a bar of iron glowing hot, sparks off each; then he cools it, a gasp of steam, and it goes dark
+      const BX = X0 + 70, by = fy - 30, AX = BX + 4, gx = AX - 15;
+      for (let y = roof; y < by; y++) { c.globalAlpha = e; px(c, (y >> 1) % 2 ? '#5a5048' : '#3a322c', BX + 3 + (y % 2), y); }
+      c.globalAlpha = e; for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) px(c, x === 0 || y === 0 ? '#5a5450' : x === 8 || y === 8 ? '#1a1614' : '#2e2a28', BX + x, by + y); c.globalAlpha = 1;
+      spiral(BX + 4.5, by + 4.5, '#7a726a', e, 3);
+      for (let x = 1; x < 8; x++) { c.globalAlpha = e * (0.5 + 0.2 * Math.sin(t * 3 + x)); px(c, ['#ff8a8a', '#ffd27a', '#8aff9a', '#7ac8ff', '#c08aff', '#ff8ad8', '#ffffff'][x - 1], BX + x, by + 8); } c.globalAlpha = 1;
+      glowAt(c, BX + 4, by + 8, 10, '255,220,200', (0.25 * e).toFixed(3));
+      // the anvil on the floor beneath it: a face with a horn, a waist, a foot
+      c.globalAlpha = e;
+      px(c, '#6a6460', AX - 6, fy - 7, 11, 1); px(c, '#3e3a38', AX - 5, fy - 6, 10, 1); px(c, '#5a5450', AX - 8, fy - 7, 2, 1); px(c, '#3e3a38', AX - 7, fy - 6, 1, 1);
+      px(c, '#2e2a28', AX - 1, fy - 5, 4, 3); px(c, '#3e3a38', AX - 3, fy - 2, 8, 1); px(c, '#4a4440', AX - 4, fy - 1, 10, 1);
+      c.globalAlpha = 1;
+      // the bar on it: white-hot, then cooled to dark iron
+      const blows = [1.6, 2.4, 3.2], hit = Math.max(...blows.map(b => t > b ? Math.exp(-(t - b) * 5) : 0)), cool = sm(3.9, 4.6, t);
+      const hot = lerpC([255, 170, 80], [44, 40, 38], cool), barC = 'rgb(' + hot.map(Math.round).join(',') + ')';
+      c.globalAlpha = e; px(c, barC, AX - 3, fy - 8, 6, 1); if (cool < 0.6) px(c, '#ffe2b0', AX - 2, fy - 8, 3, 1); c.globalAlpha = 1;
+      if (cool < 1) glowAt(c, AX, fy - 8, 12 + 8 * hit, '255,150,70', ((0.45 + 0.4 * hit) * (1 - cool) * e).toFixed(3));
+      if (hit > 0.05) for (let k = 0; k < 12; k++) { const an = -Math.PI * (0.1 + 0.8 * hash(k, 7)), r = (1 - hit) * 14; c.globalAlpha = hit * e; px(c, k % 3 ? '#ffb070' : '#ffe6c8', AX + Math.cos(an) * r, fy - 8 + Math.sin(an) * r + (1 - hit) * (1 - hit) * 6); } c.globalAlpha = 1;
+      // the cooling: a gasp of steam off it, rising
+      if (t > 3.9) { const u = sm(3.9, 5.6, t); for (let k = 0; k < 10; k++) puff(c, AX - 3 + hash(k, 41) * 6, fy - 9 - u * 24 * (0.4 + 0.6 * hash(k, 42)), 2 + u * 6, 0.5 * (1 - u) * e, '220,216,210'); }
+      // his hammer: raised and brought down on each blow; laid by when the bar is cooling
+      const ph = blows.reduce((m, b) => (t > b - 0.55 && t < b + 0.2 ? (t < b ? (t - (b - 0.55)) / 0.55 : 1 - (t - b) / 0.2) : m), 0);
+      const ang = t < 3.5 ? -1.4 * (t < 1.0 ? sm(0.6, 1.0, t) : ph) : 1.2;
+      // (a ghost's hammer: drawn pale, like him)
+      { const H = GH.cv || (GH.cv = document.createElement('canvas')); H.width = H.height = 40; const h = H.getContext('2d'); h.clearRect(0, 0, 40, 40); hammer(h, 20, 20, ang, 8); h.globalCompositeOperation = 'source-atop'; h.fillStyle = 'rgba(200,210,226,0.75)'; h.fillRect(0, 0, 40, 40); h.globalCompositeOperation = 'source-over';
+        c.globalAlpha = e * fl * 0.85; c.drawImage(H, Math.round(gx + 7) - 20, Math.round(fy - 11) - 20); c.globalAlpha = 1; }
+      if (hit > 0.3) glowAt(c, AX, fy - 9, 8, '255,240,220', (0.6 * hit * e).toFixed(3));
+      ghost(gx, {});
+    } else if (L === 4) {     // V  Ember Deep: he walks the ash and his steps burn into it; at the end his spiral burns into the floor, bright, and cools
+      const gx = walkX(X0 + 10, X0 + 124, 0.6, 3.8);
+      for (let k = 0; k < 8; k++) { const x = X0 + 22 + k * 12; if (gx < x - 2) continue; const age = (gx - x) / 40; c.globalAlpha = e; px(c, '#0a0606', x, fy - 1, 3, 1); c.globalAlpha = e * Math.max(0.35, 1 - age * 0.5); px(c, age < 0.3 ? '#ffd090' : '#ff7a3c', x, fy - 2, 3, 1); c.globalAlpha = 1; glowAt(c, x + 1, fy - 1, 5, '255,110,50', (0.25 * e).toFixed(3)); }
+      const sp = sm(3.8, 4.5, t); if (sp > 0) { spiral(X0 + 132, fy - 2, sp < 1 ? '#ffe0a0' : '#ff9a50', 0.95 * e, 4, sp); glowAt(c, X0 + 132, fy - 2, 14, '255,130,60', (0.45 * e * sp).toFixed(3)); }
+      ghost(gx, { walking: walking(0.6, 3.8) });
+    } else if (L === 5) {     // VI  the Heart: he stands; he comes apart, and what he was rises to the roof and gathers there as black smoke
+      const MX = X0 + 75, apart = sm(2.0, 3.2, t), smoke = sm(2.6, 4.6, t);
+      if (apart < 1) ghost(MX - 3, { a: 1 - apart });
+      if (t > 2.0) for (let k = 0; k < 40; k++) { const u = (t - 2.0 - hash(k, 71) * 1.2) / 2.6; if (u < 0 || u > 1) continue; const x = MX + (hash(k, 72) - 0.5) * 6 + Math.sin(u * 6 + k) * 3 * (1 - u), y = fy - 4 - hash(k, 73) * 8 - u * (fy - 12 - roof); c.globalAlpha = e * (1 - sm(0.85, 1, u)); px(c, u > 0.7 ? '#3a3440' : k % 3 ? '#b4b8c4' : '#ffffff', x, y); } c.globalAlpha = 1;
+      if (smoke > 0) for (let k = 0; k < 90; k++) { const a = k * 0.7 + t * 0.3, r = (k % 9) * 1.6 * smoke; c.globalAlpha = e * 0.85; px(c, k % 4 ? '#08080c' : '#1c1a22', MX + Math.cos(a) * r * 1.6, roof + 1 + Math.abs(Math.sin(a)) * r * 0.5); } c.globalAlpha = 1;
+      c.globalAlpha = e * sm(2.4, 3.0, t); px(c, '#8a8e96', MX - 2, fy - 2, 3, 1); px(c, '#6a6e76', MX - 1, fy - 1, 2, 1); c.globalAlpha = 1;
+    }
+    c.restore();
+  }
+
   const SKITS = [skit0, skit1, skit2, skit3, skit4, skit5, skit6, skit7, skit8, skit9, skit10, skit11, skit12, skit13, skit14, skit15, null, skit17];   // (16, the old ending's second scene, is gone)
   let OFF = null;
   // the scenes painted at the game's own scale, filling the screen between two bars (the rest are small, close views)
@@ -11768,7 +11856,7 @@ body.ninth #tbN{display:flex}
     return { x: x0, y: y0, w: fw, h: fh, a };
   }
 
-  global.DwellerSkits = { draw, warm, DUR, LINE, LINEAT };
+  global.DwellerSkits = { draw, warm, DUR, LINE, LINEAT, vision, VIS_T };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 </script>
 <script>/* DWELLER — game shell: loop, input, camera, the map of the descent, screens. */
@@ -12436,7 +12524,23 @@ body.ninth #tbN{display:flex}
     return OPT.near && ((cur >= 0 && cur < CORE) || cur >= 100) ? 185 : 230;
   }
   function fitView(force) { const k = viewFor(); if (k !== scFor || force) { scFor = k; resize(); } }
+  /* the visions: once in each of the six worlds, at one place along the way, the grey Dweller's ghost (where it begins
+     and the floor there). Seen once each time you play the level */
+  // each beside the checkpoint nearest the middle of its world (at or a little before it), where no burning light reaches
+  // at any point in its cycle, so it can be watched in peace: [where the vision is drawn from, the floor there, the
+  // first thing in it]. It begins when you come within a second's run of that, from any side, so you come up to it as it starts
+  const VISION = { 0: [4425, 276, 4439], 1: [3615, 636, 3631], 2: [4275, 684, 4349], 3: [4095, 600, 4143], 4: [4551, 444, 4559], 5: [5127, 948, 5187] };
+  let VIS = null, visSeen = -1;
+  function visionStep(dt) {
+    if (VIS) { VIS.t += dt; if (VIS.t > DwellerSkits.VIS_T + 0.2) { VIS = null; A.Live.cineStop(1.5); } return; }
+    const v = VISION[cur]; if (!v || visSeen === cur || !window.DwellerSkits || !DwellerSkits.vision || RUN) return;
+    if (Math.hypot(S.x + 2.5 - v[2], S.y + S.h - v[1]) < 110) {
+      let roof = v[1] - 40; for (let y = v[1] - 8; y > v[1] - 200; y--) if (D.solidAt(world, Math.floor((v[0] + 75) / 6), Math.floor(y / 6))) { roof = y + 1; break; }
+      VIS = { L: cur, t: 0, x: v[0], fy: v[1], roof }; visSeen = cur; A.Live.cine('vision');
+    }
+  }
   function startLevel(i, fresh) {
+    VIS = null; visSeen = -1;
     leaveKept();
     audioInit(); ARCH = null;
     loadLevel(i);
@@ -14099,6 +14203,7 @@ body.ninth #tbN{display:flex}
       // all six, for the memories)
       if (!SKIT && window.DwellerSkits && DwellerSkits.warm) { if ((mode === 'play' || mode === 'win') && cur < 6) DwellerSkits.warm(cur); else if (mode === 'town') DwellerSkits.warm(-1); }
       if (rHold >= 0) { if (!canRestart() || SKIT) rHold = -1; else if ((rHold += dt) >= RHOLD) { rHold = -1; startLevel(cur, true); rDark = 0; rFade = 1; } }
+      if (mode === 'play' && !SKIT && !RUN) visionStep(dt * speedMul);
       if ((mode === 'play' || mode === 'win') && !SKIT) {   // the world holds still while a memory plays
         simAcc += dt * speedMul;
         let n = 0;
@@ -14182,7 +14287,7 @@ body.ninth #tbN{display:flex}
         ZBLIT = [mx - cw / 2 - bx, my - chh / 2 - by, cw, chh];
       }
       else {
-      R.drawScene(ctx, { hints: HINTS, w: world, s: S, time: gameTime, dt: mode === 'pause' || mode === 'deepPick' ? 0 : dt, back: ARCH ? (c, x, y) => { AR.drawBack(c, x, y, archSt()); drawGate(c, x, y); drawRelicGate(c, x, y); } : null, lift: ARCH ? (c, x, y, disc) => { AR.lift(c, x, y, disc, archSt()); gateLift(c, x, y, disc); relicGateLift(c, x, y, disc); } : null }, fx, fy, LW, LH);
+      R.drawScene(ctx, { vision: VIS ? (c, x, y) => DwellerSkits.vision(c, R, VIS.L, VIS.t, x, y, VIS.x, VIS.fy, VIS.roof) : null, hints: HINTS, w: world, s: S, time: gameTime, dt: mode === 'pause' || mode === 'deepPick' ? 0 : dt, back: ARCH ? (c, x, y) => { AR.drawBack(c, x, y, archSt()); drawGate(c, x, y); drawRelicGate(c, x, y); } : null, lift: ARCH ? (c, x, y, disc) => { AR.lift(c, x, y, disc, archSt()); gateLift(c, x, y, disc); relicGateLift(c, x, y, disc); } : null }, fx, fy, LW, LH);
       halfText();
       if (mode !== 'pause') for (const h of HINTS) {      // carved: a dark groove a letter-pixel above, the pale stone face below
         ht(h.text, h.x, h.y - HS, '#05070b', 'left', h.a * 0.9);
@@ -14404,6 +14509,7 @@ body.ninth #tbN{display:flex}
       get arch() { return ARCH; }, get pauseSel() { return pauseSel; }, get pauseRows() { return pauseRows().map(r => r[2]); }, pauseRowAt(i) { const g = PB, r = canvas.getBoundingClientRect(); return [(g.x + 20) / LW * r.width + r.left, (g.top + i * g.rh + 3) / LH * r.height + r.top]; }, codex(id) { toCodex(id); },
       deepRoom(id, tier) { startDeep(); RUN.rooms = [id, id]; RUN.tier = tier || 0; loadDeepRoom(0); }, deepFinalRoom(id) { startDeep(); RUN.rooms = [id]; RUN.tier = 0; RUN.relic = null; loadDeepRoom(0); deepMsgT = 99; },   // (for checking the rooms)
       deepRelic(id, relicId, tier) { startDeep(); RUN.rooms = [id, id]; RUN.tier = tier || 0; RUN.relic = { id: relicId, room: 0, got: false }; loadDeepRoom(0); },   // (a room with its relic hidden in it)
+      get vis() { return VIS; },
       relicRoom() { toRelic(); }, skit(i) { playSkit(i || 0, null); }, get skitState() { return SKIT; }, get skitNext() { return skitNext; }, newRun() { startDeep(); return { rooms: RUN.rooms.slice(), relic: RUN.relic, tier: RUN.tier }; }, winNow() { deepWinNow(); }, ninth() { tryNinth(); }, get relicGate() { return gateL(); }, get keptGate() { return gate(); }, get rlm() { return RLM; }, get run() { return RUN; },
     };
   }
