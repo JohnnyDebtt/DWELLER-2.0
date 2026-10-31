@@ -2077,7 +2077,7 @@ body.ninth #tbN{display:flex}
     { id: 'geode', name: 'THE GEODE', main: '#a283c8', shade: '#5f4985', wins: 15 },
     { id: 'workings', name: 'THE WORKINGS', main: '#b8794a', shade: '#6e452c', wins: 20, glow: '#ffb070', glowA: 0.1 },
     { id: 'magma', name: 'THE MAGMA', main: '#b4503a', shade: '#6b2f2a', wins: 25, glow: '#ff7a3c', glowA: 0.16, trail: 'sparks' },
-    { id: 'vein', name: 'THE VEIN', main: '#4c4158', shade: '#272030', wins: 30, glow: '#ff5a7a', glowA: 0.26, seam: '#ff7d98' },
+    { id: 'vein', name: 'THE VEIN', main: '#4c4158', shade: '#272030', wins: 30, glow: '#ff5a7a', glowA: 0.26, seam: '#ff7d98', trail: 'sparkle' },
     // the last: the Guardian's own, black as the eye's dark, lit at the seams with the teal of its glow and trailing smoke;
     // no thread: it comes out of the dark at the 35th win and is worn at once (gift)
     { id: 'guardian', name: 'THE GUARDIAN', main: '#161b1d', shade: '#07090a', wins: 35, glow: '#3fe0c4', glowA: 0.05, seam: '#5cf2d6', trail: 'smoke', gift: true },
@@ -2242,45 +2242,89 @@ body.ninth #tbN{display:flex}
     if (Math.sin(time * 2.4) > 0.6) px(-2, -7, 1, 1, '#ffffff');    // a glint
   }
 
-  /* a cloak's trail: the Guardian's leaves smoke, drifting up and behind the way you go (drawn with the body, so the dark
-     takes it as it takes the figure, a few teal motes in it lit over the dark); the Magma's throws tiny sparks that fall
-     and die (lit over the dark). In world pixels; made as the figure is drawn, more of it the faster it moves */
-  const TRAIL = { list: [], last: -1, acc: 0 };
+  /* a cloak's trail, everywhere you wear it (the levels, the town, the Codex and its rooms, The Deep), on a clock of its
+     own. In world pixels, made as the figure is drawn: more of it the faster you go, and something else when you stand
+     still.
+       smoke   the Guardian's: heavier than air. It streams off behind you, sinks, and creeps along the ground where it
+               lands, a few teal motes lit in it; standing still, it pools round your feet and turns there slowly, curling
+               about you, low
+       sparks  the Magma's: tiny sparks thrown off that fall and die; standing still, embers rising slowly off it
+       sparkle the Vein's: glowing pink-red sparkles left hanging where you went, twinkling as they fade; standing still,
+               a heartbeat: on every beat a ring of pink light pulses out from your chest and fades
+     All of it is drawn over the dark (the smoke too, or the dark would swallow it), the lit things last. */
+  const TRAIL = { list: [], last: -1, acc: 0, idle: 0, s: null, px: 0, py: 0, beat: 0 };
+  const trailNow = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
   function coatTrail(ctx, s, camX, camY, pass) {
-    const kind = COAT && COAT.trail, L = TRAIL.list;
+    const kind = COAT && COAT.trail, L = TRAIL.list, now = trailNow();
+    const R = Math.random, cx = s.x + 2.5, feet = s.y + s.h;
     if (pass === 'body') {
-      const dt = TRAIL.last < 0 ? 0 : Math.max(0, Math.min(0.1, sceneTime - TRAIL.last)); TRAIL.last = sceneTime;
+      // (a new place, or a jump across it: what was left behind belongs to where you were)
+      if (TRAIL.s !== s || Math.hypot(cx - TRAIL.px, feet - TRAIL.py) > 40) { L.length = 0; TRAIL.acc = TRAIL.idle = 0; }
+      TRAIL.s = s; TRAIL.px = cx; TRAIL.py = feet;
+      const dt = TRAIL.last < 0 ? 0 : Math.max(0, Math.min(0.1, now - TRAIL.last)); TRAIL.last = now;
+      const sp = Math.min(1, Math.hypot(s.vx || 0, s.vy || 0) / 90), still = sp < 0.06;
+      TRAIL.idle = still ? TRAIL.idle + dt : 0;
       if (kind && !s.dead && dt > 0) {
-        const sp = Math.min(1, Math.hypot(s.vx || 0, s.vy || 0) / 90), rate = kind === 'smoke' ? 9 + 22 * sp : 3 + 14 * sp;
+        const settle = Math.min(1, TRAIL.idle / 0.6);    // (what standing still makes grows in over a moment)
+        const rate = kind === 'smoke' ? 7 + 12 * sp + 10 * settle : kind === 'sparks' ? 3 + 14 * sp + 3 * settle : 4 + 16 * sp + 3 * settle;
         TRAIL.acc += dt * rate;
-        while (TRAIL.acc >= 1 && L.length < 160) {
+        while (TRAIL.acc >= 1 && L.length < 220) {
           TRAIL.acc -= 1;
-          if (kind === 'smoke') L.push({ k: 0, x: s.x + 2.5 + (Math.random() - 0.5) * 4, y: s.y + s.h - 2 - Math.random() * 4, vx: -(s.vx || 0) * 0.18 + (Math.random() - 0.5) * 4, vy: -4 - Math.random() * 5, t0: sceneTime, life: 1.1 + Math.random() * 0.8, teal: Math.random() < 0.18 });
-          else L.push({ k: 1, x: s.x + 1 + Math.random() * 3, y: s.y + 3 + Math.random() * (s.h - 4), vx: -(s.vx || 0) * 0.25 + (Math.random() - 0.5) * 14, vy: -12 - Math.random() * 22, t0: sceneTime, life: 0.35 + Math.random() * 0.45 });
+          if (kind === 'smoke') {
+            // (standing: a puff in the pool, turning about the feet; moving: a puff streaming off the cloak, to sink)
+            // (black and grey together, curling in and out of each other)
+            if (still) L.push({ k: 4, cx, fy: feet, a: R() * Math.PI * 2, r0: 1 + R() * 2, w: (R() < 0.5 ? -1 : 1) * (0.5 + R() * 0.6), t0: now, life: 2.4 + R() * 1.6, teal: R() < 0.12, blk: R() < 0.45, x: cx, y: feet });
+            else {
+              L.push({ k: 0, x: cx + (R() - 0.5) * 4, y: s.y + 3 + R() * (s.h - 4), vx: -(s.vx || 0) * 0.3 + (R() - 0.5) * 4, vy: 2 + R() * 4, fy: feet - 1, t0: now, life: 1.4 + R() * 0.9, teal: R() < 0.18, blk: R() < 0.45, ph: R() * 9, cr: 2 + R() * 3 });
+              // and black flecks thrown off behind, hanging in the air a moment
+              if (R() < 0.35) L.push({ k: 6, x: s.x + 1 + R() * 3, y: s.y + 2 + R() * (s.h - 3), vx: -(s.vx || 0) * 0.22 + (R() - 0.5) * 10, vy: -5 - R() * 9, t0: now, life: 0.6 + R() * 0.6 });
+            }
+          } else if (kind === 'sparks') {
+            if (still) L.push({ k: 2, x: s.x + 1 + R() * 3, y: s.y + 2 + R() * (s.h - 3), vx: (R() - 0.5) * 4, vy: -6 - R() * 8, t0: now, life: 1.2 + R() * 1.0, ph: R() * 9 });
+            else L.push({ k: 1, x: s.x + 1 + R() * 3, y: s.y + 3 + R() * (s.h - 4), vx: -(s.vx || 0) * 0.25 + (R() - 0.5) * 14, vy: -12 - R() * 22, t0: now, life: 0.35 + R() * 0.45 });
+          } else if (kind === 'sparkle') {
+            if (!still) L.push({ k: 3, x: s.x + R() * 5, y: s.y + 2 + R() * (s.h - 3), vx: -(s.vx || 0) * 0.08 + (R() - 0.5) * 3, vy: (R() - 0.5) * 3, t0: now, life: 0.7 + R() * 0.6, ph: R() * 9 });
+          }
         }
       }
+      if (kind === 'sparkle' && !s.dead && TRAIL.idle > 0.4) {
+        TRAIL.beat += dt; if (TRAIL.beat >= 0.95) { TRAIL.beat = 0; const n = 16; for (let k = 0; k < n; k++) L.push({ k: 5, cx, cy: s.y + s.h * 0.42, a: k / n * Math.PI * 2 + R() * 0.2, t0: now, life: 0.85, ph: R() * 9, x: cx, y: s.y }); }
+      } else TRAIL.beat = 0.7;
       for (let i = L.length - 1; i >= 0; i--) {
-        const q = L[i], u = (sceneTime - q.t0) / q.life;
+        const q = L[i], u = (now - q.t0) / q.life;
         if (u >= 1 || u < 0) { L.splice(i, 1); continue; }
-        q.x += q.vx * dt; q.y += q.vy * dt; if (q.k === 1) q.vy += 60 * dt; else { q.vx *= 1 - dt * 1.2; q.y += Math.sin(sceneTime * 3 + i) * dt * 2; }
+        q.x += q.vx * dt; q.y += q.vy * dt;
+        if (q.k === 1) q.vy += 60 * dt;
+        else if (q.k === 0) { const cw = (q.blk ? 1 : -1) * 2.6; q.x += Math.cos(now * cw + q.ph) * dt * q.cr; q.y += Math.sin(now * cw + q.ph) * dt * q.cr * 0.8; q.vx *= 1 - dt * 1.5; q.vy += 10 * dt; if (q.y >= q.fy) { q.y = q.fy; q.vy = 0; if (!q.landed) { q.landed = 1; q.vx += (R() < 0.5 ? -1 : 1) * (3 + R() * 4); } } q.x += Math.sin(now * 2 + i) * dt * 1.5; }
+        else if (q.k === 6) { q.vx *= 1 - dt * 2; q.vy += 14 * dt; }
+        else if (q.k === 4) { q.a += q.w * dt; const r = q.r0 + u * 7; q.x = q.cx + Math.cos(q.a) * r; q.y = q.fy - 1 + Math.sin(q.a) * r * 0.22 - u * 1.5; }
+        else if (q.k === 5) { const r = 2 + u * 9; q.x = q.cx + Math.cos(q.a) * r; q.y = q.cy + Math.sin(q.a) * r * 0.85; }
+        else if (q.k === 2 || q.k === 3) { q.x += Math.sin(now * 2.2 + q.ph) * dt * 3; if (q.k === 3 && !q.rise) q.vy *= 1 - dt * 2; }
       }
-      // the smoke, behind the figure
-      for (const q of L) if (q.k === 0) {
-        const u = (sceneTime - q.t0) / q.life, r = 1 + Math.round(u * 2.5);
-        ctx.globalAlpha = 0.6 * Math.sin(u * Math.PI); ctx.fillStyle = u < 0.3 ? '#1a1f21' : u < 0.65 ? '#353b3e' : '#454c50';
-        ctx.fillRect(Math.round(q.x - camX - r / 2), Math.round(q.y - camY - r / 2), r, r);
-      }
+    } else if (pass === 'visor' && L.length) {
+      // the smoke and what pools at the feet (over the dark, so the dark does not swallow it), the black flecks; then the lit things
+      for (const q of L) if (q.k === 0 || q.k === 4) smokeDot(ctx, q, now, camX, camY);
+      for (const q of L) if (q.k === 6) { const u = (now - q.t0) / q.life; ctx.globalAlpha = 0.85 * (1 - u * u); ctx.fillStyle = '#040505'; ctx.fillRect(Math.round(q.x - camX), Math.round(q.y - camY), 1, 1); }
       ctx.globalAlpha = 1;
-    } else if (L.length) {
-      // over the dark: the sparks, and the teal in the smoke
       ctx.save(); ctx.globalCompositeOperation = 'lighter';
       for (const q of L) {
-        const u = (sceneTime - q.t0) / q.life;
-        if (q.k === 1) { ctx.globalAlpha = (1 - u) * (0.6 + 0.4 * Math.sin(sceneTime * 40 + q.t0 * 97)); ctx.fillStyle = u < 0.4 ? '#ffd28a' : '#ff7a3c'; ctx.fillRect(Math.round(q.x - camX), Math.round(q.y - camY), 1, 1); }
-        else if (q.teal) { ctx.globalAlpha = 0.35 * Math.sin(u * Math.PI); ctx.fillStyle = '#3fe0c4'; ctx.fillRect(Math.round(q.x - camX), Math.round(q.y - camY), 1, 1); }
+        const u = (now - q.t0) / q.life, X = Math.round(q.x - camX), Y = Math.round(q.y - camY);
+        if (q.k === 1) { ctx.globalAlpha = (1 - u) * (0.6 + 0.4 * Math.sin(now * 40 + q.t0 * 97)); ctx.fillStyle = u < 0.4 ? '#ffd28a' : '#ff7a3c'; ctx.fillRect(X, Y, 1, 1); }
+        else if (q.k === 2) { ctx.globalAlpha = Math.sin(u * Math.PI) * (0.55 + 0.45 * Math.sin(now * 9 + q.ph)); ctx.fillStyle = u < 0.3 ? '#ffe2a8' : u < 0.7 ? '#ff9a50' : '#d8501c'; ctx.fillRect(X, Y, 1, 1); }
+        else if (q.k === 3) { const tw = 0.5 + 0.5 * Math.sin(now * 14 + q.ph); ctx.globalAlpha = Math.sin(u * Math.PI) * (0.4 + 0.6 * tw); ctx.fillStyle = tw > 0.85 ? '#ffd0dc' : u < 0.5 ? '#ff7d98' : '#d8405e'; ctx.fillRect(X, Y, 1, 1); if (tw > 0.92 && u < 0.6) { ctx.globalAlpha *= 0.5; ctx.fillRect(X - 1, Y, 3, 1); ctx.fillRect(X, Y - 1, 1, 3); } }
+        else if (q.k === 5) { ctx.globalAlpha = (1 - u) * (0.55 + 0.45 * Math.sin(now * 12 + q.ph)); ctx.fillStyle = u < 0.3 ? '#ffd0dc' : '#ff5a7a'; ctx.fillRect(X, Y, 1, 1); }
+        else if ((q.k === 0 || q.k === 4) && q.teal) { ctx.globalAlpha = 0.35 * Math.sin(u * Math.PI); ctx.fillStyle = '#3fe0c4'; ctx.fillRect(X, Y, 1, 1); }
       }
       ctx.restore();
     }
+  }
+  // one puff of the Guardian's smoke: dark at first, greying as it thins; what pools on the ground is flat and wide
+  function smokeDot(ctx, q, now, camX, camY) {
+    const u = (now - q.t0) / q.life;
+    if (q.k === 4 || q.landed) { const w = 2 + Math.round(u * (q.k === 4 ? 5 : 6)), h = 1 + Math.round(u * 1.6); ctx.globalAlpha = (q.blk ? 0.85 : 0.7) * Math.sin(u * Math.PI); ctx.fillStyle = q.blk ? (u < 0.5 ? '#030404' : '#0c0e0f') : u < 0.35 ? '#4a5456' : u < 0.7 ? '#66706f' : '#808a8a'; ctx.fillRect(Math.round(q.x - camX - w / 2), Math.round(q.y - camY - h + 1), w, h); return; }
+    const r = 1 + Math.round(u * 3.5);
+    ctx.globalAlpha = (q.blk ? 0.85 : 0.7) * Math.sin(u * Math.PI); ctx.fillStyle = q.blk ? (u < 0.5 ? '#030404' : '#0c0e0f') : u < 0.3 ? '#4a5456' : u < 0.65 ? '#66706f' : '#808a8a';
+    ctx.fillRect(Math.round(q.x - camX - r / 2), Math.round(q.y - camY - r / 2), r, r);
   }
   function drawPlayer(ctx, s, camX, camY, pass, flash) {
     if (pass === 'body' || pass === 'visor') coatTrail(ctx, s, camX, camY, pass);
@@ -10093,14 +10137,17 @@ body.ninth #tbN{display:flex}
     'SOMEONE LEFT THIS IN THE COLD.', 'THE ROOTS HELD ON TO IT.', 'THE STONE KEPT WHAT IT COULD.', 'STILL WARM FROM THE FORGE.', 'ONLY THE THREAD SURVIVED.', 'IT STILL HAS A PULSE.',
     null, 'SOMETHING BELOW WAS CALLING.',
     'IT HAD CARRIED THE LIGHT ALONE.', 'SOMEONE WILL COME DOWN AFTER YOU.', 'THE DARK HAD BEEN KEEPING IT FOR YOU.'];
-  LINE[13] = 'THEY HUNTED IT ACROSS THE WORLD.';
+  LINE[13] = 'THE FALSE LIGHT SOUGHT TO EXTINGUISH IT.';
+  LINE[14] = 'NOW SOMETHING BELOW IS CALLING YOU.';
   LINE[0] = null;
   // (a scene of two shots has a line for each, timed: [text, in, out])
-  const LINEAT = { 0: [['IT BROKE THE KEY TO GUARD THE LIGHT.', 5.6, 8.4], ['IT SLEEPS IN ICE.', 13.6, 17.5]] };
-  LINE[1] = 'THE ROOTS PROMISED TO KEEP IT.';
-  LINE[2] = 'IT KNEW YOU WOULD COME.';
-  LINE[3] = 'HIDDEN WHERE NOTHING SHINES.';
-  LINE[4] = 'THE FLAME CRADLED IT.';
+  const LINEAT = { 0: [['IT BROKE THE KEY TO GUARD THE WAY.', 5.6, 8.4], ['ONE PIECE SLEEPS IN THE ICE.', 13.6, 17.5]] };
+  LINE[1] = 'ONE THE ROOTS PROMISED TO KEEP.';
+  LINE[2] = ['ONE IT LEFT IN THE GLASS.', 'IT KNEW YOU WOULD COME.'];
+  LINE[3] = 'ONE IT HID WHERE NOTHING SHINES.';
+  LINE[4] = 'ONE THE FLAME CRADLES STILL.';
+  LINE[11] = 'THE FIRE WOULD NOT TAKE IT.';
+  LINE[17] = 'YOU\'LL NEED THIS FOR WHAT LIES AHEAD.';
   LINE[5] = 'IT GAVE ITSELF UP TO GUARD THE LIGHT.';
   LINE[15] = 'THE LIGHT WAS ALWAYS MEANT FOR YOU.';
   const DUR = [17.5, 11.5, 10.5, 15, 11.5, 14.5, 15.5, 11, 11, 11, 11, 11, 11.5, 13.2, 12, 38, 13, 14];
@@ -10602,12 +10649,12 @@ body.ninth #tbN{display:flex}
     });
   }
   // an eye of the false light, drifting: pale and veined, a black pupil looking down its beam, a little haze round it
-  function falseEye(c, x, y, an, t, k) {
-    glowAt(c, x, y, 12, '190,210,245', '0.35');
-    for (let j = -3; j <= 3; j++) for (let i = -4; i <= 4; i++) { const r = (i * i) / 16 + (j * j) / 9; if (r > 1) continue; const vein = gNoise(x * 3 + i * 5, y * 3 + j * 5 + k * 40, 2, 251) > 0.78; px(c, r > 0.75 ? '#7a86a6' : vein ? '#b48c9c' : '#e6ecf8', x + i, y + j); }
-    const pxx = Math.round(x + Math.cos(an) * 2), pyy = Math.round(y + Math.sin(an) * 1.5); px(c, '#0a0c14', pxx - 1, pyy - 1, 2, 3); px(c, '#ffffff', x - 2, y - 2);
-    // wisps trailing behind it
-    for (let q = 0; q < 6; q++) { c.globalAlpha = 0.3 * (1 - q / 6); px(c, '#9aa8c8', x - 5 - q * 2, y + Math.round(Math.sin(t * 5 + q) * 1.5), 2, 1); } c.globalAlpha = 1;
+  // one of the false light's eyes: the same drifting eye the Dweller meets in the Descent (the game's own orb, its ring
+  // and its drips), flying, a cold glow round it
+  function falseEye(c, R, x, y, an, t, k) {
+    glowAt(c, x, y, 14, '190,215,245', '0.35');
+    const sh = R.SHEETS && (R.SHEETS.orb || R.SHEETS.orbT);
+    if (sh) R.drawFrame(c, sh, Math.floor(t * 12 + k * 3) % 8, Math.round(x), Math.round(y + Math.sin(t * 2.2 + k) * 1), false);
   }
   function skit13(c, R, t, W, H) {
     const S = openA(W, H), o = S.o, GY = o.GY, DX = o.DX;
@@ -10626,7 +10673,7 @@ body.ninth #tbN{display:flex}
       if (k === 1) { const lock = sm(5.5, 6.0, t) * (1 - sm(9.4, 10.4, t)); an = an + (tgt - an) * lock; }
       if (Math.abs(Math.atan2(Math.sin(an - tgt), Math.cos(an - tgt))) < 0.18 && !inside) near = 1;
       beam(c, ex, ey + 2, an, 0.15, 150, 0.8, '196,214,250', GY);
-      falseEye(c, ex, ey, an, t, k);
+      falseEye(c, R, ex, ey, an, t, k);
     });
     const found = t > 5.9 && t < 6.9;
     const hide = Math.max(sm(2.6, 3.0, t) * (1 - sm(3.6, 4.0, t)), t > 5.8 && t < 6.6 ? 1 : 0, t > 6.6 ? 0.5 : 0, near * (t < 5.8 ? 1 : 0));
@@ -13876,7 +13923,7 @@ body.ninth #tbN{display:flex}
       if (deepT > 1.0) uiHint(touchMode ? 'TAP ONE, TAP AGAIN TO TAKE IT' : [['ARROWS', 'CHOOSE'], ['SPACE', 'WAKE IT']], cx, LH - 14, a);
     } else if (mode === 'deepWin' && deepSpool && deepSpool.gift) {
       // the Guardian's cloak: given, not woven; worn already
-      const y0 = Math.round(LH * 0.2), c = deepSpool, w = Math.min(LW - 16, Math.max(190, htW('THE GUARDIAN\'S CLOAK', 2) + 24, htW('YOU\'LL NEED THIS FOR WHAT COMES NEXT') + 24));
+      const y0 = Math.round(LH * 0.2), c = deepSpool, w = Math.min(LW - 16, Math.max(190, htW('THE GUARDIAN\'S CLOAK', 2) + 24, htW('YOU\'LL NEED THIS FOR WHAT LIES AHEAD') + 24));
       uiPanel(ctx, cx - w / 2, y0 - 12, w, 40 + L7 * 6, a); uiMark(ctx, cx, y0 - 9, c.glow, 1, a);
       ht('THE GUARDIAN\'S CLOAK', cx, y0, PAL.snow, 'center', a, 2);
       let y = y0 + 24;
@@ -13884,7 +13931,7 @@ body.ninth #tbN{display:flex}
       y += L7 * 1.6;
       ht(c.wins + ' WINS IN THE DEEP', cx, y, '#7f9aa6', 'center', a); y += L7 * 1.4;
       ht('YOU ARE WEARING IT', cx, y, c.glow, 'center', a * (0.75 + 0.25 * Math.sin(deepT * 3))); y += L7 * 1.2;
-      ht('YOU\'LL NEED THIS FOR WHAT COMES NEXT', cx, y, UI.quiet, 'center', a);
+      ht('YOU\'LL NEED THIS FOR WHAT LIES AHEAD', cx, y, UI.quiet, 'center', a);
       if (deepT > 1.5) uiHint(touchMode ? 'TAP  -  BACK TO THE CODEX' : [['SPACE', 'BACK TO THE CODEX']], cx, y0 - 12 + 40 + L7 * 6 + 4, a);
     } else if (mode === 'deepWin' && deepSpool) {
       // a spool of thread, for the weaver
