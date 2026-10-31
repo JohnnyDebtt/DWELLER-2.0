@@ -10179,7 +10179,7 @@ body.ninth #tbN{display:flex}
     ctx.globalCompositeOperation = 'source-over';
     // The Ninth, once found, in the rift for good, and a thin fall of light from the foot of the rift to the altar
     if (found.includes(NINTH)) {
-      draw(ctx, NINTH, riftMid(150), 150, t, { sc: 2.5, glow: 1.3 });
+      draw(ctx, NINTH, riftMid(150), 150, t, { sc: 2, glow: 1.3 });   // (the same size as the other eight: the rift sets it apart)
       for (let k = 0; k < 10; k++) { const u = ((t * 0.18 + k / 10) % 1), y = 252 + u * 28, x = riftMid(250) + (RX - riftMid(250)) * u + Math.sin(k * 2.3 + t) * 1.5; P('rgba(90,235,205,' + (Math.sin(u * Math.PI) * 0.6).toFixed(2) + ')', x, y); }
     }
     // the veins: each relic's colour climbs slowly up through the rock and fades
