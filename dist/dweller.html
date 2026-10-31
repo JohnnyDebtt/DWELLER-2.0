@@ -2272,10 +2272,10 @@ body.ninth #tbN{display:flex}
           TRAIL.acc -= 1;
           if (kind === 'smoke') {
             // (standing: a puff in the pool, turning about the feet; moving: a puff streaming off the cloak, to sink)
-            // (black and grey together, curling in and out of each other)
-            if (still) L.push({ k: 4, cx, fy: feet, a: R() * Math.PI * 2, r0: 1 + R() * 2, w: (R() < 0.5 ? -1 : 1) * (0.5 + R() * 0.6), t0: now, life: 2.4 + R() * 1.6, teal: R() < 0.12, blk: R() < 0.45, x: cx, y: feet });
+            // (mostly black, a little grey, curling in and out of each other)
+            if (still) L.push({ k: 4, cx, fy: feet, a: R() * Math.PI * 2, r0: 1 + R() * 2, w: (R() < 0.5 ? -1 : 1) * (0.5 + R() * 0.6), t0: now, life: 2.4 + R() * 1.6, teal: R() < 0.12, blk: R() < 0.8, x: cx, y: feet });
             else {
-              L.push({ k: 0, x: cx + (R() - 0.5) * 4, y: s.y + 3 + R() * (s.h - 4), vx: -(s.vx || 0) * 0.3 + (R() - 0.5) * 4, vy: 2 + R() * 4, fy: feet - 1, t0: now, life: 1.4 + R() * 0.9, teal: R() < 0.18, blk: R() < 0.45, ph: R() * 9, cr: 2 + R() * 3 });
+              L.push({ k: 0, x: cx + (R() - 0.5) * 4, y: s.y + 3 + R() * (s.h - 4), vx: -(s.vx || 0) * 0.3 + (R() - 0.5) * 4, vy: 2 + R() * 4, fy: feet - 1, t0: now, life: 1.4 + R() * 0.9, teal: R() < 0.18, blk: R() < 0.8, ph: R() * 9, cr: 2 + R() * 3 });
               // and black flecks thrown off behind, hanging in the air a moment
               if (R() < 0.35) L.push({ k: 6, x: s.x + 1 + R() * 3, y: s.y + 2 + R() * (s.h - 3), vx: -(s.vx || 0) * 0.22 + (R() - 0.5) * 10, vy: -5 - R() * 9, t0: now, life: 0.6 + R() * 0.6 });
             }
@@ -12079,9 +12079,15 @@ body.ninth #tbN{display:flex}
     const sep = htW('  ', Z), kw = htW(key, Z), dw = htW(deed, Z), x = cx - (kw + sep + dw) / 2;
     ht(key, x, y, PAL.gold, 'left', a * (0.7 + 0.3 * Math.sin(gameTime * 4)), Z); ht(deed, x + kw + sep, y, deedCol || UI.body, 'left', a, Z);
   }
-  function pauseRows() { const rec = ['RECORDS', 'H', 'records'];
-    return ARCH || KEPT || RLM ? [['RESUME', 'ESC', 'resume'], rec, ['SETTINGS', 'O', 'settings'], ['BACK TO TOWN', 'Q', 'town']] : RUN ? [['RESUME', 'ESC', 'resume'], rec, ['SETTINGS', 'O', 'settings'], ['GIVE UP THE RUN', 'Q', 'giveup']]
-      : [['RESUME', 'ESC', 'resume'], ['RETURN TO TETHER', 'T', 'tether'], ['NEW DESCENT', 'R', 'new'], rec, ['SETTINGS', 'O', 'settings'], ['BACK TO TOWN', 'Q', 'town']]; }
+  /* the desktop build (DWELLER as an app on its own: Windows, a handheld, Steam) can quit itself: a QUIT row at the foot
+     of the pause menu, and Q (or a pad's B) twice on the title. Nowhere else, since a browser tab is closed as a tab */
+  const DESK = !!(window.dwellerDesktop && typeof window.dwellerDesktop.quit === 'function');
+  let titleQuitT = -99;
+  function quitGame() { try { saveProgress(); } catch (e) { } window.dwellerDesktop.quit(); }
+  function titleQuit() { if (!DESK || SKIT) return; if (gameTime - titleQuitT < 2.5) quitGame(); else { titleQuitT = gameTime; A.Live.sfx('ui'); } }
+  function pauseRows() { const rec = ['RECORDS', 'H', 'records'], q = DESK ? [['QUIT', '', 'quit']] : [];
+    return (ARCH || KEPT || RLM ? [['RESUME', 'ESC', 'resume'], rec, ['SETTINGS', 'O', 'settings'], ['BACK TO TOWN', 'Q', 'town']] : RUN ? [['RESUME', 'ESC', 'resume'], rec, ['SETTINGS', 'O', 'settings'], ['GIVE UP THE RUN', 'Q', 'giveup']]
+      : [['RESUME', 'ESC', 'resume'], ['RETURN TO TETHER', 'T', 'tether'], ['NEW DESCENT', 'R', 'new'], rec, ['SETTINGS', 'O', 'settings'], ['BACK TO TOWN', 'Q', 'town']]).concat(q); }
   let pauseSel = 0, PB = null;      // the chosen row; where the rows were drawn (for taps)
   /* menus are drawn at the same size on screen whatever the view: where the view is pulled back (the Core, the
      Codex), their pixels are doubled */
@@ -12348,6 +12354,7 @@ body.ninth #tbN{display:flex}
     if (mode === 'title') {
       if (e.code === 'KeyV' && openingKnown() && !SKIT) { playOpening(true, null); return; }
       if (e.code === 'KeyH' && !SKIT) { openRecords(); return; }
+      if (e.code === 'KeyQ') { titleQuit(); return; }
       if (['Space', 'Enter', 'ArrowUp', 'KeyW', 'ArrowRight', 'KeyD', 'ArrowLeft', 'KeyA', 'KeyZ', 'KeyK', 'ArrowDown', 'KeyS', 'KeyE'].includes(e.code)) beginTown();
     } else if (mode === 'deepPick' || mode === 'deepOver' || mode === 'deepWin' || mode === 'deepChoose') { deepKey(e.code); return;
     } else if (mode === 'town') {
@@ -12402,6 +12409,7 @@ body.ninth #tbN{display:flex}
     else if (what === 'new') { A.Live.setPaused(false); startLevel(cur, true); }
     else if (what === 'town') { A.Live.setPaused(false); if (!RUN && !ARCH && cur < NL + 1) noteEvent({ kind: 'level', lv: cur, quit: true, deaths: S.deaths }); toTown(cur); }
     else if (what === 'giveup') { A.Live.setPaused(false); mode = 'play'; deepOver(true); }
+    else if (what === 'quit' && DESK) { if (!RUN && !ARCH && cur < NL + 1) noteEvent({ kind: 'level', lv: cur, quit: true, deaths: S.deaths }); quitGame(); }
     syncTouchUI();
   }
   function pauseMove(d) { const n = pauseRows().length; pauseSel = (pauseSel + d + n) % n; A.Live.sfx('ui'); }
@@ -12514,6 +12522,7 @@ body.ninth #tbN{display:flex}
       if (edge('start', b(9))) { if (mode === 'play') setPause(true); else if (mode === 'pause') setPause(false); else if (mode === 'title') beginTown(); else if (mode === 'town') toTitle(); else if (mode === 'win' && winT > 2.5) toTown(cur); }
       if (mode === 'title' && edge('y', b(3)) && openingKnown() && !SKIT) playOpening(true, null);
       if (mode === 'title' && edge('x', b(2)) && !SKIT) openRecords();
+      if (mode === 'title' && edge('b', b(1))) titleQuit();
       if (mode === 'title' && edge('a', b(0))) beginTown();
       else if (mode === 'deepPick' || mode === 'deepOver' || mode === 'deepWin' || mode === 'deepChoose') {
         const key = deepKey;
@@ -13065,8 +13074,9 @@ body.ninth #tbN{display:flex}
     if (mode === 'title') {
       if (touchMode) uiPrompt('TAP', 'TO BEGIN', cx, y + 4, a);
       else uiPrompt('SPACE', 'TO BEGIN', cx, y + 4, a);
-      if (!touchMode) uiHint((openingKnown() ? [['V', 'THE OPENING']] : []).concat([['H', 'RECORDS'], ['O', 'SETTINGS'], ['M', 'MUTE'], ['F', 'FULLSCREEN']]), cx, y + 4 + L7 * 1.5, a * 0.75);
+      if (!touchMode) uiHint((openingKnown() ? [['V', 'THE OPENING']] : []).concat([['H', 'RECORDS'], ['O', 'SETTINGS'], ['M', 'MUTE'], ['F', 'FULLSCREEN']]).concat(DESK ? [['Q', 'QUIT']] : []), cx, y + 4 + L7 * 1.5, a * 0.75);
       else { ht('TAP HERE  -  SETTINGS', cx, LH - 14, UI.quiet, 'center', a * 0.75); if (openingKnown()) ht('TAP HERE  -  THE OPENING', cx, LH - 28, UI.quiet, 'center', a * 0.75); ht('TAP HERE  -  RECORDS', cx, LH - (openingKnown() ? 42 : 28), UI.quiet, 'center', a * 0.75); }
+      if (DESK && gameTime - titleQuitT < 2.5) ht('PRESS AGAIN TO QUIT', cx, y + 4 + L7 * 3, '#c4a3a3', 'center', a * (0.75 + 0.25 * Math.sin(gameTime * 8)));
     }
   }
   /* ------------------------------------------------------------ THE DEEP and THE CODEX
