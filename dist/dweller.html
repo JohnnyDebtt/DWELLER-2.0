@@ -2081,7 +2081,7 @@ body.ninth #tbN{display:flex}
     { id: 'vein', name: 'THE VEIN', main: '#4c4158', shade: '#272030', wins: 30, glow: '#ff5a7a', glowA: 0.26, seam: '#ff7d98', trail: 'sparkle' },
     // the last: the Guardian's own, black as the eye's dark, lit at its edge with the teal of its glow and trailing smoke;
     // no thread: it comes out of the dark at the 35th win and is worn at once (gift)
-    { id: 'guardian', name: 'THE GUARDIAN', main: '#1f2629', shade: '#0d1214', wins: 35, glow: '#3fe0c4', glowA: 0.035, seam: '#3fbfa8', rimA: 0.8, mote: '#3fbfa8', rim: true, trail: 'smoke', gift: true },
+    { id: 'guardian', name: 'THE ANCIENT', main: '#1f2629', shade: '#0d1214', wins: 35, glow: '#3fe0c4', glowA: 0.035, seam: '#3fbfa8', rimA: 0.8, mote: '#3fbfa8', rim: true, trail: 'smoke', gift: true },
   ];
   function hexRGB(h) { return [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); }
   function setCoat(c) {
@@ -5762,6 +5762,7 @@ body.ninth #tbN{display:flex}
       // the chest at the bottom, and what rises out of it
       const ch = w.level.chest, fy = floorUnder(w, ch.x, ch.y) - camY, cx = Math.round(ch.x - camX);
       drawChest(ctx, cx, fy, CHEST_OF[w.level.theme] || 'theorem', ch.t, time, ch.shake);
+      if (global.DwellerFX) global.DwellerFX.chestLight(ctx, cx, fy, ch, time);   // (its light, behind what rises out of it)
       if (ch.rise > 0) {
         const y = fy - 9 - Math.round(ch.rise * 16) + (ch.rise >= 1 ? Math.round(Math.sin(time * 3)) : 0);
         if (ch.spool) drawSpool(ctx, cx, y + 6, 1, ch.spool, time); else drawPortrait(ctx, cx, y, 0.3, Math.min(1, ch.rise * 2), ch.id);
@@ -6027,6 +6028,225 @@ body.ninth #tbN{display:flex}
     get theme() { return TH; }, claimedPit, NETN, NET, seekerTraits, setSeeker, drawFrame, drawPlayer, drawParticles, BREATH, get seekerId() { return seekerId; }, resetTethers() { tetherT = {}; }, noteBounce, guardianBurst, clearGuardian() { gBits.length = 0; },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script>/* DWELLER — THE EFFECTS: small bursts of light, our own, hard-edged, their shapes stepped twelve times a second like
+ * the rest of the game's animation, their light added on top.
+ *   event(ev, st, world, time, cur)   from the game's events: taking a sliver (a flash, a star, a ring, shards thrown
+ *                                     and turning), a sliver set in its alcove (a circle drawn round it, a pillar of
+ *                                     light, a ring across the floor)
+ *   chestLight(ctx, cx, fy, ch, time) the light out of an opened chest: drawn just after the chest, so what rises out
+ *                                     of it and the Seeker stand in front of it
+ *   draw(ctx, camX, camY, world, time, dt)   after the scene: the bursts, the chest's dust, and the drips (a kind for
+ *                                     each level, found once a level, only those on screen drawn) */
+(function (global) {
+  'use strict';
+  const L = []; let seed = 99; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const step = (a) => Math.floor(a * 12) / 12;                       // (shapes change 12 times a second)
+  const px = (c, x, y, col, a) => { if (a <= 0) return; c.globalAlpha = Math.min(1, a); c.fillStyle = col; c.fillRect(Math.round(x), Math.round(y), 1, 1); };
+  const ring = (c, cx, cy, r, col, a, ry) => { const n = Math.max(12, Math.ceil(r * 7)); for (let i = 0; i < n; i++) { const t = i / n * Math.PI * 2; px(c, cx + Math.cos(t) * r, cy + Math.sin(t) * (ry || r), col, a); } };
+  const arc = (c, cx, cy, r, t0, t1, col, a) => { const n = Math.max(6, Math.ceil(r * (t1 - t0) * 1.2)); for (let i = 0; i <= n; i++) { const t = t0 + (t1 - t0) * i / n; px(c, cx + Math.cos(t) * r, cy + Math.sin(t) * r, col, a); } };
+  const hexa = (h) => { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+  const lighten = (h, k) => { const [r, g, b] = hexa(h); return 'rgb(' + [r, g, b].map(v => Math.round(v + (255 - v) * k)).join(',') + ')'; };
+  // a small diamond shard, turned one of four ways
+  const SHARD = [[[0, -2], [0, -1], [-1, 0], [0, 0], [1, 0], [0, 1]], [[1, -1], [0, 0], [1, 0], [-1, 1], [0, 1]], [[-1, -1], [0, -1], [0, 0], [1, 0], [0, 1], [0, 2]], [[-1, -1], [0, 0], [-1, 0], [1, 1], [0, 1]]];
+  function event(ev, st, world, time, cur) {
+    const SH = global.DwellerRender.SHARDS;
+    if ((ev & 128) && world.goal && world.goal.x > -9999) {          // taking a sliver (EV.WIN)
+      const g = world.goal, col = SH[cur] || '#ffffff';
+      const shards = []; for (let i = 0; i < 16; i++) { const a = -Math.PI * rnd() * 1.0 - (i % 2 ? 0 : Math.PI * 0.0) + (rnd() - 0.5) * 0.6, sp = 45 + rnd() * 70; shards.push({ x: g.x, y: g.y, vx: Math.cos(a) * sp * (i % 2 ? 1 : -1) * 0.8, vy: Math.sin(a) * sp - 20, life: 1.1 + rnd() * 0.8, k: Math.floor(rnd() * 4), tr: [] }); }
+      L.push({ k: 'win', x: g.x, y: g.y, t0: time, col, shards });
+    }
+    if ((ev & 65536) && world.boss) {                                 // a sliver set in its alcove (EV.SLIVER)
+      const A = world.boss.alc[st.sliverI]; L.push({ k: 'alc', x: A.x + 0.5, y: A.y, t0: time, col: SH[st.sliverI] || '#ffffff' });
+    }
+  };
+  // the chest's light: drawn just after the chest, so the reward rising out of it and the Seeker are in front
+  function chestLight(c, cx0, fy, ch, time) {
+    if (!(ch.T >= 0) || ch.T > 4.5) return;
+    // (drawn before the scene's lighting, which dims it, so it goes in brighter to come out the same)
+    const pxB = (c, x, y, col, al) => px(c, x, y, col, al * 1.8);
+    c.save(); const T = ch.T, cx = cx0, cy = fy - 6 - 6;
+    c.globalCompositeOperation = 'lighter';
+    // rays fanned up out of it, hard lines, each one breathing its own length, turning slowly
+    if (T > 0.6) { const k0 = Math.min(1, (T - 0.6) / 0.3) * Math.max(0, Math.min(1, (4.5 - T) / 0.8));
+      for (let k = 0; k < 7; k++) { const t = -Math.PI * (0.18 + 0.64 * k / 6) + 0.08 * Math.sin(T * 0.7), len = [16, 24, 20, 30, 20, 24, 16][k] * (0.85 + 0.15 * Math.sin(step(T) * 6 + k * 2));
+        for (let j = 3; j < len; j++) pxB(c, cx + Math.cos(t) * j, cy + Math.sin(t) * j, j < len * 0.35 ? '#ffffff' : '#c8d6ff', k0 * (1 - j / len) * 0.75); } }
+    // glints popping round it, each a little four-pointed star that lives four twelfths
+    if (T > 0.8 && T < 4.2) { const fr = Math.floor(T * 12); for (let q = 0; q < 3; q++) { const id = Math.floor((fr + q * 5) / 4) * 3 + q, life = (fr + q * 5) % 4, gx = cx + ((id * 37) % 41) - 20, gy = cy - 4 - ((id * 53) % 30), sz = [1, 2, 3, 1][life];
+      pxB(c, gx, gy, '#ffffff', 1); for (let s = 1; s <= sz; s++) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) pxB(c, gx + dx * s, gy + dy * s, '#dfe8ff', 1 - s / (sz + 1)); } }
+    c.restore();
+  };
+  let LW = null;
+  function draw(c, camX, camY, world, time, dt) {
+    if (LW !== world) { LW = world; L.length = 0; }
+    c.save();
+    // the chest: watch for its lid
+    const ch = world.level && world.level.chest;
+    if (ch) { if (ch.T >= 0 && !ch.fxDust) { ch.fxDust = true; L.push({ k: 'chest', ch, t0: time }); } }
+    // drips, in the levels and the Deep's rooms (not the Guardian's)
+    if (!world.boss) drips(c, camX, camY, world, time, dt);
+    for (let i = L.length - 1; i >= 0; i--) {
+      const e = L[i], a = time - e.t0, sa = step(a), X = e.x - camX, Y = e.y - camY;
+      if (e.k === 'win') {
+        if (a > 2.2) { L.splice(i, 1); continue; }
+        c.globalCompositeOperation = 'lighter';
+        // the flash: a white core, three steps smaller each twelfth of a second
+        const fr = [9, 6, 3][Math.floor(a * 12)]; if (fr) for (let y = -fr; y <= fr; y++) { const w = Math.floor(Math.sqrt(fr * fr - y * y)); c.globalAlpha = 0.85; c.fillStyle = Math.abs(y) > fr - 2 ? e.col : '#ffffff'; c.fillRect(Math.round(X - w), Math.round(Y + y), w * 2 + 1, 1); }
+        // the star: four long spikes and four short, growing then pulling in
+        const sl = [10, 18, 24, 20, 14, 8, 4, 2][Math.floor(a * 12)] || 0;
+        for (let k = 1; k <= sl; k++) { const f = 1 - k / (sl + 1), col = k < sl * 0.4 ? '#ffffff' : e.col; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) px(c, X + dx * k, Y + dy * k, col, f); if (k <= sl * 0.45) for (const [dx, dy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) px(c, X + dx * k * 0.7, Y + dy * k * 0.7, e.col, f * 0.8); }
+        // the ring: out in hard steps, thinning
+        if (sa < 0.6) { const r = 5 + sa * 85, al = 1 - sa / 0.6; ring(c, X, Y, r, e.col, al); if (sa > 0.08) ring(c, X, Y, r - 3, '#ffffff', al * 0.6); }
+        // the shards: thrown, turning (a new turn each twelfth), falling, a glint left behind them now and then
+        for (const s of e.shards) {
+          s.vy += 70 * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.vx *= 1 - 0.8 * dt;
+          const u = a / s.life; if (u > 1) continue;
+          if (Math.floor(a * 12) !== s.lastF) { s.lastF = Math.floor(a * 12); if (s.lastF % 2 === 0) s.tr.push([s.x, s.y, a]); }
+          for (const [tx, ty, ta] of s.tr) { const q = (a - ta) * 12; if (q < 4) px(c, tx - camX, ty - camY, q < 1 ? '#ffffff' : e.col, (1 - q / 4) * 0.8 * (1 - u)); }
+          const shp = SHARD[(s.k + Math.floor(a * 12)) % 4];
+          for (const [dx, dy] of shp) px(c, s.x - camX + dx, s.y - camY + dy, dy < 0 ? lighten(e.col, 0.5) : e.col, 1 - u * u);
+          if (Math.floor(a * 12) % 3 === 0) px(c, s.x - camX, s.y - camY, '#ffffff', 1 - u);
+        }
+        c.globalCompositeOperation = 'source-over';
+      }
+      if (e.k === 'alc') {
+        if (a > 2.0) { L.splice(i, 1); continue; }
+        c.globalCompositeOperation = 'lighter';
+        const cx = X, cy = Y - 7, r = 13;
+        // the circle draws itself round the socket, a quarter each twelfth; six marks light as it passes; then it rings out
+        const drawn = Math.min(1, Math.floor(a * 12 + 1) / 5), fade = a < 1.0 ? 1 : Math.max(0, 1 - (sa - 1.0) / 0.5);
+        if (a < 1.5) { arc(c, cx, cy, r, -Math.PI / 2, -Math.PI / 2 + drawn * Math.PI * 2, e.col, fade); arc(c, cx, cy, r - 2, -Math.PI / 2, -Math.PI / 2 + drawn * Math.PI * 2, e.col, fade * 0.45);
+          for (let k = 0; k < 6; k++) { const t = -Math.PI / 2 + k / 6 * Math.PI * 2; if (k / 6 > drawn) continue; const mx = cx + Math.cos(t) * (r + 2), my = cy + Math.sin(t) * (r + 2); px(c, mx, my, '#ffffff', fade); px(c, mx + Math.cos(t), my + Math.sin(t), e.col, fade); px(c, mx - Math.sin(t), my + Math.cos(t), e.col, fade * 0.7); px(c, mx + Math.sin(t), my - Math.cos(t), e.col, fade * 0.7); } }
+        if (a > 1.0 && a < 1.5) ring(c, cx, cy, r + (sa - 1.0) * 30, e.col, 1 - (sa - 1.0) / 0.5);
+        // the pillar: up out of the socket, wide then thin, its top broken into a checker as it fades out
+        const pw = [7, 7, 5, 5, 3, 3, 3, 1, 1, 1][Math.floor(a * 6)] || 0, ph = 70;
+        if (pw) for (let y = 0; y < ph; y++) { const top = y / ph; for (let x = -(pw >> 1); x <= pw >> 1; x++) { if (top > 0.55 && ((x + y) & 1)) continue; if (top > 0.8 && ((x + y) % 3)) continue; px(c, X + x, Y - 4 - y, x === 0 ? '#ffffff' : e.col, (Math.abs(x) === pw >> 1 && pw > 1 ? 0.45 : 0.85) * (1 - top * 0.5)); } }
+        // and across the floor, a flat ring
+        if (sa < 0.7) ring(c, X, Y - 1, 4 + sa * 60, e.col, 1 - sa / 0.7, (4 + sa * 60) * 0.16);
+        c.globalCompositeOperation = 'source-over';
+      }
+      if (e.k === 'chest') {
+        const ch2 = e.ch, T = ch2.T, cx = ch2.x - camX, cy = ch2.y - camY - 6;
+        if (T > 4.5) { L.splice(i, 1); continue; }
+        // the lid: a puff of dust along the floor as it comes up
+        if (T > 0.45 && T < 1.0) { const u = step(T - 0.45) / 0.55; for (let k = 0; k < 12; k++) { const d = (k % 2 ? 1 : -1) * (4 + u * 16 + (k % 3) * 2); px(c, cx + d, cy + 6 - (k % 3) - u * 2, k % 3 ? '#8a8f9a' : '#b8bcc6', 1 - u); } }
+        c.globalCompositeOperation = 'source-over';
+      }
+    }
+    c.restore();
+  };
+  // drips: a different kind for each level. Sources are found once per level, kept sorted by x, and only the ones
+  // on screen are visited, so a frame costs a handful of rectangles however big the level is
+  const D = { src: null, w: null };
+  const HEART_BEAT = 60 / 90;                                      // (the heart's drops all let go on the 90 bpm beat)
+  const KINDS = {
+    descent:  { every: [4, 9], per: [2.2, 4.8], hang: 0.55, g: 160 },
+    mycelium: { every: [5, 10], per: [3.0, 5.5], hang: 1.3, g: 110 },
+    glass:    { every: [5, 10], per: [2.6, 5.0], hang: 0.7, g: 130 },
+    foundry:  { every: [6, 11], per: [2.8, 5.2], hang: 0.9, g: 170 },
+    ember:    { every: [4, 8], per: [2.2, 4.0], hang: 0.3, g: 0 },
+    heart:    { every: [5, 9], per: [2.6, 4], hang: 0.75, g: 200 },
+  };
+  function build(w) {
+    D.w = w; D.src = []; D.kind = KINDS[w.level && w.level.theme] ? w.level.theme : null; if (!D.kind) return;
+    const K = KINDS[D.kind]; seed = 99 + w.W * 7 + w.H;   // (the same drips in the same places every visit)
+    for (let tx = 2; tx < w.W - 2; tx += K.every[0] + Math.floor(rnd() * (K.every[1] - K.every[0]))) for (let ty = 1; ty < w.H - 2; ty++) {
+      if (w.solid[ty * w.W + tx] === 1 && w.solid[(ty + 1) * w.W + tx] !== 1) { let f = ty + 1; while (f < w.H && w.solid[f * w.W + tx] !== 1) f++;
+        if (f - ty > 4 && f - ty < 40 && f < w.H && rnd() < 0.6) { let per = K.per[0] + rnd() * (K.per[1] - K.per[0]); if (D.kind === 'heart') per = HEART_BEAT * Math.round(per / HEART_BEAT);
+          D.src.push({ x: tx * 6 + 1 + Math.floor(rnd() * 4), y: (ty + 1) * 6, fy: f * 6, ph: D.kind === 'heart' ? HEART_BEAT * Math.floor(rnd() * 8) : rnd() * 5, per, sd: Math.floor(rnd() * 1000) }); } } }
+    D.src.sort((a, b) => a.x - b.x);
+  }
+  // a lit bead: the pixel, and a dim plus round it (drawn with light, so it only ever brightens)
+  const bead = (c, x, y, col, hc, a) => { px(c, x, y, col, a); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) px(c, x + dx, y + dy, hc, a * 0.35); };
+  const lit = (c, f) => { c.globalCompositeOperation = 'lighter'; f(); c.globalCompositeOperation = 'source-over'; };
+  function drips(c, camX, camY, w, time, dt) {
+    if (D.w !== w) build(w); if (!D.kind) return;
+    const K = KINDS[D.kind], W = c.canvas.width;
+    let lo = 0, hi = D.src.length; const x0 = camX - 12; while (lo < hi) { const m = (lo + hi) >> 1; if (D.src[m].x < x0) lo = m + 1; else hi = m; }
+    for (let n = lo; n < D.src.length; n++) {
+      const s = D.src[n], X = s.x - camX; if (X > W + 12) break;
+      const a = (time + s.ph) % s.per, Yc = s.y - camY, Yf = s.fy - camY;
+      DRAW[D.kind](c, X, Yc, Yf, a, K, s, time);
+    }
+  }
+  // where a falling drop is, and when it lands
+  const fallY = (K, ft) => 2 + K.g * ft * ft, landT = (K, s) => Math.sqrt((s.fy - s.y - 2) / K.g);
+  const DRAW = {
+    // THE DESCENT: clear cold water. A bead, a streak, a crown, a ring
+    descent(c, X, Yc, Yf, a, K, s) {
+      if (a < K.hang) { const u = step(a) / K.hang; px(c, X, Yc, '#7d8fa6', 0.4 + 0.5 * u); if (u > 0.6) px(c, X, Yc + 1, '#9fb2c8', 0.6 * u); return; }
+      const ft = a - K.hang, y = Yc + fallY(K, ft);
+      if (y < Yf) { px(c, X, y, '#d4e2f0', 1); px(c, X, y - 1, '#9fb2c8', 0.7); px(c, X, y - 2, '#7d8fa6', 0.45); return; }
+      const q = Math.floor((ft - landT(K, s)) * 12), Y = Yf - 1; if (q < 0 || q > 5) return;
+      if (q < 3) { const r = [1, 2, 3][q]; px(c, X - r, Y - (q === 1 ? 1 : 0), '#b8c8da', 0.8); px(c, X + r, Y - (q === 1 ? 1 : 0), '#b8c8da', 0.8); if (q === 0) px(c, X, Y - 1, '#d8e4f0', 0.9); }
+      else { const r = q + 1; px(c, X - r, Y, '#7d8fa6', 0.5); px(c, X + r, Y, '#7d8fa6', 0.5); }
+    },
+    // THE MYCELIUM: glowing sap. It hangs a long time and stretches down on a thread before it lets go;
+    // where it lands it leaves a little lit splat, and spores lift off it
+    mycelium(c, X, Yc, Yf, a, K, s) {
+      lit(c, () => {
+        if (a < K.hang) { const u = step(a) / K.hang, st = u > 0.55 ? Math.floor((u - 0.55) / 0.45 * 4) : 0;
+          for (let k = 0; k < st; k++) px(c, X, Yc + k, '#5fb860', 0.8);
+          bead(c, X, Yc + st, '#9cf08a', '#4fae58', 0.5 + 0.5 * u); if (u > 0.4) { px(c, X, Yc + st + 1, '#4fae58', 0.7 * u); px(c, X - 1, Yc + st, '#2f7a38', 0.4 * u); px(c, X + 1, Yc + st, '#2f7a38', 0.4 * u); } return; }
+        const ft = a - K.hang, y = Yc + 4 + fallY(K, ft);
+        if (y < Yf) { bead(c, X, y, '#e0ffd0', '#5fc060', 1); px(c, X, y - 1, '#7fe07a', 0.6); px(c, X, y - 2, '#3f8f48', 0.4); if (ft < 0.08) px(c, X, Yc + 2, '#3f8f48', 0.6); return; }
+        const lt = ft - landT(K, s) + 0.02, q = Math.floor(lt * 12), Y = Yf - 1; if (lt < 0 || lt > 1.6) return;
+        const sp = Math.max(0, 1 - lt / 1.2); if (q < 2) px(c, X, Y - 1, '#c8ffb0', 1);
+        for (let k = -1; k <= 1; k++) px(c, X + k * (q < 1 ? 1 : 2) + (k && q > 2 ? 0 : 0), Y, k ? '#4fae58' : '#9cf08a', sp * 0.9);
+        for (let m = 0; m < 3; m++) { const u = Math.min(1, step(lt) / 1.5), dx = (m - 1) * 2 + Math.round(Math.sin(u * 6 + m * 2) * 1.5); if (lt > 0.15 + m * 0.1) px(c, X + dx, Y - 2 - u * (10 + m * 4), m === 1 ? '#ffffff' : '#b8ff9e', (1 - u) * 0.9); }
+      });
+    },
+    // THE GLASS GARDEN: drops of violet light. They fall with a short bright tail, and land as a four-pointed glint
+    // with two sparks skipping off it
+    glass(c, X, Yc, Yf, a, K, s) {
+      lit(c, () => {
+        if (a < K.hang) { const u = step(a) / K.hang; px(c, X, Yc, '#8a72d8', 0.3 + 0.6 * u); if (u > 0.5) px(c, X, Yc + 1, '#c9b4ff', u); if (Math.floor(a * 12) % 5 === 0) px(c, X + 1, Yc, '#ffffff', 0.7 * u); return; }
+        const ft = a - K.hang, y = Yc + fallY(K, ft);
+        if (y < Yf) { bead(c, X, y, '#ffffff', '#9a80f0', 1); px(c, X, y - 1, '#c9b4ff', 0.8); px(c, X, y - 2, '#9a80f0', 0.55); px(c, X, y - 3, '#6a54c0', 0.3); return; }
+        const lt = ft - landT(K, s), q = Math.floor(lt * 12), Y = Yf - 2; if (q < 0 || q > 7) return;
+        const sz = [1, 3, 4, 3, 2, 1, 1, 0][q]; px(c, X, Y, '#ffffff', 1);
+        for (let k = 1; k <= sz; k++) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) px(c, X + dx * k, Y + dy * k * (dy > 0 ? 0.5 : 1), k < 2 ? '#e6dcff' : '#a58cf5', 1 - k / (sz + 1));
+        if (q >= 1 && q <= 6) { const u = (q - 1) / 5; for (const sd of [-1, 1]) px(c, X + sd * (2 + u * 7), Y - Math.sin(u * Math.PI) * 5, sd < 0 ? '#c9b4ff' : '#ffffff', 1 - u); }
+      });
+    },
+    // THE FOUNDRY: drops of molten metal from the seams. Glowing as they fall; a hiss of steam where they land,
+    // and the splat cools from orange to red to nothing
+    foundry(c, X, Yc, Yf, a, K, s) {
+      if (a < K.hang) { const u = step(a) / K.hang; lit(c, () => { px(c, X, Yc, '#c84a24', 0.4 + 0.5 * u); if (u > 0.5) px(c, X, Yc + 1, '#ffb050', u); }); return; }
+      const ft = a - K.hang, y = Yc + fallY(K, ft);
+      if (y < Yf) { lit(c, () => { bead(c, X, y, '#ffe2a8', '#ff7030', 1); px(c, X, y - 1, '#ff9450', 0.8); px(c, X, y - 2, '#c84a24', 0.5); }); return; }
+      const lt = ft - landT(K, s), q = Math.floor(lt * 12), Y = Yf - 1; if (lt < 0 || lt > 1.6) return;
+      const cool = Math.min(1, step(lt) / 1.3), col = cool < 0.25 ? '#ffd090' : cool < 0.55 ? '#ff8040' : '#a83a20';
+      lit(c, () => { for (let k = -2; k <= 2; k++) px(c, X + k, Y, col, (1 - cool) * (k ? (Math.abs(k) > 1 ? 0.45 : 0.75) : 1)); if (cool < 0.4) px(c, X, Y - 1, col, 0.6); if (q < 3) { px(c, X - 2 - q, Y - 1 - (q === 1), '#ffb050', 0.9); px(c, X + 2 + q, Y - 1 - (q === 1), '#ffb050', 0.9); } });
+      for (let m = 0; m < 8; m++) { const u = Math.min(1, Math.max(0, step(lt) - m * 0.06) / 1.0); if (u <= 0 || u >= 1) continue; const sx = X + (m - 3.5) * (0.6 + u * 1.6) + Math.round(Math.sin(u * 5 + m) * 1.5), sy = Y - 2 - u * (10 + (m % 3) * 4); px(c, sx, sy, m % 2 ? '#a8a8b0' : '#d8d8e0', 0.65 * (1 - u)); if (m % 3 === 0) px(c, sx + 1, sy, '#a8a8b0', 0.4 * (1 - u)); }
+    },
+    // EMBER DEEP: not water at all: embers come loose from the rock and drift down, swinging and flickering;
+    // they burst into sparks on the floor
+    ember(c, X, Yc, Yf, a, K, s) {
+      lit(c, () => {
+        if (a < K.hang) { if (Math.floor(a * 12) % 2 === 0) px(c, X, Yc, '#ff7a3c', 0.8); return; }
+        const ft = a - K.hang, v = 22, land = (Yf - Yc - 2) / v, y = Yc + 1 + v * ft, sw = Math.round(Math.sin(step(ft) * 4.2 + s.sd) * 3);
+        if (ft < land) { const fl = Math.floor(ft * 12 + s.sd) % 3; bead(c, X + sw, y, fl === 0 ? '#fff0c8' : '#ffc070', '#ff6a2c', 1); if (fl === 2) px(c, X + sw + 1, y - 1, '#ffb060', 0.7);
+          for (let k = 1; k <= 3; k++) { const swk = Math.round(Math.sin(step(ft - k * 0.09) * 4.2 + s.sd) * 3); px(c, X + swk, y - k * 2, k < 2 ? '#ff9450' : '#c84a24', 0.6 - k * 0.15); } return; }
+        const lt = ft - land, q = Math.floor(lt * 12), Y = Yf - 1, Xl = X + Math.round(Math.sin(step(land) * 4.2 + s.sd) * 3); if (q > 8) return;
+        if (q < 2) bead(c, Xl, Y, '#ffffff', '#ff9450', 1); if (q < 5) px(c, Xl, Y + 1, '#ff7a3c', 0.6);
+        for (let m = 0; m < 4; m++) { const u = q / 8, vx = (m - 1.5) * 8, vy = 30 + (m % 2) * 10, tt = lt; px(c, Xl + vx * tt, Y - vy * tt + 60 * tt * tt, u < 0.4 ? '#ffe0b0' : '#ff7a3c', 1 - u); }
+      });
+    },
+    // THE HEART: heavy crimson drops that let go on the beat. They swell big, fall hard, and land in a wide crown
+    // with drops thrown out of it, leaving a dark stain that fades
+    heart(c, X, Yc, Yf, a, K, s) {
+      if (a < K.hang) { const u = step(a) / K.hang; px(c, X, Yc, '#8a1a34', 0.6 + 0.4 * u); if (u > 0.3) { px(c, X, Yc + 1, '#c8304e', u); } if (u > 0.65) { px(c, X - 1, Yc + 1, '#901c38', u); px(c, X + 1, Yc + 1, '#901c38', u); px(c, X, Yc + 2, '#e8506e', u); px(c, X - 1, Yc + 1, '#ff9ab0', u * 0.5); } return; }
+      const ft = a - K.hang, y = Yc + 1 + fallY(K, ft);
+      if (y < Yf) { px(c, X, y, '#f05a7c', 1); px(c, X + 1, y, '#b02444', 1); px(c, X, y - 1, '#ff9ab0', 0.9); px(c, X + 1, y - 1, '#c8304e', 0.9); px(c, X, y - 2, '#c8304e', 0.6); px(c, X, y - 3, '#8a1a34', 0.4); return; }
+      const lt = ft - landT(K, s) + 0.02, q = Math.floor(lt * 12), Y = Yf - 1; if (lt < 0 || lt > 2.0) return;
+      const st = Math.max(0, 1 - lt / 2.0); for (let k = -2; k <= 3; k++) px(c, X + k, Y, '#6a1426', st * (Math.abs(k - 0.5) < 2 ? 0.9 : 0.5));
+      if (q < 4) { const r = [1, 2, 3, 4][q], h = [1, 2, 2, 1][q]; for (const sd of [-1, 1]) { px(c, X + 0.5 + sd * r, Y - h, '#c8304e', 0.95); px(c, X + 0.5 + sd * r, Y - h + 1, '#7a1830', 0.8); } }
+      if (q < 9) for (let m = 0; m < 2; m++) { const sd = m ? 1 : -1, tt = lt; px(c, X + 0.5 + sd * (2 + 18 * tt), Y - 2 - 34 * tt + 120 * tt * tt, '#e0466a', 1 - q / 9); }
+    },
+  };
+  global.DwellerFX = { event, chestLight, draw };
+})(typeof window !== 'undefined' ? window : globalThis);
 </script>
 <script>/* DWELLER — procedural music and sound, all synthesised with Web Audio (no samples).
  *
@@ -10103,7 +10323,8 @@ body.ninth #tbN{display:flex}
  * veins of the rock round it pulsing slowly in its colour, and a floor where each step sends a faint fan of glowing
  * dust down into the stone.
  *   RELICS                       the nine: name, where found, colour, what it does, its pixels
- *   draw(ctx, i, x, y, t, o)     a relic, centred at (x, y); o: { sc, glow, dim, still }
+ *   draw(ctx, i, x, y, t, o)     a relic, centred at (x, y): at the room's size (sc 2) alive, or small and calm
+ *                                (sc 1, the HUD); o: { sc, glow, dim }
  *   box(ctx, i, cx, by, t, status, dim, x0, x1)    the relic box (bottom at by, kept between x0 and x1)
  *   create()                     the room (a 640 x 360 world of its own) and its little level for the simulation
  *   bakeArt()                    the room's still art, drawn once (the build bakes it to a picture)
@@ -10112,96 +10333,251 @@ body.ninth #tbN{display:flex}
 (function (global) {
   'use strict';
   const RELICS = [
-    { id: 'plumb', name: 'PLUMB LINE', from: 'THE SHAFT', stratum: 'descent', col: [170, 190, 214], text: 'YOU START EVERY RUN HOLDING ONE RANDOM UPGRADE',
-      px: ['.....d.....', '.....b.....', '.....b.....', '.....b.....', '....cdc....', '...cddcb...', '...cdccb...', '...cdccb...', '....cbb....', '.....b.....', '...........'] },
-    { id: 'spore', name: 'SPORE MAP', from: 'THE ROOTS', stratum: 'mycelium', col: [140, 214, 136], text: 'A FAKE WALL BLAZES WITH LIGHT WHEN YOU COME NEAR',
-      px: ['...........', '...bbbbb...', '..bcdcccb..', '.bccccdccb.', '.bdcccccdb.', 'bbbbbbbbbbb', '.aaaaaaaaa.', '....ccc....', '....cbc....', '....cbc....', '...bcccb...'], spots: true },
-    { id: 'prism', name: 'PRISM', from: 'THE GEODE', stratum: 'glass', col: [184, 160, 245], text: 'UPGRADE OFFERS SHOW FOUR CHOICES INSTEAD OF THREE',
-      px: ['...........', '.....d.....', '....ddb....', '....dcb....', '...dccbb...', '...dccbb...', '..dcccbbb..', '..dcccbbb..', '.dccccbbbb.', '.bbbbbbbbb.', '...........'], motes: true },
-    { id: 'coal', name: 'BANKED COAL', from: 'THE MAGMA', stratum: 'ember', col: [240, 132, 72], text: 'ONCE A RUN, A FULL BURN IS TAKEN FROM YOU',
-      px: ['...........', '...........', '....aaa....', '..aaadaaa..', '.aadaadaaa.', '.adddaadaa.', '.aadaaddaa.', '..aadaaaa..', '...aaaaa...', '...........', '...........'], coal: true },
-    { id: 'gear', name: 'SPARE GEAR', from: 'THE WORKINGS', stratum: 'foundry', col: [214, 170, 96], text: 'ONCE A RUN, REROLL AN UPGRADE OFFER',
-      px: ['...........', '....b.b....', '..b.bcb.b..', '...bcccb...', '.bbcc.ccbb.', '..bc...cb..', '.bbcc.ccbb.', '...bcccb...', '..b.bcb.b..', '....b.b....', '...........'] },
-    { id: 'keep', name: 'KEEPSAKE', from: 'THE VEIN', stratum: 'heart', col: [226, 106, 134], text: 'REACH THE BOTTOM AND YOUR UPGRADES CARRY INTO THE NEXT RUN',
-      px: ['.....b.....', '....b.b....', '.....b.....', '..cc...cc..', '.cddc.cddc.', '.cdddcdddc.', '.bcdddddcb.', '..bcdddcb..', '...bcdcb...', '....bcb....', '.....b.....'] },
-    { id: 'fork', name: 'TUNING FORK', from: 'HARSH DEPTHS', tier: 2, col: [190, 226, 255], text: 'YOUR SEEKER HOLDS TWO CHARGES  -  ECLIPSE TWICE',
-      px: ['..d.....d..', '..c.....c..', '..c.....c..', '..c.....c..', '..c.....c..', '..cb...bc..', '...bcccb...', '.....b.....', '.....b.....', '.....b.....', '....bbb....'] },
-    { id: 'lens', name: 'CODEX LENS', from: 'CRUEL DEPTHS', tier: 3, col: [120, 224, 184], text: 'AT THE BOTTOM, CHOOSE BETWEEN TWO SLEEPING SEEKERS',
-      px: ['...........', '...bbbbb...', '..bc...cb..', '.bc.ddd.cb.', '.b.dcacd.b.', '.b.dacad.b.', '.b.dcacd.b.', '.bc.ddd.cb.', '..bc...cb..', '...bbbbb...', '...........'] },
-    { id: 'ninth', name: 'THE NINTH', from: 'THE CEILING', tier: 4, col: [90, 230, 200], text: 'ENTER THE LIGHT AND THEN EQUIP  -  IMPERVIOUS TO THEIR EYES FOR 4 ROOMS', sun: true },
+    { id: 'plumb', name: 'PLUMB LINE', from: 'THE SHAFT', stratum: 'descent', col: [170, 190, 214], text: 'YOU START EVERY RUN HOLDING ONE RANDOM UPGRADE' },
+    { id: 'spore', name: 'SPORE MAP', from: 'THE ROOTS', stratum: 'mycelium', col: [140, 214, 136], text: 'A FAKE WALL BLAZES WITH LIGHT WHEN YOU COME NEAR' },
+    { id: 'prism', name: 'PRISM', from: 'THE GEODE', stratum: 'glass', col: [184, 160, 245], text: 'UPGRADE OFFERS SHOW FOUR CHOICES INSTEAD OF THREE' },
+    { id: 'coal', name: 'BANKED COAL', from: 'THE MAGMA', stratum: 'ember', col: [240, 132, 72], text: 'ONCE A RUN, A FULL BURN IS TAKEN FROM YOU' },
+    { id: 'gear', name: 'SPARE GEAR', from: 'THE WORKINGS', stratum: 'foundry', col: [206, 128, 88], text: 'ONCE A RUN, REROLL AN UPGRADE OFFER' },
+    { id: 'keep', name: 'KEEPSAKE', from: 'THE VEIN', stratum: 'heart', col: [226, 106, 134], text: 'REACH THE BOTTOM AND YOUR UPGRADES CARRY INTO THE NEXT RUN' },
+    { id: 'fork', name: 'TUNING FORK', from: 'HARSH DEPTHS', tier: 2, col: [190, 226, 255], text: 'YOUR SEEKER HOLDS TWO CHARGES  -  ECLIPSE TWICE' },
+    { id: 'lens', name: 'CODEX LENS', from: 'CRUEL DEPTHS', tier: 3, col: [120, 224, 184], text: 'AT THE BOTTOM, CHOOSE BETWEEN TWO SLEEPING SEEKERS' },
+    { id: 'ninth', name: 'THE NINTH', from: 'THE CEILING', tier: 4, col: [90, 230, 200], text: 'ENTER THE LIGHT AND THEN EQUIP  -  IMPERVIOUS TO THEIR EYES FOR 4 ROOMS' },
   ];
   const NINTH = 8;
   const mix = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
   const rgb = (c, a) => 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + (a === undefined ? 1 : a) + ')';
-  const shades = (c, dim) => { const k = dim ? 0.35 : 1; return { a: mix([12, 12, 18], c, 0.32 * k), b: mix([12, 12, 18], c, 0.62 * k), c: mix([12, 12, 18], c, 0.9 * k), d: dim ? mix([12, 12, 18], c, 0.5) : mix(c, [255, 255, 255], 0.55) }; };
-  function halo(ctx, x, y, r, c, a) { if (r <= 0 || a <= 0) return; const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, rgb(c, a)); g.addColorStop(1, rgb(c, 0)); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
+  /* the relics as the room shows them: each one a small living thing on the room's own pixels, doing what it gives
+     you; its shapes change twelve times a second like the rest of the game's animation, its light is added on top */
+  const LIVE = (() => {
+    const st = (t) => Math.floor(t * 12) / 12;
+    // (a pixel: the colour and alpha are only set when they change, which is most of the cost of a pixel)
+    const K = { c: null, col: null, a: -1 }, inv = () => { K.c = null; };
+    const P = (c, x, y, col, a) => { if (a !== undefined && a <= 0) return; a = a === undefined ? 1 : Math.min(1, a);
+      if (K.c !== c) { K.c = c; K.col = null; K.a = -1; } if (K.a !== a) { c.globalAlpha = K.a = a; } if (K.col !== col) { c.fillStyle = K.col = col; } c.fillRect(Math.round(x), Math.round(y), 1, 1); };
+    const R = (c, x, y, w, h, col, a) => { inv(); c.globalAlpha = a === undefined ? 1 : a; c.fillStyle = col; c.fillRect(Math.round(x), Math.round(y), w, h); };
+    const ring = (c, cx, cy, r, col, a, ry, t0, t1) => { const n = Math.max(10, Math.ceil(r * 7)); for (let i = 0; i < n; i++) { const t = (t0 || 0) + ((t1 === undefined ? Math.PI * 2 : t1) - (t0 || 0)) * i / n; P(c, cx + Math.cos(t) * r, cy + Math.sin(t) * (ry || r), col, a); } };
+    const disc = (c, cx, cy, r, colAt, al) => { for (let y = -Math.ceil(r); y <= Math.ceil(r); y++) for (let x = -Math.ceil(r); x <= Math.ceil(r); x++) { const d = Math.hypot(x, y); if (d > r) continue; const col = colAt(x, y, d); if (col) P(c, cx + x, cy + y, col, al); } };
+    const line = (c, x0, y0, x1, y1, col, a) => { const n = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)))); for (let i = 0; i <= n; i++) P(c, x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n, col, a); };
+    const add = (c, f) => { const o = c.globalCompositeOperation; c.globalCompositeOperation = 'lighter'; f(); c.globalCompositeOperation = o; c.globalAlpha = 1; inv(); };
+    // a soft halo in three hard steps
+    const halo = (c, cx, cy, r, col, a) => add(c, () => { inv(); c.fillStyle = col; c.globalAlpha = a / 10; const X = Math.round(cx);   // (a faint glow in three hard steps, a row at a time)
+      for (let k = 1; k <= 3; k++) { const q = r * k / 3, n = Math.ceil(q); for (let y = -n; y <= n; y++) { if (y * y > q * q) continue; const w = Math.floor(Math.sqrt(q * q - y * y)); c.fillRect(X - w, Math.round(cy + y), w * 2 + 1, 1); } } });
+    const D = [];
+    // 1 PLUMB LINE: a crystal bob on a taut line, swinging; now and then a bead of light runs down the line and the bob rings
+    D[0] = (c, x, y, t) => {
+      const s = st(t), sw = Math.sin(s * 1.8) * 0.16, top = y - 14, L = 14, bx = x + Math.sin(sw) * L, by = top + Math.cos(sw) * L;
+      halo(c, bx, by + 2, 9, '#7c97c4', 0.35);
+      R(c, x - 3, top - 1, 7, 1, '#5d6f8e'); R(c, x - 1, top - 2, 3, 1, '#8ea6cc');
+      line(c, x, top, bx, by - 3, '#aab8cf');
+      // the bob: a long cut crystal, lit up left
+      for (let j = -4; j <= 7; j++) { const w = j < 0 ? 4 + j : Math.max(0, 4 - Math.floor(j * 0.6)); for (let i = -w; i <= w; i++) P(c, bx + i, by + j, j < 1 && i < 0 ? '#dfe9fb' : i < 0 ? '#9fb5da' : i === 0 ? '#c3d3ee' : '#5d7096'); }
+      add(c, () => { const dsh = Math.floor(s * 12) % 4; for (let j = 0; j < 12; j++) if ((j + 4 - dsh) % 4 < 2) P(c, x, by + 9 + j, '#9fb5da', 0.35 * (1 - j / 12)); });
+      const ph = (t % 3.2) / 3.2;
+      if (ph < 0.35) { const u = st(ph * 3.2) / (0.35 * 3.2); add(c, () => { P(c, x + (bx - x) * u, top + (by - 3 - top) * u, '#ffffff'); P(c, x + (bx - x) * u, top + (by - 3 - top) * u - 1, '#bcd0f0', 0.6); }); }
+      if (ph >= 0.35 && ph < 0.6) { const u = (st(ph * 3.2) - 0.35 * 3.2) / (0.25 * 3.2); add(c, () => { ring(c, bx, by + 1, 4 + u * 9, '#bcd0f0', 1 - u, (4 + u * 9) * 0.45); P(c, bx - 1, by - 1, '#ffffff', 1 - u); }); }
+    };
+    // 2 SPORE MAP: a cap of mycelium; its spots light one by one along threads, as if a path were being traced; spores lift
+    D[1] = (c, x, y, t) => {
+      const s = st(t); halo(c, x, y - 2, 11, '#4fae58', 0.28);
+      disc(c, x, y - 1, 11, (i, j, d) => j > 1 ? null : d > 10 ? '#2f6a37' : j < -5 + Math.abs(i) * 0.15 ? '#8fd685' : (i + j) < -2 ? '#6fbf68' : '#4f9850');
+      R(c, x - 11, y + 1, 23, 1, '#24502b'); R(c, x - 2, y + 2, 5, 7, '#cfd9c0'); R(c, x + 1, y + 2, 2, 7, '#9ba98e'); R(c, x - 4, y + 8, 9, 1, '#7d8a72');
+      const spots = [[-6, -3], [-2, -7], [3, -5], [7, -1], [0, -1], [-8, 0], [5, -8], [-4, -8]], k = Math.floor(s * 2) % (spots.length + 3);
+      for (let i = 0; i < spots.length; i++) { const [a, b] = spots[i], on = i < k; P(c, x + a, y + b, on ? '#e8ffd6' : '#b9e6a8'); P(c, x + a + 1, y + b, on ? '#c6f5ae' : '#8fc786');
+        if (on && i > 0) add(c, () => line(c, x + spots[i - 1][0], y + spots[i - 1][1], x + a, y + b, '#9cff8c', 0.45)); if (on) add(c, () => P(c, x + a, y + b - 1, '#d7ffc8', 0.6)); }
+      add(c, () => { for (let q = 0; q < 8; q++) { const u = ((t * 0.28 + q * 0.137) % 1), sx = x - 7 + ((q * 37) % 15) + Math.sin(u * 9 + q) * 2, sy = y - 6 - u * 16; P(c, sx, sy, q % 3 ? '#b8ff9e' : '#ffffff', (1 - u) * 0.9); } });
+    };
+    // 4 BANKED COAL: a black lump lit from inside: its cracks run white-orange-red in turn like breath, its underside
+    // glows where it sits, a flame stands on it in three steps, and now and then it spits a spark that arcs and falls
+    D[3] = (c, x, y, t) => {
+      const s = st(t), br = 0.5 + 0.5 * Math.sin(s * 2.4);
+      disc(c, x, y + 2, 9.5, (i, j, d) => (j < -6 + Math.abs(i) * 0.35) ? null : j > 6 && d > 7.5 ? '#5a2414' : d > 8.8 ? '#140c0a' : (i + j) < -7 ? '#4a3a36' : (i + j) < -2 ? '#2a1e1a' : '#1c1412');
+      const cr = [[-6, 2], [-5, 2], [-4, 3], [-3, 3], [-2, 4], [-1, 4], [0, 4], [1, 3], [2, 2], [3, 2], [4, 1], [5, 1], [-1, 1], [0, 0], [0, -1], [1, -2], [2, 5], [3, 6], [4, 6], [-4, 6], [-3, 7], [-2, 8], [5, 3], [6, 4], [-5, 5], [-6, 6]];
+      const cc = ['#fff2d0', '#ffc070', '#ff7a30', '#c03a18'];
+      add(c, () => {
+        cr.forEach(([a, b], k) => { const ph = (Math.floor(s * 12) + k) % 16, col = cc[Math.min(3, Math.floor(Math.abs(ph - 8) / 2.5))]; P(c, x + a, y + b, col, 0.75 + 0.25 * br); if (k % 3 === 0) P(c, x + a, y + b - 1, '#ff7a30', 0.25 * br); });
+        for (let i = -6; i <= 6; i++) P(c, x + i, y + 11, '#ff6a2c', (0.5 - Math.abs(i) / 14) * (0.6 + 0.4 * br)); for (let i = -4; i <= 4; i++) P(c, x + i, y + 12, '#c84a24', 0.3);
+        const f = Math.floor(s * 12) % 3, off = [0, 1, -1][f], fl = [[0, 0, 0], [-1, 0, 0], [1, 0, 0], [0, -1, 0], [-1, -1, 1], [0, -2, 1], [1, -2, 1], [0, -3, 1], [0, -4, 2], [1, -5, 2], [0, -6, 3], [1, -8, 3]];
+        fl.forEach(([a, b, k2]) => P(c, x + 1 + a + (k2 > 1 ? off : 0), y - 5 + b, cc[k2], 0.95 - k2 * 0.15));
+        const sp = (t % 2.6) / 2.6; if (sp < 0.45) { const u = st(sp * 2.6), vx = 18, vy = -34; for (let k = 0; k < 3; k++) { const tt = Math.max(0, u - k * 0.05); P(c, x + 3 + vx * tt, y - 4 + vy * tt + 90 * tt * tt, k ? '#ff7a30' : '#fff2d0', (1 - sp / 0.45) * (1 - k * 0.3)); } }
+        for (let q = 0; q < 4; q++) { const u = ((t * 0.5 + q * 0.25) % 1); P(c, x - 3 + ((q * 5) % 8) + Math.round(Math.sin(u * 7 + q)), y - 10 - u * 14, u < 0.3 ? '#ffe0b0' : '#ff7a3c', (1 - u) * 0.8); }
+      });
+    };
+    // 5 SPARE GEAR: a copper wheel and a steel pinion meshed, each turning a tooth at a step the other way; where
+    // they bite, a little shower of sparks every fourth step
+    D[4] = (c, x, y, t) => {
+      const s = st(t), f = Math.floor(s * 12);
+      const gear = (cx, cy, r, n, ang, base, hi, lo, hole) => {
+        for (let j = -r - 3; j <= r + 3; j++) for (let i = -r - 3; i <= r + 3; i++) { const d = Math.hypot(i, j), a = Math.atan2(j, i) - ang, u = ((a / (Math.PI * 2) * n) % 1 + 1) % 1, tooth = u > 0.15 && u < 0.6;
+          if (d > r + 2.5 || (d > r && !tooth)) continue; if (d < hole) continue;
+          const spoke = d < r - 2 && d > hole + 1 && (((a / (Math.PI * 2) * 4) % 1 + 1) % 1 > 0.22);
+          if (spoke && n > 7) { if (d < hole + 2.2) P(c, cx + i, cy + j, lo); continue; }
+          const lit = (i + j) / (d || 1); P(c, cx + i, cy + j, d > r - 0.8 ? (lit < -0.5 ? hi : lit > 0.6 ? lo : base) : (lit < -0.3 ? base : lit > 0.5 ? lo : base)); }
+      };
+      gear(x - 3, y + 3, 8, 10, f * (Math.PI * 2 / 10) / 2, '#b8704a', '#f0b08a', '#5e3424', 1.5);
+      gear(x + 9, y - 7, 5, 7, -f * (Math.PI * 2 / 7) / 2, '#9a958c', '#e4ded2', '#4f4b44', 1.6);
+      P(c, x - 3, y + 3, '#2a1810');
+      add(c, () => { const q = f % 4; if (q < 3) { const mx = x + 5, my = y - 3; P(c, mx, my, '#ffffff', q === 0 ? 1 : 0.5);
+          for (let k = 0; k < 4; k++) { const tt = q / 12 + 0.02, vx = [-30, 18, 34, -8][k], vy = [-30, -40, -14, -48][k]; P(c, mx + vx * tt, my + vy * tt + 150 * tt * tt, k % 2 ? '#ffd0a0' : '#ffffff', 1 - q / 3); } } });
+    };
+    // 6 KEEPSAKE: a locket: a heart split down the middle by a hinge. On every beat it parts a pixel and the light it
+    // keeps shines out of the seam, then it closes; a ring of pink goes out with each beat
+    D[5] = (c, x, y, t) => {
+      const per = 1.1, ph = (t % per) / per, open = ph < 0.18 ? 1 : 0, glowA = ph < 0.18 ? 1 : ph < 0.4 ? 0.5 : 0.15;
+      for (let k = 0; k < 6; k++) P(c, x - 1 + (k % 2), y - 14 + k, '#c8b0b8'); P(c, x, y - 14, '#ffffff', Math.floor(t * 12) % 9 === 0 ? 1 : 0);
+      const sz = 8, inH = (i, j, e) => { const X = i / sz, Y = -j / sz + 0.25; return Math.pow(X * X + Y * Y - 0.6 + e, 3) - X * X * Y * Y * Y * 0.9 <= 0; };
+      for (let j = -sz; j <= sz; j++) for (let i = -sz - 1; i <= sz + 1; i++) { if (!inH(i, j, 0)) continue;
+        const side = i < 0 ? -1 : 1, rim = !inH(i, j, 0.12);
+        if (i === 0) { P(c, x, y + j + 1, '#5a1426'); continue; }
+        const col = rim ? (i < 0 && j < 2 ? '#ffc8d6' : '#a63458') : (i < -1 && j < 0) ? '#ff8eaa' : (i > 1 && j > 1) ? '#9a2a4c' : '#d84a70';
+        P(c, x + i + (open ? side : 0), y + j + 1, col); }
+      P(c, x - 4 - open, y - 3, '#ffe8ef'); P(c, x - 5 - open, y - 2, '#ffc0d0');
+      add(c, () => { for (let j = -5; j <= 8; j++) P(c, x, y + j, '#ffe8f0', glowA * (1 - Math.abs(j - 1) / 10));
+        if (open) for (let k = -2; k <= 2; k++) for (let j = 1; j < 10 - Math.abs(k) * 2; j++) { P(c, x + k * j * 0.5, y - 6 - j, '#ffd0de', 0.7 * (1 - j / 10)); P(c, x + k * j * 0.5, y + 9 + j * 0.6, '#ff9ab8', 0.4 * (1 - j / 10)); }
+        if (ph < 0.6) { const u = st(ph * per) / (0.6 * per); ring(c, x, y + 1, 10 + u * 10, '#ff7aa0', (1 - u) * 0.9); } });
+    };
+    // 7 TUNING FORK: its tines ring, a pixel apart and back each step; arcs of sound go out from them; a frost of motes
+    D[6] = (c, x, y, t) => {
+      const s = st(t), f = Math.floor(s * 12) % 2, ring2 = (t % 2.4) < 1.2; halo(c, x, y - 3, 10, '#8fc6ff', 0.25);
+      const sp = ring2 ? f : 0;
+      for (let j = 0; j < 14; j++) { P(c, x - 3 - sp, y - 12 + j, j < 1 ? '#ffffff' : '#c6e4ff'); P(c, x - 4 - sp, y - 12 + j, '#8fb7e0', 0.6); P(c, x + 3 + sp, y - 12 + j, j < 1 ? '#ffffff' : '#8fb7e0'); P(c, x + 4 + sp, y - 12 + j, '#5f86b0', 0.7); }
+      for (let i = -3; i <= 3; i++) P(c, x + i, y + 2 + (Math.abs(i) < 3 ? 1 : 0), i < 0 ? '#c6e4ff' : '#8fb7e0');
+      R(c, x, y + 3, 1, 8, '#a9c8ea'); R(c, x - 1, y + 11, 3, 1, '#7895b8'); R(c, x - 2, y + 12, 5, 1, '#5f7a9c');
+      if (ring2) add(c, () => { const u = ((t % 2.4) / 1.2 * 3) % 1, uu = Math.floor(u * 4) / 4; for (const sd of [-1, 1]) { ring(c, x + sd * 4, y - 5, 4 + uu * 8, '#cfe8ff', 0.8 * (1 - uu), 6 + uu * 8, sd < 0 ? Math.PI * 0.65 : -Math.PI * 0.35, sd < 0 ? Math.PI * 1.35 : Math.PI * 0.35); } });
+      add(c, () => { for (let q = 0; q < 6; q++) { const a = t * 0.4 + q * 1.05, r = 9 + (q % 3); P(c, x + Math.cos(a) * r, y - 3 + Math.sin(a) * r * 0.7, '#e6f4ff', 0.3 + 0.4 * Math.max(0, Math.sin(t * 2 + q))); } });
+    };
+    // 8 CODEX LENS: a lens of dark glass; in it, two seekers asleep, their visor slits glowing in turn (the two you will
+    // choose between); a glare sweeps across the glass; glyphs turn round its rim a step at a time
+    D[7] = (c, x, y, t) => {
+      const s = st(t); halo(c, x, y, 14, '#4fc79a', 0.25);
+      disc(c, x, y, 10, (i, j, d) => d > 9 ? ((i + j) < 0 ? '#9ff0d0' : '#2f8a68') : d > 8 ? '#1b4c3c' : (i + j) < -6 ? '#123a2e' : '#0a221b');
+      const ph = (t % 3.2) / 3.2, A = ph < 0.5 ? 1 - Math.abs(ph - 0.25) * 2.2 : 0.15, B = ph >= 0.5 ? 1 - Math.abs(ph - 0.75) * 2.2 : 0.15;
+      for (const [hx, al] of [[-4, A], [4, B]]) { disc(c, x + hx, y + 1, 3.2, (i, j, d) => j > 2 ? null : d > 2.4 ? '#1f3a33' : '#050c0a');
+        for (let j = 3; j <= 6; j++) for (let i = -4; i <= 4; i++) if (Math.abs(i) <= 2 + (j - 2) * 0.6 && Math.hypot(hx + i, j) < 8.5) P(c, x + hx + i, y + j, '#16302a');
+        add(c, () => { P(c, x + hx - 1, y + 1, '#b8ffe6', al); P(c, x + hx, y + 1, '#ffffff', al); P(c, x + hx + 1, y + 1, '#b8ffe6', al); P(c, x + hx, y + 2, '#5fe0b0', al * 0.3); P(c, x + hx, y, '#5fe0b0', al * 0.3); }); }
+      add(c, () => { const g = Math.floor(s * 12) % 30; if (g < 8) for (let k = -9; k <= 9; k++) { const gx = x - 10 + g * 2.6 + k * 0.5, gy = y + k; if (Math.hypot(gx - x, gy - y) < 8.5) { P(c, gx, gy, '#d8fff0', 0.4); P(c, gx + 1, gy, '#d8fff0', 0.2); } }
+        for (let q = 0; q < 8; q++) { const a = Math.floor(s * 4) * (Math.PI / 16) + q * Math.PI / 4, gx = x + Math.cos(a) * 12.5, gy = y + Math.sin(a) * 12.5; P(c, gx, gy, '#8ff5cc', 0.85); if (q % 2) P(c, gx + 1, gy, '#8ff5cc', 0.5); else P(c, gx, gy + 1, '#8ff5cc', 0.5); } });
+    };
+    // 9 THE NINTH: a black sun: light falls into it in turning streaks; its rim pulses teal; nine dark points ride round it
+    D[8] = (c, x, y, t) => {
+      const s = st(t);
+      add(c, () => { for (let q = 0; q < 26; q++) { const u = ((t * 0.35 + q * 0.0385) % 1), r = 24 - u * 14, a = q * 2.4 + u * 2.6; P(c, x + Math.cos(a) * r, y + Math.sin(a) * r, q % 5 ? '#5ae6c8' : '#ff8c3c', u * 0.9); P(c, x + Math.cos(a - 0.12) * (r + 1), y + Math.sin(a - 0.12) * (r + 1), '#2a8a78', u * 0.4); } });
+      disc(c, x, y, 10, (i, j, d) => d > 9.1 ? '#5ae6c8' : d > 8.2 ? '#06120f' : '#000000');
+      add(c, () => { const pr = 10.6 + (Math.floor(s * 6) % 3) * 0.8; ring(c, x, y, pr, '#5ae6c8', 0.55 - (pr - 10.6) * 0.22); });
+      for (let n = 0; n < 9; n++) { const a = s * 0.5 + n * Math.PI * 2 / 9, r = 14; P(c, x + Math.cos(a) * r, y + Math.sin(a) * r, '#000000'); P(c, x + Math.cos(a) * (r + 1), y + Math.sin(a) * (r + 1), n % 3 ? '#5ae6c8' : '#ff8c3c', 0.85); }
+      P(c, x - 1, y - 1, '#c8fff0', 0.5 + 0.5 * Math.sin(t * 3));
+    };
+    const hex = (h) => { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+    const VI = ['#2e2358', '#4b3a86', '#6f58c0', '#9a80f0', '#c9b4ff', '#efe6ff'];
+    const CH = ['#ff8a8a', '#f5e27a', '#7fe8a0', '#86b8ff'];               // (the four choices)
+    // a filled triangle on whole pixels
+    const tri = (c, a, b, d, col, al) => { const x0 = Math.floor(Math.min(a[0], b[0], d[0])), x1 = Math.ceil(Math.max(a[0], b[0], d[0])), y0 = Math.floor(Math.min(a[1], b[1], d[1])), y1 = Math.ceil(Math.max(a[1], b[1], d[1]));
+      const e = (p, q, x, y) => (q[0] - p[0]) * (y - p[1]) - (q[1] - p[1]) * (x - p[0]), ar = e(a, b, d[0], d[1]); if (Math.abs(ar) < 0.01) return;
+      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const px = x + 0.5, py = y + 0.5, w0 = e(b, d, px, py) / ar, w1 = e(d, a, px, py) / ar, w2 = e(a, b, px, py) / ar; if (w0 >= 0 && w1 >= 0 && w2 >= 0) P(c, x, y, col, al); } };
+    const seg = (c, a, b, col, al) => { const n = Math.max(1, Math.ceil(Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1])))); for (let i = 0; i <= n; i++) P(c, a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n, col, al); };
+    // a little 3D: turn about y, tip toward us about x, flat orthographic
+    const rot = (v, ay, ax) => { const [x, y, z] = v, c1 = Math.cos(ay), s1 = Math.sin(ay), X = x * c1 + z * s1, Z = -x * s1 + z * c1, c2 = Math.cos(ax), s2 = Math.sin(ax); return [X, y * c2 - Z * s2, y * s2 + Z * c2]; };
+    const LIGHT = (() => { const l = [-0.55, 0.65, 0.55], n = Math.hypot(...l); return l.map(v => v / n); })();
+    const shade = (n) => Math.max(0, n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2]);
+    const norm = (a, b, d) => { const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v = [d[0] - a[0], d[1] - a[1], d[2] - a[2]], n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]], m = Math.hypot(...n) || 1; return n.map(q => q / m); };
+    // draw a convex solid: faces = [[i, j, k, ...], ...] (counter-clockwise seen from outside), colour per face from (face, light)
+    function solid(c, x, y, V, F, ay, ax, colOf, edgeCol) {
+      const R = V.map(v => rot(v, ay, ax)), S = R.map(v => [x + v[0], y - v[1]]), front = [];
+      F.forEach((f, k) => { const n = norm(R[f[0]], R[f[1]], R[f[2]]); if (n[2] <= 0.02) return; front.push([k, f, n]); });
+      for (const [k, f, n] of front) { const col = colOf(k, shade(n), n); for (let i = 1; i < f.length - 1; i++) tri(c, S[f[0]], S[f[i]], S[f[i + 1]], col); }
+      // the edges between two faces we can see, lit where they face up-left
+      if (edgeCol) for (const [k, f, n] of front) for (let i = 0; i < f.length; i++) { const a = f[i], b = f[(i + 1) % f.length]; if ((S[b][0] - S[a][0]) * -0.7 + (S[b][1] - S[a][1]) * -0.7 < 0 && n[1] + -n[0] > 0.2) seg(c, S[a], S[b], edgeCol, 0.8); }
+      return { S, front };
+    }
+    // 3 PRISM: a crystal of glass, pointed at both ends, turning a step at a time; its faces darken and brighten as they
+    // come round to the light, a glint runs up the edge that catches it, a soft light climbs its core; every few seconds
+    // it flashes white round its outline and a ring of light goes out from it
+    const CRY = { c: null };
+    D[2] = (c, x, y, t) => {
+      y -= 4;                                                                // (stands clear of its stump)
+      const per = 3.8, ph = t % per, R1 = 3.0, FL = 0.17, s = st(t), ay = s * 0.9, ax = 0.32, r = 8, h = 11;
+      if (!CRY.c) { CRY.c = document.createElement('canvas'); CRY.c.width = 48; CRY.c.height = 60; }
+      const o = CRY.c.getContext('2d', { willReadFrequently: true }); o.clearRect(0, 0, 48, 60); const X = 24, Y = 30, V = [];   // (read back each frame: kept off the GPU)
+      for (let k = 0; k < 3; k++) { const a = k * Math.PI * 2 / 3; V.push([Math.cos(a) * r, h, Math.sin(a) * r]); }
+      for (let k = 0; k < 3; k++) { const a = k * Math.PI * 2 / 3; V.push([Math.cos(a) * r, -h, Math.sin(a) * r]); }
+      V.push([0, h + 6, 0], [0, -h - 5, 0]);
+      const F = [[0, 3, 4, 1], [1, 4, 5, 2], [2, 5, 3, 0], [6, 0, 1], [6, 1, 2], [6, 2, 0], [7, 4, 3], [7, 5, 4], [7, 3, 5]].map(f => f.slice().reverse());
+      const sol = solid(o, X, Y, V, F, ay, ax, (k, L) => VI[Math.min(5, 1 + Math.floor(L * 4.6))], '#e6dcff');
+      o.globalAlpha = 1;
+      const flash = ph >= R1 && ph < R1 + FL;
+      add(o, () => { const ph2 = Math.floor(s * 12) % 24; for (let j = -h - 2; j <= h + 2; j++) { const on = Math.abs(j - (ph2 - 12)) < 3; P(o, X, Y - j * Math.cos(ax), on ? '#ffffff' : '#9a80f0', on ? 0.7 : 0.18); } });
+      const img = o.getImageData(0, 0, 48, 60).data, A = (i, j) => i < 0 || j < 0 || i >= 48 || j >= 60 ? 0 : img[(j * 48 + i) * 4 + 3];
+      inv(); c.globalAlpha = 1; c.drawImage(CRY.c, Math.round(x - X), Math.round(y - Y));
+      if (flash) add(c, () => { for (let j = 0; j < 60; j++) for (let i = 0; i < 48; i++) if (A(i, j) && (!A(i - 1, j) || !A(i + 1, j) || !A(i, j - 1) || !A(i, j + 1))) P(c, x - X + i, y - Y + j, '#ffffff', 0.9); });
+      if (ph >= R1) add(c, () => { const u = Math.min(1, Math.floor((ph - R1) * 12) / 4); ring(c, x, y, 12 + u * 12, '#c9b4ff', 1 - u, (12 + u * 12) * 0.9); });
+      if (!flash) add(c, () => { let best = -1, bk = 0; for (let k = 0; k < 3; k++) { const v = rot(V[k], ay, ax); const sc = -v[0] * 0.6 + v[2] * 0.8; if (sc > best) { best = sc; bk = k; } }
+        const a = sol.S[bk + 3], b = sol.S[bk], g = Math.floor(s * 12) % 14; if (g < 8 && best > 4) { const u = g / 7, gx = x - X + a[0] + (b[0] - a[0]) * u, gy = y - Y + a[1] + (b[1] - a[1]) * u; P(c, gx, gy, '#ffffff'); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) P(c, gx + dx, gy + dy, '#ffffff', 0.5); } });
+    };
+    return D.map(f => (c, x, y, t) => { inv(); f(c, x, y, t); inv(); });
+  })();
 
-  /* the relics as the room shows them (twice their size): at twice the detail, on the room's own pixel grid, Scale2x
-     smoothing the stairs on their curves and diagonals, lit from the top left (a pale rim there, a shade below right).
-     They no longer turn (a turning column smeared at this size): they hang face on, and a glint crosses them now and
-     then, in whole pixels, twelve steps a second like the rest of the game's animation */
-  const s2x = (rows) => { const H = rows.length, W = rows[0].length, g = (r, c) => (r < 0 || c < 0 || r >= H || c >= W) ? '.' : rows[r][c], out = [];
-    for (let r = 0; r < H; r++) { let l1 = '', l2 = '';
-      for (let c = 0; c < W; c++) { const P = g(r, c), A = g(r - 1, c), B = g(r, c + 1), C = g(r, c - 1), D = g(r + 1, c);
-        l1 += ((C === A && C !== D && A !== B) ? A : P) + ((A === B && A !== C && B !== D) ? B : P);
-        l2 += ((D === C && D !== B && C !== A) ? C : P) + ((B === D && B !== A && D !== C) ? D : P); }
-      out.push(l1, l2); }
-    return out; };
-  const FINE = {};
-  function drawFine(ctx, q, S, x, y, t, o, sc, ph, icon) {
-    const rows = icon ? q.px : (FINE[q.id] || (FINE[q.id] = s2x(q.px))), H = rows.length, W = rows[0].length, p = icon ? sc : sc / 2;
-    const tq = Math.floor(t * 12) / 12, bob = o.still ? 0 : Math.round(Math.sin(tq * 1.6 + ph) * 1.2) * sc;
-    const e = (r, c) => (r < 0 || c < 0 || r >= H || c >= W) ? true : rows[r][c] === '.';
-    const x0 = Math.round(x - W * p / 2), y0 = Math.round(y - H * p / 2 + bob);
-    const band = -10 + (((tq + ph * 2.3) % 3.4) / 3.4) * (W + H + 20);
-    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
-      const ch = rows[r][c]; if (ch === '.') continue;
-      let col = S[ch];
-      if (ch !== 'd' && !o.dim) { if (e(r - 1, c) || e(r, c - 1)) col = mix(col, [255, 255, 255], ch === 'a' ? 0.12 : 0.22); else if (e(r + 1, c) || e(r, c + 1)) col = mix(col, [8, 8, 14], 0.35); }
-      if (q.spots && ch === 'd' && !o.dim) col = mix([200, 255, 190], [255, 255, 230], 0.5 + 0.5 * Math.sin(t * 2.5 + (icon ? c : c >> 1)));
-      if (q.coal && ch === 'd' && !o.dim) col = mix([255, 120, 60], [255, 210, 140], 0.5 + 0.5 * (icon ? Math.sin(t * 3 + r + c) : Math.sin(t * 3 + (r >> 1) + (c >> 1))));
-      if (!o.dim) { const u = c + r - band; if (u >= 0 && u < 3) col = mix(col, [255, 255, 255], u < 1 ? 0.55 : 0.25); }
-      ctx.fillStyle = rgb(col); ctx.fillRect(x0 + c * p, y0 + r * p, Math.ceil(p), Math.ceil(p));
-    }
-    if (q.motes && !o.dim) {   // the Prism's motes of split light, as before, a fine pixel each
-      const cols = [[255, 120, 120], [255, 190, 110], [250, 240, 120], [130, 240, 150], [120, 200, 255], [150, 130, 255], [220, 130, 255]];
-      for (let k = 0; k < 14; k++) {
-        const an = t * (0.35 + (k % 4) * 0.08) + k * 2.399, r = 6.5 + 2.2 * Math.sin(t * 0.7 + k * 1.3), a = Math.max(0, Math.sin(t * 1.3 + k * 0.9)) * 0.85;
-        if (a < 0.05) continue;
-        ctx.fillStyle = rgb(cols[k % 7], a); ctx.fillRect(Math.round(x + Math.cos(an) * r * sc), Math.round(y + Math.sin(an) * r * 0.8 * sc + bob), Math.ceil(p), Math.ceil(p));
-      }
-    }
+  /* the relics small (in the HUD, in their hollows in The Deep, beside the word that one is yours): 13 x 13 on the
+     game's own pixels, lit from the top left, still, with one slow light each */
+  const ICONS = [
+    { // PLUMB LINE: the crystal bob on its line
+      rows: ['....aaaaa....', '......b......', '......b......', '......b......', '......b......', '.....hlm.....', '....hhlmd....', '....hllmd....', '....hlmmd....', '.....lmd.....', '.....lmd.....', '......d......', '.............'],
+      pal: { a: '#5d6f8e', b: '#aab8cf', h: '#dfe9fb', l: '#9fb5da', m: '#c3d3ee', d: '#5d7096' } },
+    { // SPORE MAP: the cap, its spots
+      rows: ['.............', '....eeeee....', '...eLLLLLe...', '..eLLoLLLMe..', '.eLLLLLoMMMe.', '.eoLLMMMMoMe.', '.eMMMoMMMMMe.', '.ddddddddddd.', '.....sst.....', '.....sst.....', '.....sst.....', '....ssstt....', '.............'],
+      pal: { e: '#2f6a37', L: '#8fd685', M: '#4f9850', o: '#e8ffd6', d: '#24502b', s: '#cfd9c0', t: '#9ba98e' }, spots: [[5, 3], [7, 4], [2, 5], [9, 5], [5, 6]] },
+    { // PRISM: the crystal, pointed at both ends, two faces showing
+      rows: ['......h......', '.....hhm.....', '....hlmmd....', '....lllmd....', '....lllmd....', '....lllmd....', '....lllmd....', '....lllmd....', '....lllmd....', '....lllmd....', '.....lmd.....', '......d......', '.............'],
+      pal: { h: '#efe6ff', l: '#9a80f0', m: '#6f58c0', d: '#4b3a86' }, core: [6, 2, 9] },
+    { // BANKED COAL: a black lump, its cracks lit, a small flame
+      rows: ['......f......', '.....fF......', '......F......', '...aaaaaaa...', '..aabcaabaa..', '.abaaacaaaaa.', '.aacaaaccaca.', '.aaaccaaacaa.', '.aacaaaaaaca.', '..aaacaacaa..', '...aaaaaaa...', '...uuuuuuu...', '.............'],
+      pal: { a: '#2a1e1a', b: '#4a3a36', c: '#ff8a3c', f: '#ffd9a8', F: '#ff9450', u: '#7a2a14' }, cracks: 'c' },
+    { // SPARE GEAR: a copper wheel and a steel pinion
+      rows: ['.........s.s.', '........sSSs.', '...c.c..sSKSs', '..cCCCc..sSs.', '.cCCooCCc.s..', '..CokkoC.....', '.cCokkoCc....', '..CCooCC.....', '.cCCCCCCc....', '..c.cCc.c....', '....c.c......', '.............', '.............'],
+      pal: { c: '#b8704a', C: '#d88a5e', o: '#5e3424', k: '#1e120c', s: '#9a958c', S: '#cfc8bc', K: '#3a3632' } },
+    { // KEEPSAKE: the locket, its seam
+      rows: ['......c......', '......c......', '.............', '..hhh...hhh..', '.hHHHh.hHHPh.', '.hHHHHsHHPPh.', '.hHHHHsHPPPh.', '..hHHHsPPPh..', '...hHHsPPh...', '....hHsPh....', '.....hsh.....', '......h......', '.............'],
+      pal: { c: '#c8b0b8', h: '#a63458', H: '#e05a80', P: '#b8345a', s: '#5a1426' }, seam: 's' },
+    { // TUNING FORK
+      rows: ['...h.....h...', '...hd....hd..', '...hd....hd..', '...hd....hd..', '...hd....hd..', '...hd....hd..', '...hd....hd..', '....hhhhhd...', '......h......', '......h......', '......h......', '.....ddd.....', '.............'],
+      pal: { h: '#c6e4ff', d: '#6f93ba' } },
+    { // CODEX LENS: two sleepers behind the glass
+      rows: ['....hhhhd....', '..hhkkkkkdd..', '.hkkkkkkkkkd.', '.hkKKkkkKKkd.', 'hkKKKKkKKKKkd', 'hkKvKKkKwKKkd', 'hkKKKKkKKKKkd', 'hkkKKkkkKKkkd', '.hkkkkkkkkkd.', '.hkkkkkkkkkd.', '..dkkkkkkdd..', '....ddddd....', '.............'],
+      pal: { h: '#9ff0d0', d: '#2f8a68', k: '#0a221b', K: '#1f3a33', v: '#b8ffe6', w: '#b8ffe6' }, eyes: [[3, 5], [8, 5]] },
+    { // THE NINTH: a black sun
+      rows: ['.............', '.....t.t.....', '...tTTTTTt...', '..TTkkkkkTT..', '.tTkkkkkkkTt.', '..TkkkkkkkT..', '.tTkkkkkkkTo.', '..TkkkkkkkT..', '.tTkkkkkkkTt.', '..TTkkkkkTT..', '...tTTTTTt...', '.....o.t.....', '.............'],
+      pal: { t: '#2a8a78', T: '#5ae6c8', k: '#000000', o: '#ff8c3c' } },
+  ];
+  const DIMC = {}, dimc = (h) => DIMC[h] || (DIMC[h] = (() => { const n = parseInt(h.slice(1), 16), c = [n >> 16 & 255, n >> 8 & 255, n & 255]; return rgb(mix([12, 12, 18], c, 0.4)); })());
+  function icon(ctx, i, x, y, t, o) {
+    const ic = ICONS[i], dim = !!o.dim, x0 = x - 6, y0 = y - 6, glow = o.glow === undefined ? 1 : o.glow;
+    // its colour round it, in three hard steps, added (stronger for The Ninth while you are the light)
+    if (!dim && glow > 0) { ctx.globalCompositeOperation = 'lighter'; const c = RELICS[i].col;
+      for (let k = 1; k <= 3; k++) { const r = 3 + k * 2.5; ctx.fillStyle = rgb(c, 0.035 * glow); for (let j = -Math.ceil(r); j <= r; j++) { const w = Math.floor(Math.sqrt(r * r - j * j)); ctx.fillRect(x - w, y + j, w * 2 + 1, 1); } }
+      ctx.globalCompositeOperation = 'source-over'; }
+    const f = Math.floor(t * 12), ov = {};
+    if (!dim) {   // the one slow light of each
+      const ph = (n) => (t % n) / n;
+      if (i === 0) { const u = ph(3); if (u < 0.3) ov['6,' + (1 + Math.floor(u / 0.3 * 5))] = '#ffffff'; }
+      if (i === 1) { const k = Math.floor(t * 2) % (ic.spots.length + 2); if (k < ic.spots.length) ov[ic.spots[k].join(',')] = '#ffffff'; }
+      if (i === 2) { const u = ph(3.8); if (u < 0.2) ov['6,' + (9 - Math.floor(u / 0.2 * 8))] = '#ffffff'; if (u > 0.79 && u < 0.84) ov.flash = '#ffffff'; }
+      if (i === 3) { const b = Math.floor((0.5 + 0.5 * Math.sin(t * 1.6)) * 2.99); ov.c = ['#c84a24', '#ff8a3c', '#ffc070'][b]; if (f % 8 < 4) { ov.f = '#ff9450'; ov.F = '#ffd9a8'; } }
+      if (i === 4) { if (ph(2.2) < 0.08) ov.K = '#ffffff'; }
+      if (i === 5) { const u = ph(1.1); ov.s = u < 0.14 ? '#ffd0de' : u < 0.3 ? '#a0405e' : '#5a1426'; }
+      if (i === 6) { if (ph(2.4) < 0.12) { ov['3,0'] = '#ffffff'; ov['9,0'] = '#ffffff'; } }
+      if (i === 7) { const u = ph(3.2); ov.v = u < 0.5 ? '#ffffff' : '#3a6a5a'; ov.w = u < 0.5 ? '#3a6a5a' : '#ffffff'; }
+      if (i === 8) { ov.T = rgb(mix([90, 230, 200], [170, 250, 230], 0.25 + 0.25 * Math.sin(Math.floor(t * 6) / 6 * 2))); }
+    } else if (i === 7) { ov.v = ov.w = '#1f3a33'; }
+    const rows = ic.rows;
+    for (let r = 0; r < 13; r++) for (let c = 0; c < 13; c++) { const ch = rows[r][c]; if (ch === '.') continue;
+      let col = ov[c + ',' + r] || ov[ch] || ic.pal[ch];
+      if (ov.flash && (r === 0 || c === 0 || rows[r - 1][c] === '.' || rows[r][c - 1] === '.' || c === 12 || rows[r][c + 1] === '.' || r === 12 || rows[r + 1][c] === '.')) col = ov.flash;
+      ctx.fillStyle = dim ? dimc(ic.pal[ch]) : col; ctx.fillRect(x0 + c, y0 + r, 1, 1); }
   }
-  /* ---------------------------------------------------------------- a relic */
+  /* ---------------------------------------------------------------- a relic: at the room's size or small */
   function draw(ctx, i, x, y, t, o) {
-    o = o || {}; const sc = o.sc || 1, q = RELICS[i], S = shades(q.col, o.dim), ph = i * 1.37;
-    const bob = o.still ? 0 : Math.round(Math.sin(t * 1.6 + ph) * 1.2) * sc;
-    const glow = o.glow === undefined ? 1 : o.glow;
-    const prev = ctx.globalCompositeOperation;
-    if (!o.dim && glow > 0 && !q.sun) { ctx.globalCompositeOperation = 'lighter'; const br = 0.55 + 0.25 * Math.sin(t * 2.1 + ph); halo(ctx, x, y + bob, 14 * sc, q.col, 0.16 * br * glow); halo(ctx, x, y + bob, 6 * sc, q.col, 0.22 * br * glow); ctx.globalCompositeOperation = prev; }
-    if (q.sun) {
-      // The Ninth: it drinks the light round it, a black core with a teal rim, and nine dark points turning, three of
-      // them catching orange
-      const cx = x, cy = y + bob, T1 = [90, 230, 200], V = [255, 140, 60];
-      if (!o.dim && glow > 0) {
-        const g = ctx.createRadialGradient(cx, cy, 2 * sc, cx, cy, 16 * sc); g.addColorStop(0, 'rgba(0,0,0,0.85)'); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(cx - 16 * sc, cy - 16 * sc, 32 * sc, 32 * sc);
-        ctx.globalCompositeOperation = 'lighter';
-        const br = 0.6 + 0.4 * Math.sin(t * 1.7);
-        for (let k = 0; k < 48; k++) { const an = k / 48 * 6.283, r0 = (6.2 + 0.5 * Math.sin(an * 3 + t * 2)) * sc; ctx.fillStyle = rgb(k % 5 === 0 ? V : T1, 0.35 * br); ctx.fillRect(Math.round(cx + Math.cos(an) * r0), Math.round(cy + Math.sin(an) * r0), Math.ceil(sc), Math.ceil(sc)); }
-        halo(ctx, cx, cy, 11 * sc, T1, 0.10 * br); halo(ctx, cx, cy, 14 * sc, V, 0.05 * br);
-        ctx.globalCompositeOperation = prev;
-      }
-      for (let j = -4; j <= 4; j++) for (let k = -4; k <= 4; k++) { const d = Math.hypot(j, k); if (d > 4.3) continue; ctx.fillStyle = d > 3.4 ? rgb(o.dim ? S.b : T1, o.dim ? 1 : 0.9) : d > 2.6 ? '#05110f' : '#000'; ctx.fillRect(Math.round(cx + j * sc), Math.round(cy + k * sc), Math.ceil(sc), Math.ceil(sc)); }
-      if (!o.dim) { ctx.fillStyle = 'rgba(200,255,240,' + (0.5 + 0.5 * Math.sin(t * 3)).toFixed(2) + ')'; ctx.fillRect(Math.round(cx - sc), Math.round(cy - sc), Math.ceil(sc), Math.ceil(sc)); }
-      for (let n = 0; n < 9; n++) {
-        const an = t * 0.35 + n * Math.PI * 2 / 9, r1 = 7.5 + 0.8 * Math.sin(t * 2 + n), px = cx + Math.cos(an) * r1 * sc, py = cy + Math.sin(an) * r1 * sc;
-        ctx.fillStyle = '#000'; ctx.fillRect(Math.round(px), Math.round(py), Math.ceil(sc), Math.ceil(sc));
-        ctx.fillStyle = rgb(n % 3 === 0 ? V : T1, o.dim ? 0.3 : 0.85); ctx.fillRect(Math.round(px + Math.cos(an) * sc), Math.round(py + Math.sin(an) * sc), Math.ceil(sc), Math.ceil(sc));
-      }
-      return;
-    }
-    // in the room (twice the size) at twice the detail; as an icon, its own pixels; both lit, held still, glinting
-    return drawFine(ctx, q, S, x, y, t, o, sc, ph, sc < 2);
+    o = o || {}; const sc = o.sc || 1; x = Math.round(x); y = Math.round(y);
+    ctx.save();
+    if (sc >= 2) LIVE[i](ctx, x, y, t); else icon(ctx, i, x, y, t, o);
+    ctx.restore(); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   }
   /* the relic box: one stone panel, a thin border and a soft halo in the relic's own colour */
   function box(ctx, i, cx, by, t, status, dim, x0b, x1b, key) {
@@ -12516,7 +12892,7 @@ body.ninth #tbN{display:flex}
 <script>/* DWELLER — game shell: loop, input, camera, the map of the descent, screens. */
 (function () {
   'use strict';
-  const D = Dweller, R = DwellerRender, A = DwellerAudio;
+  const D = Dweller, R = DwellerRender, A = DwellerAudio, FX = window.DwellerFX;
   const TS = D.TS, IN = D.IN, EV = D.EV;
   const PAL = R.PAL;
   const LEVELS = window.DWELLER_LEVELS || [window.DWELLER_LEVEL];
@@ -14553,9 +14929,9 @@ body.ninth #tbN{display:flex}
       if (deepT > 1.0) uiHint(touchMode ? 'TAP ONE, TAP AGAIN TO TAKE IT' : [['ARROWS', 'CHOOSE'], ['SPACE', 'WAKE IT']], cx, LH - 14, a);
     } else if (mode === 'deepWin' && deepSpool && deepSpool.gift) {
       // the Guardian's cloak: given, not woven; worn already
-      const y0 = Math.round(LH * 0.2), c = deepSpool, w = Math.min(LW - 16, Math.max(190, htW('THE GUARDIAN\'S CLOAK', 2) + 24, htW('YOU\'LL NEED THIS FOR WHAT LIES AHEAD') + 24));
+      const y0 = Math.round(LH * 0.2), c = deepSpool, w = Math.min(LW - 16, Math.max(190, htW('THE ANCIENT CLOAK', 2) + 24, htW('YOU\'LL NEED THIS FOR WHAT LIES AHEAD') + 24));
       uiPanel(ctx, cx - w / 2, y0 - 12, w, 40 + L7 * 6, a); uiMark(ctx, cx, y0 - 9, c.glow, 1, a);
-      ht('THE GUARDIAN\'S CLOAK', cx, y0, PAL.snow, 'center', a, 2);
+      ht('THE ANCIENT CLOAK', cx, y0, PAL.snow, 'center', a, 2);
       let y = y0 + 24;
       { const ex = cx, ey = y + 2, op = Math.min(1, deepT * 1.5) * (deepT % 4 > 3.85 ? 0.1 : 1); ctx.globalAlpha = a * op; ctx.fillStyle = c.seam; ctx.fillRect(ex - 9, ey, 5, 2); ctx.fillRect(ex + 4, ey, 5, 2); ctx.fillStyle = '#04100e'; ctx.fillRect(ex - 7, ey, 1, 2); ctx.fillRect(ex + 6, ey, 1, 2); ctx.globalAlpha = 1; }
       y += L7 * 1.6;
@@ -14669,6 +15045,7 @@ body.ninth #tbN{display:flex}
   /* ------------------------------------------------------------ events -> sound & particles */
   function handleEvents(ev, st) {
     const L = A.Live;
+    FX.event(ev, st, world, gameTime, cur);          // (the bursts of light: fx.js)
     const th = R.theme;
     if (ev & EV.JUMP) { L.sfx('jump'); puff(st, 5, 0.6); }
     if (ev & EV.WJUMP) { L.sfx('wjump'); puff(st, 4, 0.7); }
@@ -14963,11 +15340,13 @@ body.ninth #tbN{display:flex}
         const bx = Math.floor(mx - LWm / 2), by = Math.floor(my - LHm / 2);
         LW = LWm; LH = LHm;
         R.drawScene(ctx, { hints: null, w: world, s: S, time: gameTime, dt: mode === 'pause' ? 0 : dt, back: null, lift: null }, bx, by, LW, LH);
+        FX.draw(ctx, bx, by, world, gameTime, mode === 'pause' ? 0 : dt);
         LW = LW0; LH = LH0;
         ZBLIT = [mx - cw / 2 - bx, my - chh / 2 - by, cw, chh];
       }
       else {
       R.drawScene(ctx, { vision: VIS ? (c, x, y) => DwellerSkits.vision(c, R, VIS.L, VIS.t, x, y, VIS.x, VIS.fy, VIS.roof) : null, hints: HINTS, w: world, s: S, time: gameTime, dt: mode === 'pause' || mode === 'deepPick' ? 0 : dt, back: ARCH ? (c, x, y) => { AR.drawBack(c, x, y, archSt()); drawGate(c, x, y); drawRelicGate(c, x, y); } : null, lift: ARCH ? (c, x, y, disc) => { AR.lift(c, x, y, disc, archSt()); gateLift(c, x, y, disc); relicGateLift(c, x, y, disc); } : null }, fx, fy, LW, LH);
+      FX.draw(ctx, fx, fy, world, gameTime, mode === 'pause' ? 0 : dt);
       halfText();
       if (mode !== 'pause') for (const h of HINTS) {      // carved: a dark groove a letter-pixel above, the pale stone face below
         ht(h.text, h.x, h.y - HS, '#05070b', 'left', h.a * 0.9);
@@ -15105,7 +15484,7 @@ body.ninth #tbN{display:flex}
       ctx.globalAlpha = a * 0.55; ctx.fillStyle = '#05050a'; ctx.fillRect(0, 0, LW, LH); ctx.globalAlpha = 1;
       const Z = uiZ(), L7 = Math.ceil(7 * HS * Z) + 3 * Z, H2 = Math.ceil(21 * HS * Z) + 4 * Z, core = cur === CORE, cx = LW >> 1;
       const accent = core ? '#e6f2f0' : R.SHARDS[cur];
-      const credits = core ? ['DWELLER', 'A GAME IN THE SEEKER UNIVERSE  -  OPEN ART, MUSIC AND LORE', 'THE GUARDIAN  -  PLANETARY GUARDIAN #255', 'YOUR COMPANION  -  ' + netName(R.seekerId).replace('  #', ' #'), 'THANK YOU FOR DESCENDING', '', 'SOMETHING STIRS BEHIND THE GREAT DOOR'] : [];
+      const credits = core ? ['DWELLER', 'A GAME IN THE SEEKER UNIVERSE  -  OPEN ART, MUSIC AND LORE', 'THE GUARDIAN  -  PLANETARY GUARDIAN #51', 'YOUR COMPANION  -  ' + netName(R.seekerId).replace('  #', ' #'), 'THANK YOU FOR DESCENDING', '', 'SOMETHING STIRS BEHIND THE GREAT DOOR'] : [];
       const cand = !core && candWin ? (candWin.k[0] && candWin.k[1] ? ['UNTOUCHED, UNSEEN.', 'BOTH FLAMES WAKE.']
         : candWin.k[0] ? ['NOT ONCE DID THE DARK TAKE YOU.', 'A BLUE FLAME REMEMBERS.'] : ['YOU WALKED IT WITH YOUR EYES SHUT.', 'A BLUE FLAME SEES FOR YOU.']) : [];
       const head = core ? 'THE CORE IS QUIET' : 'A SLIVER OF THE CRYSTAL', place = core ? 'THE GUARDIAN IS GONE, AND THE DARK BELOW IS YOURS' : ROMAN[cur] + '  ' + NAMES[cur] + '  -  COMPLETE';
