@@ -15396,22 +15396,48 @@ body.ninth #tbN{display:flex}
     }
     if (!SKIT) drawCard();
   }
-  /* the section's name: small and low, clear of the corner lines, gone in three seconds (drawn at screen resolution so the letters stay crisp),
-     no band behind it, only a faint one-pixel shadow so it reads over light */
+  /* the section's name: small and low, clear of the corner lines, gone in three seconds (drawn at screen resolution so the
+     letters stay crisp), no band behind it, only a faint one-pixel shadow so it reads over light. It is struck in from the
+     left, a white edge and sparks at the letter being struck; the visor's slit over it is drawn out from the middle and a
+     glint runs along it once; at the end its letters come apart into their own pixels, which lift and go out. The slit,
+     the sparks and the going out are in the place's own light (the lamps' colour) */
+  const CARDPX = {};
   function drawCard() {
     if (!(cardT < CARD_T && mode === 'play' && seekerCardT > 6.5) || window.__clean) return;
-    const a = Math.min(1, cardT / 0.5) * Math.min(1, (CARD_T - cardT) / 0.8);
-    const k = Math.max(1, Math.round(SC * 0.75)), sp = R.textSprite(cardText, PAL.snow), sh = R.textSprite(cardText, '#05050a');
+    const t = cardT, k = Math.max(1, Math.round(SC * 0.75)), sp = R.textSprite(cardText, PAL.snow), sh = R.textSprite(cardText, '#05050a');
     const w = sp.width * k, h = sp.height * k, x = Math.round((canvas.width - w) / 2), y = Math.round(LH * 0.3 * SC);
-    gctx.imageSmoothingEnabled = false;
-    gctx.globalAlpha = a * 0.6; gctx.drawImage(sh, x + Math.max(1, k >> 2), y + Math.max(1, k >> 2), w, h);
-    gctx.globalAlpha = a * 0.92; gctx.drawImage(sp, x, y, w, h);
-    // the visor's slit over the name, in the place's colour, as on the screens that stop play (the Codex's rooms keep theirs plain)
-    if (cur !== 7) {
-      const col = cur >= 0 && cur < 7 ? R.SHARDS[cur] : '#e8e0cc', mx = Math.round(canvas.width / 2), my = y - 5 * k;
-      gctx.fillStyle = col; gctx.globalAlpha = a * 0.25; gctx.fillRect(mx - 6 * k, my, 12 * k, 2 * k); gctx.globalAlpha = a * 0.9; gctx.fillRect(mx - 4 * k, my + Math.floor(k / 2), 8 * k, k);
+    let px = CARDPX[cardText];     // (its pixels, once, for the going out; each with its own moment to go)
+    if (!px) { const d = sp.getContext('2d').getImageData(0, 0, sp.width, sp.height).data; px = []; for (let j = 0; j < sp.height; j++) for (let i = 0; i < sp.width; i++) if (d[(j * sp.width + i) * 4 + 3] > 128) px.push([i, j, ((i * 73 + j * 151) % 97) / 97]); CARDPX[cardText] = px; }
+    const col = ((cur >= 0 && cur < 7) || RUN) && R.theme && R.theme.lamp ? R.theme.lamp[1] : '#e8e0cc';
+    const REV = 0.7, OUT = CARD_T - 0.9, tq = Math.floor(t * 24) / 24;
+    gctx.imageSmoothingEnabled = false; gctx.save();
+    if (t < OUT) {
+      // struck in, a column at a time
+      const rc = Math.min(sp.width, Math.floor(tq / REV * (sp.width + 2)));
+      gctx.globalAlpha = 0.6; gctx.drawImage(sh, 0, 0, rc, sp.height, x + Math.max(1, k >> 2), y + Math.max(1, k >> 2), rc * k, h);
+      gctx.globalAlpha = 0.92; gctx.drawImage(sp, 0, 0, rc, sp.height, x, y, rc * k, h);
+      if (rc < sp.width) {
+        gctx.globalCompositeOperation = 'lighter'; gctx.fillStyle = '#ffffff'; gctx.globalAlpha = 0.9;
+        for (const [i, j] of px) if (i === rc - 1) gctx.fillRect(x + i * k, y + j * k, k, k);
+        gctx.fillStyle = col; for (let m = 0; m < 3; m++) { const u = (tq * 7 + m * 0.33) % 1; gctx.globalAlpha = 1 - u; gctx.fillRect(x + (rc - 1) * k + Math.round((m - 1) * u * 6) * k, y - Math.round(u * 8) * k, k, k); }
+        gctx.globalCompositeOperation = 'source-over';
+      }
+    } else {
+      // the going out: each pixel in its turn, white, then the place's light, lifting
+      const u = (tq - OUT) / (CARD_T - OUT);
+      for (const [i, j, th] of px) { const v = u * 1.4 - th * 0.6;
+        if (v <= 0) { gctx.globalAlpha = 0.92; gctx.fillStyle = PAL.snow; gctx.fillRect(x + i * k, y + j * k, k, k); continue; }
+        if (v > 0.5) continue;
+        gctx.globalAlpha = 1 - v / 0.5; gctx.fillStyle = v < 0.15 ? '#ffffff' : col; gctx.fillRect(x + i * k, y + j * k - Math.round(v * 24) * k, k, k); }
     }
-    gctx.globalAlpha = 1;
+    // the visor's slit over the name, as on the screens that stop play (the Codex's rooms keep theirs plain)
+    if (cur !== 7) {
+      const mx = Math.round(canvas.width / 2), my = y - 5 * k, half = Math.min(1, Math.floor(t * 12) / 4) * 6, fa = t < OUT ? 1 : Math.max(0, 1 - (t - OUT) / 0.5);
+      gctx.fillStyle = col; gctx.globalAlpha = 0.25 * fa; gctx.fillRect(mx - half * k, my, half * 2 * k, 2 * k);
+      gctx.globalAlpha = 0.9 * fa; gctx.fillRect(mx - Math.max(0, half - 2) * k, my + Math.floor(k / 2), Math.max(0, half - 2) * 2 * k, k);
+      const gl = Math.floor((t - 0.5) * 24); if (gl >= 0 && gl < 14) { gctx.globalCompositeOperation = 'lighter'; gctx.fillStyle = '#ffffff'; gctx.globalAlpha = 0.9; gctx.fillRect(mx + (gl - 7) * k, my, k, 2 * k); gctx.globalCompositeOperation = 'source-over'; }
+    }
+    gctx.restore(); gctx.globalAlpha = 1;
   }
 
   /* a flash is light added, not a grey sheet laid over: it blooms out from (x, y) and brightens what is there, so the
