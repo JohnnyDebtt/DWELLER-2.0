@@ -10324,7 +10324,7 @@ body.ninth #tbN{display:flex}
  * dust down into the stone.
  *   RELICS                       the nine: name, where found, colour, what it does, its pixels
  *   draw(ctx, i, x, y, t, o)     a relic, centred at (x, y): at the room's size (sc 2) alive, or small and calm
- *                                (sc 1, the HUD); o: { sc, glow, dim }
+ *                                (sc 1, the HUD); o: { sc, glow, dim, lit (The Ninth while you are the light) }
  *   box(ctx, i, cx, by, t, status, dim, x0, x1)    the relic box (bottom at by, kept between x0 and x1)
  *   create()                     the room (a 640 x 360 world of its own) and its little level for the simulation
  *   bakeArt()                    the room's still art, drawn once (the build bakes it to a picture)
@@ -10365,97 +10365,95 @@ body.ninth #tbN{display:flex}
     const D = [];
     // 1 PLUMB LINE: a crystal bob on a taut line, swinging; now and then a bead of light runs down the line and the bob rings
     D[0] = (c, x, y, t) => {
-      const s = st(t), sw = Math.sin(s * 1.8) * 0.16, top = y - 14, L = 14, bx = x + Math.sin(sw) * L, by = top + Math.cos(sw) * L;
-      halo(c, bx, by + 2, 9, '#7c97c4', 0.35);
-      R(c, x - 3, top - 1, 7, 1, '#5d6f8e'); R(c, x - 1, top - 2, 3, 1, '#8ea6cc');
+      const s = st(t), sw = Math.sin(s * 1.8) * 0.16, top = y - 11, L = 11, bx = x + Math.sin(sw) * L, by = top + Math.cos(sw) * L;
+      halo(c, bx, by + 2, 7, '#7c97c4', 0.35);
+      R(c, x - 2, top - 1, 5, 1, '#5d6f8e'); R(c, x - 1, top - 2, 3, 1, '#8ea6cc');
       line(c, x, top, bx, by - 3, '#aab8cf');
       // the bob: a long cut crystal, lit up left
-      for (let j = -4; j <= 7; j++) { const w = j < 0 ? 4 + j : Math.max(0, 4 - Math.floor(j * 0.6)); for (let i = -w; i <= w; i++) P(c, bx + i, by + j, j < 1 && i < 0 ? '#dfe9fb' : i < 0 ? '#9fb5da' : i === 0 ? '#c3d3ee' : '#5d7096'); }
-      add(c, () => { const dsh = Math.floor(s * 12) % 4; for (let j = 0; j < 12; j++) if ((j + 4 - dsh) % 4 < 2) P(c, x, by + 9 + j, '#9fb5da', 0.35 * (1 - j / 12)); });
+      for (let j = -3; j <= 5; j++) { const w = j < 0 ? 3 + j : Math.max(0, 3 - Math.floor(j * 0.6)); for (let i = -w; i <= w; i++) P(c, bx + i, by + j, j < 1 && i < 0 ? '#dfe9fb' : i < 0 ? '#9fb5da' : i === 0 ? '#c3d3ee' : '#5d7096'); }
+      add(c, () => { const dsh = Math.floor(s * 12) % 4; for (let j = 0; j < 9; j++) if ((j + 4 - dsh) % 4 < 2) P(c, x, by + 7 + j, '#9fb5da', 0.35 * (1 - j / 9)); });
       const ph = (t % 3.2) / 3.2;
       if (ph < 0.35) { const u = st(ph * 3.2) / (0.35 * 3.2); add(c, () => { P(c, x + (bx - x) * u, top + (by - 3 - top) * u, '#ffffff'); P(c, x + (bx - x) * u, top + (by - 3 - top) * u - 1, '#bcd0f0', 0.6); }); }
       if (ph >= 0.35 && ph < 0.6) { const u = (st(ph * 3.2) - 0.35 * 3.2) / (0.25 * 3.2); add(c, () => { ring(c, bx, by + 1, 4 + u * 9, '#bcd0f0', 1 - u, (4 + u * 9) * 0.45); P(c, bx - 1, by - 1, '#ffffff', 1 - u); }); }
     };
     // 2 SPORE MAP: a cap of mycelium; its spots light one by one along threads, as if a path were being traced; spores lift
     D[1] = (c, x, y, t) => {
-      const s = st(t); halo(c, x, y - 2, 11, '#4fae58', 0.28);
-      disc(c, x, y - 1, 11, (i, j, d) => j > 1 ? null : d > 10 ? '#2f6a37' : j < -5 + Math.abs(i) * 0.15 ? '#8fd685' : (i + j) < -2 ? '#6fbf68' : '#4f9850');
-      R(c, x - 11, y + 1, 23, 1, '#24502b'); R(c, x - 2, y + 2, 5, 7, '#cfd9c0'); R(c, x + 1, y + 2, 2, 7, '#9ba98e'); R(c, x - 4, y + 8, 9, 1, '#7d8a72');
-      const spots = [[-6, -3], [-2, -7], [3, -5], [7, -1], [0, -1], [-8, 0], [5, -8], [-4, -8]], k = Math.floor(s * 2) % (spots.length + 3);
+      const s = st(t); halo(c, x, y - 2, 8, '#4fae58', 0.28);
+      disc(c, x, y - 1, 8, (i, j, d) => j > 1 ? null : d > 7 ? '#2f6a37' : j < -4 + Math.abs(i) * 0.15 ? '#8fd685' : (i + j) < -2 ? '#6fbf68' : '#4f9850');
+      R(c, x - 8, y + 1, 17, 1, '#24502b'); R(c, x - 1, y + 2, 3, 5, '#cfd9c0'); R(c, x + 1, y + 2, 1, 5, '#9ba98e'); R(c, x - 3, y + 6, 7, 1, '#7d8a72');
+      const spots = [[-4, -2], [-1, -5], [2, -4], [5, -1], [0, -1], [-6, 0], [3, -6], [-3, -6]], k = Math.floor(s * 2) % (spots.length + 3);
       for (let i = 0; i < spots.length; i++) { const [a, b] = spots[i], on = i < k; P(c, x + a, y + b, on ? '#e8ffd6' : '#b9e6a8'); P(c, x + a + 1, y + b, on ? '#c6f5ae' : '#8fc786');
         if (on && i > 0) add(c, () => line(c, x + spots[i - 1][0], y + spots[i - 1][1], x + a, y + b, '#9cff8c', 0.45)); if (on) add(c, () => P(c, x + a, y + b - 1, '#d7ffc8', 0.6)); }
-      add(c, () => { for (let q = 0; q < 8; q++) { const u = ((t * 0.28 + q * 0.137) % 1), sx = x - 7 + ((q * 37) % 15) + Math.sin(u * 9 + q) * 2, sy = y - 6 - u * 16; P(c, sx, sy, q % 3 ? '#b8ff9e' : '#ffffff', (1 - u) * 0.9); } });
+      add(c, () => { for (let q = 0; q < 8; q++) { const u = ((t * 0.28 + q * 0.137) % 1), sx = x - 5 + ((q * 37) % 11) + Math.sin(u * 9 + q) * 2, sy = y - 5 - u * 14; P(c, sx, sy, q % 3 ? '#b8ff9e' : '#ffffff', (1 - u) * 0.9); } });
     };
-    // 4 BANKED COAL: a black lump lit from inside: its cracks run white-orange-red in turn like breath, its underside
-    // glows where it sits, a flame stands on it in three steps, and now and then it spits a spark that arcs and falls
+    // 4 BANKED COAL: a squat iron lantern with a coal banked low in it; the glow breathes through its slats and a
+    // thread of smoke curls up from its cap
     D[3] = (c, x, y, t) => {
-      const s = st(t), br = 0.5 + 0.5 * Math.sin(s * 2.4);
-      disc(c, x, y + 2, 9.5, (i, j, d) => (j < -6 + Math.abs(i) * 0.35) ? null : j > 6 && d > 7.5 ? '#5a2414' : d > 8.8 ? '#140c0a' : (i + j) < -7 ? '#4a3a36' : (i + j) < -2 ? '#2a1e1a' : '#1c1412');
-      const cr = [[-6, 2], [-5, 2], [-4, 3], [-3, 3], [-2, 4], [-1, 4], [0, 4], [1, 3], [2, 2], [3, 2], [4, 1], [5, 1], [-1, 1], [0, 0], [0, -1], [1, -2], [2, 5], [3, 6], [4, 6], [-4, 6], [-3, 7], [-2, 8], [5, 3], [6, 4], [-5, 5], [-6, 6]];
-      const cc = ['#fff2d0', '#ffc070', '#ff7a30', '#c03a18'];
-      add(c, () => {
-        cr.forEach(([a, b], k) => { const ph = (Math.floor(s * 12) + k) % 16, col = cc[Math.min(3, Math.floor(Math.abs(ph - 8) / 2.5))]; P(c, x + a, y + b, col, 0.75 + 0.25 * br); if (k % 3 === 0) P(c, x + a, y + b - 1, '#ff7a30', 0.25 * br); });
-        for (let i = -6; i <= 6; i++) P(c, x + i, y + 11, '#ff6a2c', (0.5 - Math.abs(i) / 14) * (0.6 + 0.4 * br)); for (let i = -4; i <= 4; i++) P(c, x + i, y + 12, '#c84a24', 0.3);
-        const f = Math.floor(s * 12) % 3, off = [0, 1, -1][f], fl = [[0, 0, 0], [-1, 0, 0], [1, 0, 0], [0, -1, 0], [-1, -1, 1], [0, -2, 1], [1, -2, 1], [0, -3, 1], [0, -4, 2], [1, -5, 2], [0, -6, 3], [1, -8, 3]];
-        fl.forEach(([a, b, k2]) => P(c, x + 1 + a + (k2 > 1 ? off : 0), y - 5 + b, cc[k2], 0.95 - k2 * 0.15));
-        const sp = (t % 2.6) / 2.6; if (sp < 0.45) { const u = st(sp * 2.6), vx = 18, vy = -34; for (let k = 0; k < 3; k++) { const tt = Math.max(0, u - k * 0.05); P(c, x + 3 + vx * tt, y - 4 + vy * tt + 90 * tt * tt, k ? '#ff7a30' : '#fff2d0', (1 - sp / 0.45) * (1 - k * 0.3)); } }
-        for (let q = 0; q < 4; q++) { const u = ((t * 0.5 + q * 0.25) % 1); P(c, x - 3 + ((q * 5) % 8) + Math.round(Math.sin(u * 7 + q)), y - 10 - u * 14, u < 0.3 ? '#ffe0b0' : '#ff7a3c', (1 - u) * 0.8); }
-      });
+      const s = st(t), br = 0.5 + 0.5 * Math.sin(s * 2.2);
+      halo(c, x, y + 1, 11, '#e0642c', 0.25 + 0.15 * br);
+      R(c, x - 1, y - 10, 3, 1, '#5a5048'); P(c, x - 2, y - 9, '#5a5048'); P(c, x + 2, y - 9, '#5a5048');
+      R(c, x - 4, y - 7, 9, 2, '#3a322c'); R(c, x - 3, y - 8, 7, 1, '#5a5048');
+      for (let j = -5; j <= 4; j++) for (let i = -4; i <= 4; i++) {
+        if (i === -4 || i === 4 || i === 0) { P(c, x + i, y + j, i < 0 ? '#6a5e54' : i === 0 ? '#4a4038' : '#3a322c'); continue; }
+        const d = Math.hypot(i * 0.8, j - 2), heat = Math.max(0, 1 - d / 7) * (0.6 + 0.4 * br);
+        P(c, x + i, y + j, heat > 0.65 ? '#ffd090' : heat > 0.45 ? '#ff8a3c' : heat > 0.25 ? '#c84a24' : '#5a2010'); }
+      R(c, x - 5, y + 5, 11, 2, '#3a322c'); R(c, x - 4, y + 7, 9, 1, '#241e1a');
+      for (let i = -2; i <= 2; i++) if (i) P(c, x + i, y + 4 - (Math.abs(i) < 2 ? 1 : 0), '#1c1210');
+      add(c, () => { for (let k = 0; k < 6; k++) { const u = ((t * 0.3 + k / 6) % 1); P(c, x + Math.round(Math.sin(u * 7 + s) * 2 * u), y - 11 - u * 12, '#9a9aa2', (1 - u) * 0.45); } });
     };
-    // 5 SPARE GEAR: a copper wheel and a steel pinion meshed, each turning a tooth at a step the other way; where
-    // they bite, a little shower of sparks every fourth step
+    // 5 SPARE GEAR: one copper gear, turning a half tooth at a step: eight teeth, four spokes, a hub; a glint rides round
+    // its rim, and now and then a tooth throws a few sparks off as it comes over the top
     D[4] = (c, x, y, t) => {
-      const s = st(t), f = Math.floor(s * 12);
-      const gear = (cx, cy, r, n, ang, base, hi, lo, hole) => {
-        for (let j = -r - 3; j <= r + 3; j++) for (let i = -r - 3; i <= r + 3; i++) { const d = Math.hypot(i, j), a = Math.atan2(j, i) - ang, u = ((a / (Math.PI * 2) * n) % 1 + 1) % 1, tooth = u > 0.15 && u < 0.6;
-          if (d > r + 2.5 || (d > r && !tooth)) continue; if (d < hole) continue;
-          const spoke = d < r - 2 && d > hole + 1 && (((a / (Math.PI * 2) * 4) % 1 + 1) % 1 > 0.22);
-          if (spoke && n > 7) { if (d < hole + 2.2) P(c, cx + i, cy + j, lo); continue; }
-          const lit = (i + j) / (d || 1); P(c, cx + i, cy + j, d > r - 0.8 ? (lit < -0.5 ? hi : lit > 0.6 ? lo : base) : (lit < -0.3 ? base : lit > 0.5 ? lo : base)); }
-      };
-      gear(x - 3, y + 3, 8, 10, f * (Math.PI * 2 / 10) / 2, '#b8704a', '#f0b08a', '#5e3424', 1.5);
-      gear(x + 9, y - 7, 5, 7, -f * (Math.PI * 2 / 7) / 2, '#9a958c', '#e4ded2', '#4f4b44', 1.6);
-      P(c, x - 3, y + 3, '#2a1810');
-      add(c, () => { const q = f % 4; if (q < 3) { const mx = x + 5, my = y - 3; P(c, mx, my, '#ffffff', q === 0 ? 1 : 0.5);
-          for (let k = 0; k < 4; k++) { const tt = q / 12 + 0.02, vx = [-30, 18, 34, -8][k], vy = [-30, -40, -14, -48][k]; P(c, mx + vx * tt, my + vy * tt + 150 * tt * tt, k % 2 ? '#ffd0a0' : '#ffffff', 1 - q / 3); } } });
+      const s = st(t), f = Math.floor(s * 12), ang = Math.floor(f / 2) * (Math.PI / 8), r = 7, n = 8, hole = 1.5;
+      halo(c, x, y, 11, '#c47a50', 0.22);
+      for (let j = -r - 3; j <= r + 3; j++) for (let i = -r - 3; i <= r + 3; i++) {
+        const d = Math.hypot(i, j), a = Math.atan2(j, i) - ang, u = ((a / (Math.PI * 2) * n) % 1 + 1) % 1, tooth = u > 0.12 && u < 0.6;
+        if (d > r + 2.3 || (d > r && !tooth) || d < hole) continue;
+        const spoke = (((a / (Math.PI * 2) * 4) % 1 + 1) % 1) < 0.3;
+        if (d > hole + 1.8 && d < r - 2.4 && !spoke) continue;                    // (the gaps between the spokes)
+        const lit = (i + j) / (d || 1);
+        P(c, x + i, y + j, d < hole + 1.8 ? (lit < 0 ? '#e8a682' : '#7a4630') : d > r - 0.6 ? (lit < -0.45 ? '#f6c4a2' : lit > 0.55 ? '#5e3424' : '#c07a50') : (lit < -0.3 ? '#d88a5e' : lit > 0.45 ? '#6e3c28' : '#b0704a')); }
+      P(c, x, y, '#1e120c');
+      add(c, () => { const ga = -Math.PI * 0.75 + Math.floor(s * 12) * 0.35, gx = x + Math.cos(ga) * (r - 0.5), gy = y + Math.sin(ga) * (r - 0.5); if (Math.floor(s * 12) % 18 < 8) { P(c, gx, gy, '#ffffff', 0.9); P(c, gx + 1, gy, '#ffd0a0', 0.4); P(c, gx, gy - 1, '#ffd0a0', 0.4); }
+        const ph = t % 2.2; if (ph < 0.4) { const q = st(ph) / 0.4; for (let k = 0; k < 3; k++) { const tt = q * 0.4, vx = 26 + k * 8, vy = -18 - k * 10; P(c, x + 3 + vx * tt, y - r - 2 + vy * tt + 120 * tt * tt, k % 2 ? '#ffd0a0' : '#ffffff', 1 - q); } } });
     };
     // 6 KEEPSAKE: a locket: a heart split down the middle by a hinge. On every beat it parts a pixel and the light it
     // keeps shines out of the seam, then it closes; a ring of pink goes out with each beat
     D[5] = (c, x, y, t) => {
       const per = 1.1, ph = (t % per) / per, open = ph < 0.18 ? 1 : 0, glowA = ph < 0.18 ? 1 : ph < 0.4 ? 0.5 : 0.15;
-      for (let k = 0; k < 6; k++) P(c, x - 1 + (k % 2), y - 14 + k, '#c8b0b8'); P(c, x, y - 14, '#ffffff', Math.floor(t * 12) % 9 === 0 ? 1 : 0);
-      const sz = 8, inH = (i, j, e) => { const X = i / sz, Y = -j / sz + 0.25; return Math.pow(X * X + Y * Y - 0.6 + e, 3) - X * X * Y * Y * Y * 0.9 <= 0; };
+      for (let k = 0; k < 6; k++) P(c, x - 1 + (k % 2), y - 11 + k, '#c8b0b8'); P(c, x, y - 11, '#ffffff', Math.floor(t * 12) % 9 === 0 ? 1 : 0);
+      const sz = 6, inH = (i, j, e) => { const X = i / sz, Y = -j / sz + 0.25; return Math.pow(X * X + Y * Y - 0.6 + e, 3) - X * X * Y * Y * Y * 0.9 <= 0; };
       for (let j = -sz; j <= sz; j++) for (let i = -sz - 1; i <= sz + 1; i++) { if (!inH(i, j, 0)) continue;
         const side = i < 0 ? -1 : 1, rim = !inH(i, j, 0.12);
         if (i === 0) { P(c, x, y + j + 1, '#5a1426'); continue; }
         const col = rim ? (i < 0 && j < 2 ? '#ffc8d6' : '#a63458') : (i < -1 && j < 0) ? '#ff8eaa' : (i > 1 && j > 1) ? '#9a2a4c' : '#d84a70';
         P(c, x + i + (open ? side : 0), y + j + 1, col); }
-      P(c, x - 4 - open, y - 3, '#ffe8ef'); P(c, x - 5 - open, y - 2, '#ffc0d0');
-      add(c, () => { for (let j = -5; j <= 8; j++) P(c, x, y + j, '#ffe8f0', glowA * (1 - Math.abs(j - 1) / 10));
-        if (open) for (let k = -2; k <= 2; k++) for (let j = 1; j < 10 - Math.abs(k) * 2; j++) { P(c, x + k * j * 0.5, y - 6 - j, '#ffd0de', 0.7 * (1 - j / 10)); P(c, x + k * j * 0.5, y + 9 + j * 0.6, '#ff9ab8', 0.4 * (1 - j / 10)); }
-        if (ph < 0.6) { const u = st(ph * per) / (0.6 * per); ring(c, x, y + 1, 10 + u * 10, '#ff7aa0', (1 - u) * 0.9); } });
+      P(c, x - 3 - open, y - 2, '#ffe8ef'); P(c, x - 4 - open, y - 1, '#ffc0d0');
+      add(c, () => { for (let j = -4; j <= 6; j++) P(c, x, y + j, '#ffe8f0', glowA * (1 - Math.abs(j - 1) / 8));
+        if (open) for (let k = -2; k <= 2; k++) for (let j = 1; j < 8 - Math.abs(k) * 2; j++) { P(c, x + k * j * 0.5, y - 5 - j, '#ffd0de', 0.7 * (1 - j / 8)); P(c, x + k * j * 0.5, y + 7 + j * 0.6, '#ff9ab8', 0.4 * (1 - j / 10)); }
+        if (ph < 0.6) { const u = st(ph * per) / (0.6 * per); ring(c, x, y + 1, 8 + u * 9, '#ff7aa0', (1 - u) * 0.9); } });
     };
     // 7 TUNING FORK: its tines ring, a pixel apart and back each step; arcs of sound go out from them; a frost of motes
     D[6] = (c, x, y, t) => {
-      const s = st(t), f = Math.floor(s * 12) % 2, ring2 = (t % 2.4) < 1.2; halo(c, x, y - 3, 10, '#8fc6ff', 0.25);
+      const s = st(t), f = Math.floor(s * 12) % 2, ring2 = (t % 2.4) < 1.2; halo(c, x, y - 3, 8, '#8fc6ff', 0.25);
       const sp = ring2 ? f : 0;
-      for (let j = 0; j < 14; j++) { P(c, x - 3 - sp, y - 12 + j, j < 1 ? '#ffffff' : '#c6e4ff'); P(c, x - 4 - sp, y - 12 + j, '#8fb7e0', 0.6); P(c, x + 3 + sp, y - 12 + j, j < 1 ? '#ffffff' : '#8fb7e0'); P(c, x + 4 + sp, y - 12 + j, '#5f86b0', 0.7); }
-      for (let i = -3; i <= 3; i++) P(c, x + i, y + 2 + (Math.abs(i) < 3 ? 1 : 0), i < 0 ? '#c6e4ff' : '#8fb7e0');
-      R(c, x, y + 3, 1, 8, '#a9c8ea'); R(c, x - 1, y + 11, 3, 1, '#7895b8'); R(c, x - 2, y + 12, 5, 1, '#5f7a9c');
-      if (ring2) add(c, () => { const u = ((t % 2.4) / 1.2 * 3) % 1, uu = Math.floor(u * 4) / 4; for (const sd of [-1, 1]) { ring(c, x + sd * 4, y - 5, 4 + uu * 8, '#cfe8ff', 0.8 * (1 - uu), 6 + uu * 8, sd < 0 ? Math.PI * 0.65 : -Math.PI * 0.35, sd < 0 ? Math.PI * 1.35 : Math.PI * 0.35); } });
-      add(c, () => { for (let q = 0; q < 6; q++) { const a = t * 0.4 + q * 1.05, r = 9 + (q % 3); P(c, x + Math.cos(a) * r, y - 3 + Math.sin(a) * r * 0.7, '#e6f4ff', 0.3 + 0.4 * Math.max(0, Math.sin(t * 2 + q))); } });
+      for (let j = 0; j < 10; j++) { P(c, x - 2 - sp, y - 9 + j, j < 1 ? '#ffffff' : '#c6e4ff'); P(c, x - 3 - sp, y - 9 + j, '#8fb7e0', 0.6); P(c, x + 2 + sp, y - 9 + j, j < 1 ? '#ffffff' : '#8fb7e0'); P(c, x + 3 + sp, y - 9 + j, '#5f86b0', 0.7); }
+      for (let i = -2; i <= 2; i++) P(c, x + i, y + 1 + (Math.abs(i) < 2 ? 1 : 0), i < 0 ? '#c6e4ff' : '#8fb7e0');
+      R(c, x, y + 2, 1, 6, '#a9c8ea'); R(c, x - 1, y + 8, 3, 1, '#7895b8'); R(c, x - 2, y + 9, 5, 1, '#5f7a9c');
+      if (ring2) add(c, () => { const u = ((t % 2.4) / 1.2 * 3) % 1, uu = Math.floor(u * 4) / 4; for (const sd of [-1, 1]) { ring(c, x + sd * 3, y - 4, 3 + uu * 7, '#cfe8ff', 0.8 * (1 - uu), 5 + uu * 7, sd < 0 ? Math.PI * 0.65 : -Math.PI * 0.35, sd < 0 ? Math.PI * 1.35 : Math.PI * 0.35); } });
+      add(c, () => { for (let q = 0; q < 6; q++) { const a = t * 0.4 + q * 1.05, r = 7 + (q % 3); P(c, x + Math.cos(a) * r, y - 3 + Math.sin(a) * r * 0.7, '#e6f4ff', 0.3 + 0.4 * Math.max(0, Math.sin(t * 2 + q))); } });
     };
     // 8 CODEX LENS: a lens of dark glass; in it, two seekers asleep, their visor slits glowing in turn (the two you will
     // choose between); a glare sweeps across the glass; glyphs turn round its rim a step at a time
     D[7] = (c, x, y, t) => {
-      const s = st(t); halo(c, x, y, 14, '#4fc79a', 0.25);
-      disc(c, x, y, 10, (i, j, d) => d > 9 ? ((i + j) < 0 ? '#9ff0d0' : '#2f8a68') : d > 8 ? '#1b4c3c' : (i + j) < -6 ? '#123a2e' : '#0a221b');
+      const s = st(t); halo(c, x, y, 11, '#4fc79a', 0.25);
+      disc(c, x, y, 8, (i, j, d) => d > 7 ? ((i + j) < 0 ? '#9ff0d0' : '#2f8a68') : d > 6 ? '#1b4c3c' : (i + j) < -5 ? '#123a2e' : '#0a221b');
       const ph = (t % 3.2) / 3.2, A = ph < 0.5 ? 1 - Math.abs(ph - 0.25) * 2.2 : 0.15, B = ph >= 0.5 ? 1 - Math.abs(ph - 0.75) * 2.2 : 0.15;
-      for (const [hx, al] of [[-4, A], [4, B]]) { disc(c, x + hx, y + 1, 3.2, (i, j, d) => j > 2 ? null : d > 2.4 ? '#1f3a33' : '#050c0a');
-        for (let j = 3; j <= 6; j++) for (let i = -4; i <= 4; i++) if (Math.abs(i) <= 2 + (j - 2) * 0.6 && Math.hypot(hx + i, j) < 8.5) P(c, x + hx + i, y + j, '#16302a');
+      for (const [hx, al] of [[-3, A], [3, B]]) { disc(c, x + hx, y + 1, 2.3, (i, j, d) => j > 1 ? null : d > 1.6 ? '#1f3a33' : '#050c0a');
+        for (let j = 2; j <= 4; j++) for (let i = -3; i <= 3; i++) if (Math.abs(i) <= 1 + (j - 2) * 0.6 && Math.hypot(hx + i, j) < 6.5) P(c, x + hx + i, y + j, '#16302a');
         add(c, () => { P(c, x + hx - 1, y + 1, '#b8ffe6', al); P(c, x + hx, y + 1, '#ffffff', al); P(c, x + hx + 1, y + 1, '#b8ffe6', al); P(c, x + hx, y + 2, '#5fe0b0', al * 0.3); P(c, x + hx, y, '#5fe0b0', al * 0.3); }); }
-      add(c, () => { const g = Math.floor(s * 12) % 30; if (g < 8) for (let k = -9; k <= 9; k++) { const gx = x - 10 + g * 2.6 + k * 0.5, gy = y + k; if (Math.hypot(gx - x, gy - y) < 8.5) { P(c, gx, gy, '#d8fff0', 0.4); P(c, gx + 1, gy, '#d8fff0', 0.2); } }
-        for (let q = 0; q < 8; q++) { const a = Math.floor(s * 4) * (Math.PI / 16) + q * Math.PI / 4, gx = x + Math.cos(a) * 12.5, gy = y + Math.sin(a) * 12.5; P(c, gx, gy, '#8ff5cc', 0.85); if (q % 2) P(c, gx + 1, gy, '#8ff5cc', 0.5); else P(c, gx, gy + 1, '#8ff5cc', 0.5); } });
+      add(c, () => { const g = Math.floor(s * 12) % 30; if (g < 8) for (let k = -7; k <= 7; k++) { const gx = x - 8 + g * 2.1 + k * 0.5, gy = y + k; if (Math.hypot(gx - x, gy - y) < 6.5) { P(c, gx, gy, '#d8fff0', 0.4); P(c, gx + 1, gy, '#d8fff0', 0.2); } }
+        for (let q = 0; q < 8; q++) { const a = Math.floor(s * 4) * (Math.PI / 16) + q * Math.PI / 4, gx = x + Math.cos(a) * 10, gy = y + Math.sin(a) * 10; P(c, gx, gy, '#8ff5cc', 0.85); if (q % 2) P(c, gx + 1, gy, '#8ff5cc', 0.5); else P(c, gx, gy + 1, '#8ff5cc', 0.5); } });
     };
     // 9 THE NINTH: a black sun: light falls into it in turning streaks; its rim pulses teal; nine dark points ride round it
     D[8] = (c, x, y, t) => {
@@ -10493,13 +10491,13 @@ body.ninth #tbN{display:flex}
     // it flashes white round its outline and a ring of light goes out from it
     const CRY = { c: null };
     D[2] = (c, x, y, t) => {
-      y -= 4;                                                                // (stands clear of its stump)
-      const per = 3.8, ph = t % per, R1 = 3.0, FL = 0.17, s = st(t), ay = s * 0.9, ax = 0.32, r = 8, h = 11;
+      y -= 1;
+      const per = 3.8, ph = t % per, R1 = 3.0, FL = 0.17, s = st(t), ay = s * 0.9, ax = 0.32, r = 6, h = 8;
       if (!CRY.c) { CRY.c = document.createElement('canvas'); CRY.c.width = 48; CRY.c.height = 60; }
       const o = CRY.c.getContext('2d', { willReadFrequently: true }); o.clearRect(0, 0, 48, 60); const X = 24, Y = 30, V = [];   // (read back each frame: kept off the GPU)
       for (let k = 0; k < 3; k++) { const a = k * Math.PI * 2 / 3; V.push([Math.cos(a) * r, h, Math.sin(a) * r]); }
       for (let k = 0; k < 3; k++) { const a = k * Math.PI * 2 / 3; V.push([Math.cos(a) * r, -h, Math.sin(a) * r]); }
-      V.push([0, h + 6, 0], [0, -h - 5, 0]);
+      V.push([0, h + 4, 0], [0, -h - 4, 0]);
       const F = [[0, 3, 4, 1], [1, 4, 5, 2], [2, 5, 3, 0], [6, 0, 1], [6, 1, 2], [6, 2, 0], [7, 4, 3], [7, 5, 4], [7, 3, 5]].map(f => f.slice().reverse());
       const sol = solid(o, X, Y, V, F, ay, ax, (k, L) => VI[Math.min(5, 1 + Math.floor(L * 4.6))], '#e6dcff');
       o.globalAlpha = 1;
@@ -10508,11 +10506,25 @@ body.ninth #tbN{display:flex}
       const img = o.getImageData(0, 0, 48, 60).data, A = (i, j) => i < 0 || j < 0 || i >= 48 || j >= 60 ? 0 : img[(j * 48 + i) * 4 + 3];
       inv(); c.globalAlpha = 1; c.drawImage(CRY.c, Math.round(x - X), Math.round(y - Y));
       if (flash) add(c, () => { for (let j = 0; j < 60; j++) for (let i = 0; i < 48; i++) if (A(i, j) && (!A(i - 1, j) || !A(i + 1, j) || !A(i, j - 1) || !A(i, j + 1))) P(c, x - X + i, y - Y + j, '#ffffff', 0.9); });
-      if (ph >= R1) add(c, () => { const u = Math.min(1, Math.floor((ph - R1) * 12) / 4); ring(c, x, y, 12 + u * 12, '#c9b4ff', 1 - u, (12 + u * 12) * 0.9); });
+      if (ph >= R1) add(c, () => { const u = Math.min(1, Math.floor((ph - R1) * 12) / 4); ring(c, x, y, 9 + u * 10, '#c9b4ff', 1 - u, (9 + u * 10) * 0.9); });
       if (!flash) add(c, () => { let best = -1, bk = 0; for (let k = 0; k < 3; k++) { const v = rot(V[k], ay, ax); const sc = -v[0] * 0.6 + v[2] * 0.8; if (sc > best) { best = sc; bk = k; } }
         const a = sol.S[bk + 3], b = sol.S[bk], g = Math.floor(s * 12) % 14; if (g < 8 && best > 4) { const u = g / 7, gx = x - X + a[0] + (b[0] - a[0]) * u, gy = y - Y + a[1] + (b[1] - a[1]) * u; P(c, gx, gy, '#ffffff'); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) P(c, gx + dx, gy + dy, '#ffffff', 0.5); } });
     };
-    return D.map(f => (c, x, y, t) => { inv(); f(c, x, y, t); inv(); });
+    const DY = [0, 2, 0, 3, 3, 2, 3, 2, 0];   // (smaller, they sit lower, the same gap above their stumps as before)
+    const out = D.map((f, i) => (c, x, y, t) => { inv(); f(c, x, y + DY[i], t); inv(); });
+    // The Ninth small, for the HUD: an eclipse: a black sun, its corona broken into short rays that turn a step at a
+    // time, one orange point going round it; while you are the light it turns faster and rings go out from it; spent,
+    // it goes dark and still. A faint teal haze behind, so the black reads against the dark
+    out.crown = (c, x, y, t, st8) => { inv();
+      const sp = st8 === 'spent', hot = st8 === 'light', col = sp ? '#1f3a33' : '#5ae6c8';
+      if (!sp) add(c, () => { for (let k = 1; k <= 3; k++) disc(c, x, y, 8 * k / 3, () => '#2a8a78', hot ? 0.16 : 0.09); });
+      for (let j = -5; j <= 5; j++) for (let i = -5; i <= 5; i++) { const d = Math.hypot(i, j); if (d <= 3.6) P(c, x + i, y + j, '#000000'); else if (d <= 4.5) P(c, x + i, y + j, col); }
+      const rot = Math.floor(t * (hot ? 6 : 2)) / 12 * Math.PI;
+      for (let k = 0; k < 8; k++) { const a = rot + k * Math.PI / 4, L = k % 2 ? 1 : 2; for (let q = 1; q <= L; q++) P(c, x + Math.cos(a) * (4.6 + q), y + Math.sin(a) * (4.6 + q), col, sp ? 0.6 : 1 - q * 0.25); }
+      if (!sp) { const a = t * (hot ? 2 : 0.6); P(c, x + Math.cos(a) * 3, y + Math.sin(a) * 3, '#ff8c3c'); }
+      if (hot) add(c, () => ring(c, x, y, 6 + (Math.floor(t * 12) % 4), '#5ae6c8', 0.5));
+      inv(); };
+    return out;
   })();
 
   /* the relics small (in the HUD, in their hollows in The Deep, beside the word that one is yours): 13 x 13 on the
@@ -10527,9 +10539,9 @@ body.ninth #tbN{display:flex}
     { // PRISM: the crystal, pointed at both ends, two faces showing
       rows: ['......h......', '.....hhm.....', '....hlmmd....', '....lllmd....', '....lllmd....', '....lllmd....', '....lllmd....', '....lllmd....', '....lllmd....', '....lllmd....', '.....lmd.....', '......d......', '.............'],
       pal: { h: '#efe6ff', l: '#9a80f0', m: '#6f58c0', d: '#4b3a86' }, core: [6, 2, 9] },
-    { // BANKED COAL: a black lump, its cracks lit, a small flame
-      rows: ['......f......', '.....fF......', '......F......', '...aaaaaaa...', '..aabcaabaa..', '.abaaacaaaaa.', '.aacaaaccaca.', '.aaaccaaacaa.', '.aacaaaaaaca.', '..aaacaacaa..', '...aaaaaaa...', '...uuuuuuu...', '.............'],
-      pal: { a: '#2a1e1a', b: '#4a3a36', c: '#ff8a3c', f: '#ffd9a8', F: '#ff9450', u: '#7a2a14' }, cracks: 'c' },
+    { // BANKED COAL: the lantern, its glow through the slats
+      rows: ['.....aaa.....', '...bbbbbbb...', '..bbbbbbbbb..', '..s.s.s.s.s..', '..sgsgsgsgs..', '..sgsfsfsgs..', '..sfsfsfsfs..', '..sfsysysfs..', '..sfsysysfs..', '..bbbbbbbbb..', '...ddddddd...', '.............', '.............'],
+      pal: { a: '#5a5048', b: '#3a322c', s: '#6a5e54', g: '#c84a24', f: '#ff8a3c', y: '#ffd090', d: '#241e1a' } },
     { // SPARE GEAR: a copper wheel and a steel pinion
       rows: ['.........s.s.', '........sSSs.', '...c.c..sSKSs', '..cCCCc..sSs.', '.cCCooCCc.s..', '..CokkoC.....', '.cCokkoCc....', '..CCooCC.....', '.cCCCCCCc....', '..c.cCc.c....', '....c.c......', '.............', '.............'],
       pal: { c: '#b8704a', C: '#d88a5e', o: '#5e3424', k: '#1e120c', s: '#9a958c', S: '#cfc8bc', K: '#3a3632' } },
@@ -10542,12 +10554,11 @@ body.ninth #tbN{display:flex}
     { // CODEX LENS: two sleepers behind the glass
       rows: ['....hhhhd....', '..hhkkkkkdd..', '.hkkkkkkkkkd.', '.hkKKkkkKKkd.', 'hkKKKKkKKKKkd', 'hkKvKKkKwKKkd', 'hkKKKKkKKKKkd', 'hkkKKkkkKKkkd', '.hkkkkkkkkkd.', '.hkkkkkkkkkd.', '..dkkkkkkdd..', '....ddddd....', '.............'],
       pal: { h: '#9ff0d0', d: '#2f8a68', k: '#0a221b', K: '#1f3a33', v: '#b8ffe6', w: '#b8ffe6' }, eyes: [[3, 5], [8, 5]] },
-    { // THE NINTH: a black sun
-      rows: ['.............', '.....t.t.....', '...tTTTTTt...', '..TTkkkkkTT..', '.tTkkkkkkkTt.', '..TkkkkkkkT..', '.tTkkkkkkkTo.', '..TkkkkkkkT..', '.tTkkkkkkkTt.', '..TTkkkkkTT..', '...tTTTTTt...', '.....o.t.....', '.............'],
-      pal: { t: '#2a8a78', T: '#5ae6c8', k: '#000000', o: '#ff8c3c' } },
+    null,   // THE NINTH: the eclipse crown (LIVE.crown)
   ];
   const DIMC = {}, dimc = (h) => DIMC[h] || (DIMC[h] = (() => { const n = parseInt(h.slice(1), 16), c = [n >> 16 & 255, n >> 8 & 255, n & 255]; return rgb(mix([12, 12, 18], c, 0.4)); })());
   function icon(ctx, i, x, y, t, o) {
+    if (i === NINTH) return LIVE.crown(ctx, x, y, t, o.dim ? 'spent' : o.lit ? 'light' : 'carry');
     const ic = ICONS[i], dim = !!o.dim, x0 = x - 6, y0 = y - 6, glow = o.glow === undefined ? 1 : o.glow;
     // its colour round it, in three hard steps, added (stronger for The Ninth while you are the light)
     if (!dim && glow > 0) { ctx.globalCompositeOperation = 'lighter'; const c = RELICS[i].col;
@@ -10559,12 +10570,11 @@ body.ninth #tbN{display:flex}
       if (i === 0) { const u = ph(3); if (u < 0.3) ov['6,' + (1 + Math.floor(u / 0.3 * 5))] = '#ffffff'; }
       if (i === 1) { const k = Math.floor(t * 2) % (ic.spots.length + 2); if (k < ic.spots.length) ov[ic.spots[k].join(',')] = '#ffffff'; }
       if (i === 2) { const u = ph(3.8); if (u < 0.2) ov['6,' + (9 - Math.floor(u / 0.2 * 8))] = '#ffffff'; if (u > 0.79 && u < 0.84) ov.flash = '#ffffff'; }
-      if (i === 3) { const b = Math.floor((0.5 + 0.5 * Math.sin(t * 1.6)) * 2.99); ov.c = ['#c84a24', '#ff8a3c', '#ffc070'][b]; if (f % 8 < 4) { ov.f = '#ff9450'; ov.F = '#ffd9a8'; } }
+      if (i === 3) { if (Math.sin(Math.floor(t * 6) / 6 * 2.2) < -0.3) { ov.y = '#ff8a3c'; ov.f = '#c84a24'; } }   // (the glow breathes)
       if (i === 4) { if (ph(2.2) < 0.08) ov.K = '#ffffff'; }
       if (i === 5) { const u = ph(1.1); ov.s = u < 0.14 ? '#ffd0de' : u < 0.3 ? '#a0405e' : '#5a1426'; }
       if (i === 6) { if (ph(2.4) < 0.12) { ov['3,0'] = '#ffffff'; ov['9,0'] = '#ffffff'; } }
       if (i === 7) { const u = ph(3.2); ov.v = u < 0.5 ? '#ffffff' : '#3a6a5a'; ov.w = u < 0.5 ? '#3a6a5a' : '#ffffff'; }
-      if (i === 8) { ov.T = rgb(mix([90, 230, 200], [170, 250, 230], 0.25 + 0.25 * Math.sin(Math.floor(t * 6) / 6 * 2))); }
     } else if (i === 7) { ov.v = ov.w = '#1f3a33'; }
     const rows = ic.rows;
     for (let r = 0; r < 13; r++) for (let c = 0; c < 13; c++) { const ch = rows[r][c]; if (ch === '.') continue;
@@ -14855,7 +14865,7 @@ body.ninth #tbN{display:flex}
       if (deepMsgT < 2.5) { deepMsgT += frameDt; if (deepMsgT >= 0) ht(deepMsgS, LW >> 1, Math.round(LH * 0.3), '#d6b98a', 'center', Math.min(1, deepMsgT * 3, (2.5 - deepMsgT) * 2)); }
       // the relics you carry, small, under the wards (The Ninth dim once it is spent, bright while you are the light)
       const carried = RUN.load.concat(P.relics.includes(8) ? [8] : []);
-      carried.forEach((id, j) => RLX.draw(ctx, id, 12 + j * 15, hy + L7 * 3 + 12, gameTime, { sc: 1, glow: id === 8 && S.immune ? 1.2 : 0.4, still: true, dim: id === 8 && RUN.ninthUsed && !S.immune }));
+      carried.forEach((id, j) => RLX.draw(ctx, id, 12 + j * 15, hy + L7 * 3 + 12, gameTime, { sc: 1, glow: 0.4, lit: id === 8 && S.immune, dim: id === 8 && RUN.ninthUsed && !S.immune }));
       // (while you are the light, how many rooms of it are left, under The Ninth)
       { const j = carried.indexOf(8); if (j >= 0 && S.immune && RUN.ninthUsed) ht(String(Math.max(1, RUN.ninthLast - RUN.i + 1)), 12 + j * 15, hy + L7 * 3 + 19, '#5ae6c8', 'center', 0.9); }
       if (ninthReady() && !touchMode) { ht('V', 8, hy + L7 * 3 + 24, PAL.gold, 'left', 0.7 + 0.3 * Math.sin(gameTime * 4)); ht('EQUIP', 8 + htW('V  '), hy + L7 * 3 + 24, '#5ae6c8', 'left', 0.85); }
