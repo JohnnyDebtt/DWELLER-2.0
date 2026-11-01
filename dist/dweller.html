@@ -1685,7 +1685,8 @@ body.ninth #tbN{display:flex}
       P('#07060b', x0, y0, x1 - x0, y1 - y0);
       for (let k = 0; k < 10; k++) P(k % 3 ? '#16141f' : '#211d2e', x0 + 1 + (k * 37) % Math.max(1, x1 - x0 - 2), y0 + 1 + (k * 13) % Math.max(1, y1 - y0 - 2));
       P('#3a3550', rx - 4, fy - 2, 9, 1); P('#221f33', rx - 3, fy - 1, 7, 1);         // a low slab of stone
-      if (!sp.got) RLX.draw(ctx, sp.id, rx, fy - 8, time, { sc: 1, glow: 0 });
+      // (the relic itself only once its wall is down: while the wall stands, not a pixel of it may show through)
+      if (!sp.got && F.open) RLX.draw(ctx, sp.id, rx, fy - 8, time, { sc: 1, glow: 0 });
       return;
     }
     if (!F.open) {
@@ -2080,7 +2081,7 @@ body.ninth #tbN{display:flex}
     { id: 'vein', name: 'THE VEIN', main: '#4c4158', shade: '#272030', wins: 30, glow: '#ff5a7a', glowA: 0.26, seam: '#ff7d98', trail: 'sparkle' },
     // the last: the Guardian's own, black as the eye's dark, lit at its edge with the teal of its glow and trailing smoke;
     // no thread: it comes out of the dark at the 35th win and is worn at once (gift)
-    { id: 'guardian', name: 'THE GUARDIAN', main: '#161b1d', shade: '#07090a', wins: 35, glow: '#3fe0c4', glowA: 0.05, seam: '#5cf2d6', rim: true, trail: 'smoke', gift: true },
+    { id: 'guardian', name: 'THE GUARDIAN', main: '#1f2629', shade: '#0d1214', wins: 35, glow: '#3fe0c4', glowA: 0.035, seam: '#3fbfa8', rimA: 0.8, mote: '#3fbfa8', rim: true, trail: 'smoke', gift: true },
   ];
   function hexRGB(h) { return [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); }
   function setCoat(c) {
@@ -2330,7 +2331,7 @@ body.ninth #tbN{display:flex}
         else if (q.k === 2) { ctx.globalAlpha = Math.sin(u * Math.PI) * (0.55 + 0.45 * Math.sin(now * 9 + q.ph)); ctx.fillStyle = u < 0.3 ? '#ffe2a8' : u < 0.7 ? '#ff9a50' : '#d8501c'; ctx.fillRect(X, Y, 1, 1); }
         else if (q.k === 3) { const tw = 0.5 + 0.5 * Math.sin(now * 14 + q.ph); ctx.globalAlpha = Math.sin(u * Math.PI) * (0.4 + 0.6 * tw); ctx.fillStyle = tw > 0.85 ? '#ffd0dc' : u < 0.5 ? '#ff7d98' : '#d8405e'; ctx.fillRect(X, Y, 1, 1); if (tw > 0.92 && u < 0.6) { ctx.globalAlpha *= 0.5; ctx.fillRect(X - 1, Y, 3, 1); ctx.fillRect(X, Y - 1, 1, 3); } }
         else if (q.k === 5) { ctx.globalAlpha = (1 - u) * (0.55 + 0.45 * Math.sin(now * 12 + q.ph)); ctx.fillStyle = u < 0.3 ? '#ffd0dc' : '#ff5a7a'; ctx.fillRect(X, Y, 1, 1); }
-        else if ((q.k === 0 || q.k === 4) && q.teal) { ctx.globalAlpha = 0.35 * Math.sin(u * Math.PI); ctx.fillStyle = '#3fe0c4'; ctx.fillRect(X, Y, 1, 1); }
+        else if ((q.k === 0 || q.k === 4) && q.teal) { ctx.globalAlpha = 0.35 * Math.sin(u * Math.PI); ctx.fillStyle = (COAT && COAT.mote) || '#3fe0c4'; ctx.fillRect(X, Y, 1, 1); }
       }
       ctx.restore();
     }
@@ -2355,19 +2356,20 @@ body.ninth #tbN{display:flex}
     if (GR.s !== s) { GR.s = s; GR.echoes = []; GR.air = air; GR.land = -9; }
     if (GR.air && !air) GR.land = now;
     GR.air = air;
+    const RA = COAT.rimA || 1;   // (how strongly its edge is lit)
     const br = 0.5 + 0.5 * Math.sin(now * 2.2), pul = 0.5 + 0.5 * Math.sin(now * 2 * Math.PI / 1.1), land = Math.max(0, 1 - (now - GR.land) / 0.25);
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     if ((air || s.st === 'roll' || s.st === 'wall') && now - GR.t > (air ? 0.05 : 0.09)) { GR.t = now; GR.echoes.push({ nm, ix, x: s.x + 2.5 + sway, y: s.y + s.h, fl, t: now }); }
     GR.echoes = GR.echoes.filter(e => now - e.t < 0.35 && now >= e.t);
     for (const e of GR.echoes) { const G = RIM[e.nm]; if (G) drawFrame(ctx, G.rim, e.ix, Math.round(e.x - camX), Math.round(e.y - camY), e.fl, (1 - (now - e.t) / 0.35) * 0.55); }
     if (moving) {
-      drawFrame(ctx, g.rim, ix, fx, fy, fl, Math.min(1, 0.5 + 0.4 * pul + (air ? 0.15 : 0) + 0.5 * land));
-      drawFrame(ctx, g.hem, ix, fx, fy, fl, Math.min(1, 0.35 + 0.2 * pul + 0.4 * land));
+      drawFrame(ctx, g.rim, ix, fx, fy, fl, RA * Math.min(1, 0.5 + 0.4 * pul + (air ? 0.15 : 0) + 0.5 * land));
+      drawFrame(ctx, g.hem, ix, fx, fy, fl, RA * Math.min(1, 0.35 + 0.2 * pul + 0.4 * land));
     } else {
-      drawFrame(ctx, g.rim, ix, fx, fy, fl, Math.min(1, 0.45 + 0.3 * br + 0.5 * land));
-      drawFrame(ctx, g.hem, ix, fx, fy, fl, Math.min(1, 0.35 + 0.2 * br + 0.4 * land));
+      drawFrame(ctx, g.rim, ix, fx, fy, fl, RA * Math.min(1, 0.45 + 0.3 * br + 0.5 * land));
+      drawFrame(ctx, g.hem, ix, fx, fy, fl, RA * Math.min(1, 0.35 + 0.2 * br + 0.4 * land));
       const u = (now % 1.6) / 1.6, band = fy - 34 + Math.round(u * 36);
-      ctx.beginPath(); ctx.rect(fx - 30, band, 60, 3); ctx.clip(); drawFrame(ctx, g.all, ix, fx, fy, fl, 0.9);
+      ctx.beginPath(); ctx.rect(fx - 30, band, 60, 3); ctx.clip(); drawFrame(ctx, g.all, ix, fx, fy, fl, 0.9 * RA);
     }
     ctx.restore();
   }
@@ -2995,7 +2997,29 @@ body.ninth #tbN{display:flex}
     return 'rgb(' + m(r) + ',' + m(g) + ',' + m(b) + ')';
   }
   /* the whole gem; have[i] says which slivers are in. ghost: draw missing ones as faint outlines */
+  /* the gem drawn small (the count in the town's corner): a pixel at a time, one column for each of the six slivers
+     (so every sliver you hold shows), lit from above as the large gem is; no soft edges, outline or seams, which at
+     this size left only a smudge. All six in: its rim catches the light, as the outline did */
+  const GEM_SMALL = [2, 4, 6, 6, 6, 6, 4, 2];   // its width, row by row
+  function drawGemSmall(ctx, x, y, time, have, glow) {
+    ctx.save();
+    const X = Math.round(x) - 3, Y = Math.round(y) - 4, H = GEM_SMALL.length;
+    const inG = (c, r) => r >= 0 && r < H && Math.abs(c - 2.5) < GEM_SMALL[r] / 2;
+    for (let r = 0; r < H; r++) for (let c = 0; c < 6; c++) {
+      if (!inG(c, r)) continue;
+      let col;
+      if (have[c]) {
+        col = shade(SHARDS[c], r < 2 ? 0.35 : r >= H - 2 ? -0.3 : 0.05);
+        const row = Math.floor(((time * 6 + c * 5) % 32) / 32 * H);
+        if (r === row) { ctx.fillStyle = col; ctx.fillRect(X + c, Y + r, 1, 1); col = 'rgba(255,255,255,' + (0.35 * (0.5 + 0.5 * Math.sin(time * 2 + c))).toFixed(3) + ')'; }
+      } else col = 'rgb(30,32,44)';
+      ctx.fillStyle = col; ctx.fillRect(X + c, Y + r, 1, 1);
+      if (glow && (!inG(c - 1, r) || !inG(c + 1, r) || !inG(c, r - 1) || !inG(c, r + 1))) { ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fillRect(X + c, Y + r, 1, 1); }
+    }
+    ctx.restore();
+  }
   function drawGem(ctx, x, y, s, have, time, glow) {
+    if (s < 0.5) return drawGemSmall(ctx, x, y, time, have, glow);
     ctx.save(); ctx.translate(Math.round(x), Math.round(y));
     const sw = 18 / 6;
     for (let i = 0; i < 6; i++) {
@@ -8566,23 +8590,63 @@ body.ninth #tbN{display:flex}
       rect(x, PALT.woodH, dx - 2, by - dh - 3, dw + 4, 1);
     }
   }
+  /* house II: a gnarled dead oak, leaning, swollen with burls, forked and broken; the door a hollow at its foot, pale
+     mushrooms on its roots. An owl lives in the knot hole low on its trunk: now and then its eyes open (oakOwl, live) */
+  const OAK = { owlX: null, owlY: null };
   function drawHollowTree(x, r, cx, by) {
-    // a giant dead tree, hollow at the foot, with pale mushrooms on its roots
-    const tw = 30;
-    for (let j = 0; j < 150; j++) {
-      const y = by - j, half = Math.round(tw / 2 + Math.max(0, 14 - j) * 0.9 - j * 0.04 + Math.sin(j * 0.2) * 1.2);
-      rect(x, '#161310', cx - half, y, half * 2, 1);
-      rect(x, '#241e19', cx - half, y, 2, 1);
-      if (j % 9 === 0) rect(x, '#1e1915', cx - half + 4 + (j % 5), y, 2, 3);
+    // (the tree that stood here before took a turn of the town's dice for its branches; the turn is still taken, on a
+    //  scrap of canvas, so nothing else in the town moves)
+    deadTree(document.createElement('canvas').getContext('2d'), r, cx, by - 140, 70, 4, '#161310', 3);
+    const BARK = '#161310', EDGE = '#241e19', KNOT = '#1e1915', RIM = '#2b241d';
+    // its own dice, for its limbs
+    let seed = 62; const R = () => { seed = (seed + 0x6D2B79F5) >>> 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = (t + Math.imul(t ^ t >>> 7, 61 | t)) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const ell = (X, Y, rx, ry, colAt) => { for (let dy = -ry; dy <= ry; dy++) { const hw = Math.round(rx * Math.sqrt(Math.max(0, 1 - (dy / ry) * (dy / ry)))); for (let dx = -hw; dx <= hw; dx++) rect(x, colAt(dx, dy), X + dx, Y + dy, 1, 1); } };
+    const limb = (x0, y0, a, len, w, depth) => {
+      const x1 = x0 + Math.cos(a) * len, y1 = y0 + Math.sin(a) * len;
+      line(x, BARK, x0, y0, x1, y1, w);
+      if (depth > 0) { limb(x1, y1, a - 0.35 - R() * 0.4, len * 0.68, Math.max(1, w - 1), depth - 1); if (R() < 0.85) limb(x1, y1, a + 0.3 + R() * 0.4, len * 0.62, Math.max(1, w - 1), depth - 1); }
+    };
+    // the trunk: it leans left as it rises, wide at the foot, with two burls
+    const T = 92, dx = (j) => -0.0024 * j * j + Math.sin(j * 0.12) * 1.5;
+    const half = (j) => Math.round((j < 12 ? 24 - j * 0.75 : Math.max(7, 15 - j * 0.065)) + (j > 38 && j < 50 ? 3 * Math.sin((j - 38) / 12 * Math.PI) : 0) + (j > 66 && j < 76 ? 2 * Math.sin((j - 66) / 10 * Math.PI) : 0));
+    for (let j = 0; j < T; j++) {
+      const y = by - j, h = half(j), d = Math.round(dx(j));
+      rect(x, BARK, cx - h + d, y, h * 2, 1); rect(x, EDGE, cx - h + d, y, 2, 1);
+      if (j % 9 === 0) rect(x, KNOT, cx - h + d + 4 + (j % 5), y, 2, 3);
     }
-    deadTree(x, r, cx, by - 140, 70, 4, '#161310', 3);
+    // a knot hole high on its left; and the owl's, lower and further in
+    ell(cx + Math.round(dx(80)) - (half(80) - 5), by - 80, 2, 3, (a, b) => (Math.abs(a) === 2 || Math.abs(b) === 3 ? RIM : '#07080b'));
+    OAK.owlX = cx + Math.round(dx(54)) + 3; OAK.owlY = by - 54;
+    ell(OAK.owlX, OAK.owlY, 3, 4, (a, b) => ((a * a) / 9 + (b * b) / 16 > 0.62 ? RIM : '#050607'));
+    // forked at the top: a long limb reaching left, a short one broken off to the right; a lower limb, left
+    const tx = cx + Math.round(dx(T)), ty = by - T;
+    limb(tx - 3, ty, -2.2, 46, 5, 4); limb(tx + 3, ty, -0.8, 24, 4, 1);
+    limb(cx + Math.round(dx(60)) - half(60) + 2, by - 60, -2.9, 26, 3, 3);
+    // roots
+    for (const [ddx, len] of [[-22, 16], [-15, 9], [19, 13], [13, 7]]) line(x, BARK, cx + ddx, by - 2, cx + ddx + Math.sign(ddx) * len, by, 3);
     // the hollow
     const hw = 9, hh = 24;
-    for (let j = 0; j < hh; j++) { const half = j > hh - 9 ? Math.round(Math.sqrt(1 - Math.pow((j - (hh - 9)) / 9, 2)) * hw) : hw; rect(x, '#07080b', cx - half, by - j - 1, half * 2, 1); }
-    // roots
-    for (const [dx, len] of [[-16, 14], [-12, 8], [14, 12], [10, 6]]) line(x, '#161310', cx + dx, by - 2, cx + dx + Math.sign(dx) * len, by, 3);
+    for (let j = 0; j < hh; j++) { const hh2 = j > hh - 9 ? Math.round(Math.sqrt(1 - Math.pow((j - (hh - 9)) / 9, 2)) * hw) : hw; rect(x, '#07080b', cx - hh2, by - j - 1, hh2 * 2, 1); }
     // mushrooms
-    for (const [dx, h] of [[-19, 4], [-15, 2], [17, 3], [21, 5], [-6, 2]]) { rect(x, '#5c6b70', cx + dx, by - h, 1, h); rect(x, '#8fa6a6', cx + dx - 1, by - h - 1, 3, 1); rect(x, '#b7c9c4', cx + dx, by - h - 2, 1, 1); }
+    for (const [ddx, h] of [[-19, 4], [-15, 2], [17, 3], [21, 5], [-6, 2]]) { rect(x, '#5c6b70', cx + ddx, by - h, 1, h); rect(x, '#8fa6a6', cx + ddx - 1, by - h - 1, 3, 1); rect(x, '#b7c9c4', cx + ddx, by - h - 2, 1, 1); }
+  }
+  /* the owl in the oak: its hole is dark most of the time; now and then (a few seconds in every seven or so, and some
+     stretches not at all) two amber eyes open in it, look out a while, blink once, and close */
+  function oakOwl(ctx, camX, camY, time) {
+    if (OAK.owlX === null) return;
+    const X = OAK.owlX - camX, Y = OAK.owlY - camY; if (X < -10 || X > 2000) return;
+    const P = 7.3, seg = Math.floor(time / P), u = time - seg * P, hs = (k) => { const v = Math.sin(seg * 127.1 + k * 311.7) * 43758.5453; return v - Math.floor(v); };
+    if (hs(0) < 0.25) return;
+    const t0 = 0.8 + hs(1) * 2.6, d = 1.6 + hs(2) * 2.4, v = u - t0; if (v < 0 || v > d) return;
+    const blink = Math.abs(v - d * (0.35 + hs(3) * 0.3)) < 0.07, half = v < 0.12 || v > d - 0.12 || blink;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    glow(ctx, X, Y - 1, 5, '#e8a83a', half ? 0.05 : 0.12);
+    ctx.globalCompositeOperation = 'source-over';
+    for (const ex of [X - 2, X + 1]) {
+      if (half) { ctx.fillStyle = '#b8862e'; ctx.fillRect(ex, Y - 1, 1, 1); }
+      else { ctx.fillStyle = '#ffcf5a'; ctx.fillRect(ex, Y - 2, 1, 1); ctx.fillStyle = '#e09a30'; ctx.fillRect(ex, Y - 1, 1, 1); }
+    }
+    ctx.restore();
   }
   function drawGlassArch(x, r, cx, by) {
     // a ring of ice and glass shards standing in the grass
@@ -8862,6 +8926,7 @@ body.ninth #tbN{display:flex}
     // the night over everything, then the lights
     ctx.fillStyle = 'rgba(4,6,14,0.16)'; ctx.fillRect(0, 0, LW, LH);
     drawLights(ctx, st, camX, camY);
+    oakOwl(ctx, camX, camY, time);                        // (the owl's eyes, over the dark)
     if (st.showPlayer !== false && !(inShaft && s.y + 3 > GY - 12)) { if (flooded && s.y + 3 > WLV) ctx.globalAlpha = 0.35; R.drawPlayer(ctx, s, camX, camY, 'visor', 0); ctx.globalAlpha = 1; }
     // snow, drifting slowly
     for (const f of snow) {
@@ -9858,8 +9923,8 @@ body.ninth #tbN{display:flex}
       out.push(l1, l2); }
     return out; };
   const FINE = {};
-  function drawFine(ctx, q, S, x, y, t, o, sc, ph) {
-    const rows = FINE[q.id] || (FINE[q.id] = s2x(q.px)), H = rows.length, W = rows[0].length, p = sc / 2;
+  function drawFine(ctx, q, S, x, y, t, o, sc, ph, icon) {
+    const rows = icon ? q.px : (FINE[q.id] || (FINE[q.id] = s2x(q.px))), H = rows.length, W = rows[0].length, p = icon ? sc : sc / 2;
     const tq = Math.floor(t * 12) / 12, bob = o.still ? 0 : Math.round(Math.sin(tq * 1.6 + ph) * 1.2) * sc;
     const e = (r, c) => (r < 0 || c < 0 || r >= H || c >= W) ? true : rows[r][c] === '.';
     const x0 = Math.round(x - W * p / 2), y0 = Math.round(y - H * p / 2 + bob);
@@ -9868,8 +9933,8 @@ body.ninth #tbN{display:flex}
       const ch = rows[r][c]; if (ch === '.') continue;
       let col = S[ch];
       if (ch !== 'd' && !o.dim) { if (e(r - 1, c) || e(r, c - 1)) col = mix(col, [255, 255, 255], ch === 'a' ? 0.12 : 0.22); else if (e(r + 1, c) || e(r, c + 1)) col = mix(col, [8, 8, 14], 0.35); }
-      if (q.spots && ch === 'd' && !o.dim) col = mix([200, 255, 190], [255, 255, 230], 0.5 + 0.5 * Math.sin(t * 2.5 + (c >> 1)));
-      if (q.coal && ch === 'd' && !o.dim) col = mix([255, 120, 60], [255, 210, 140], 0.5 + 0.5 * Math.sin(t * 3 + (r >> 1) + (c >> 1)));
+      if (q.spots && ch === 'd' && !o.dim) col = mix([200, 255, 190], [255, 255, 230], 0.5 + 0.5 * Math.sin(t * 2.5 + (icon ? c : c >> 1)));
+      if (q.coal && ch === 'd' && !o.dim) col = mix([255, 120, 60], [255, 210, 140], 0.5 + 0.5 * (icon ? Math.sin(t * 3 + r + c) : Math.sin(t * 3 + (r >> 1) + (c >> 1))));
       if (!o.dim) { const u = c + r - band; if (u >= 0 && u < 3) col = mix(col, [255, 255, 255], u < 1 ? 0.55 : 0.25); }
       ctx.fillStyle = rgb(col); ctx.fillRect(x0 + c * p, y0 + r * p, Math.ceil(p), Math.ceil(p));
     }
@@ -9910,25 +9975,8 @@ body.ninth #tbN{display:flex}
       }
       return;
     }
-    if (sc >= 2) return drawFine(ctx, q, S, x, y, t, o, sc, ph);
-    // (smaller, as an icon) it turns: its columns squeeze to the middle as it does, and its back is a shade darker
-    const turn = o.still ? 1 : Math.cos(t * 0.9 + ph), sx = Math.max(0.18, Math.abs(turn)), back = turn < 0;
-    const rows = q.px, H = rows.length, W = rows[0].length;
-    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
-      const ch = rows[r][c]; if (ch === '.') continue;
-      let col = S[ch]; if (back) col = mix(col, [10, 10, 16], 0.3);
-      if (q.spots && ch === 'd' && !o.dim) col = mix([200, 255, 190], [255, 255, 230], 0.5 + 0.5 * Math.sin(t * 2.5 + c));
-      if (q.coal && ch === 'd' && !o.dim) col = mix([255, 120, 60], [255, 210, 140], 0.5 + 0.5 * Math.sin(t * 3 + r + c));
-      ctx.fillStyle = rgb(col); ctx.fillRect(Math.round(x + (c - (W - 1) / 2) * sx * sc), Math.round(y + (r - (H - 1) / 2) * sc + bob), Math.max(Math.ceil(sc), Math.ceil(sx * sc)), Math.ceil(sc));
-    }
-    if (q.motes && !o.dim) {   // motes of split light drifting round the Prism, fading in and out
-      const cols = [[255, 120, 120], [255, 190, 110], [250, 240, 120], [130, 240, 150], [120, 200, 255], [150, 130, 255], [220, 130, 255]];
-      for (let k = 0; k < 14; k++) {
-        const an = t * (0.35 + (k % 4) * 0.08) + k * 2.399, r = 6.5 + 2.2 * Math.sin(t * 0.7 + k * 1.3), a = Math.max(0, Math.sin(t * 1.3 + k * 0.9)) * 0.85;
-        if (a < 0.05) continue;
-        ctx.fillStyle = rgb(cols[k % 7], a); ctx.fillRect(Math.round(x + Math.cos(an) * r * sc), Math.round(y + Math.sin(an) * r * 0.8 * sc + bob), Math.ceil(sc), Math.ceil(sc));
-      }
-    }
+    // in the room (twice the size) at twice the detail; as an icon, its own pixels; both lit, held still, glinting
+    return drawFine(ctx, q, S, x, y, t, o, sc, ph, sc < 2);
   }
   /* the relic box: one stone panel, a thin border and a soft halo in the relic's own colour */
   function box(ctx, i, cx, by, t, status, dim, x0b, x1b, key) {
@@ -10610,8 +10658,19 @@ body.ninth #tbN{display:flex}
     for (let i = 0; i < d.length; i += 4) { if (!d[i + 3]) continue; const to = d[i] === 185 && d[i + 1] === 168 && d[i + 2] === 123 ? M : d[i] === 107 && d[i + 1] === 98 && d[i + 2] === 88 ? S : null; if (to) for (let q = 0; q < 3; q++) d[i + q] = Math.round(d[i + q] + (to[q] - d[i + q]) * k); }
     g.putImageData(id, 0, 0); c.drawImage(cv, Math.round(x) - 48, Math.round(fl) - 60);
   }
+  /* this memory keeps the Guardian's cloak as it first was (its black and teal before v22.4 softened them), whatever
+     the cloak is now; and if you watch it again wearing that cloak, the figure walks in wearing it in those colours */
+  const GUARD_FIRST = { main: '#161b1d', shade: '#07090a', seam: '#5cf2d6' };
+  const GF = { cv: null };
+  function guardianFirst(c, R, t, x, fl, o) {
+    const cv = GF.cv || (GF.cv = document.createElement('canvas')); if (cv.width !== 96) cv.width = cv.height = 96;   // (its own canvas: the one the settling uses is left as it was)
+    const g = GF.g || (GF.g = cv.getContext('2d', { willReadFrequently: true })); g.clearRect(0, 0, 96, 96); dweller(g, R, t, 48, 60, o);
+    const id = g.getImageData(0, 0, 96, 96), d = id.data, NM = hexA(R.coat.main), NS = hexA(R.coat.shade), M = hexA(GUARD_FIRST.main), S = hexA(GUARD_FIRST.shade);
+    for (let i = 0; i < d.length; i += 4) { if (!d[i + 3]) continue; const to = d[i] === NM[0] && d[i + 1] === NM[1] && d[i + 2] === NM[2] ? M : d[i] === NS[0] && d[i + 1] === NS[1] && d[i + 2] === NS[2] ? S : null; if (to) for (let q = 0; q < 3; q++) d[i + q] = to[q]; }
+    g.putImageData(id, 0, 0); c.drawImage(cv, Math.round(x) - 48, Math.round(fl) - 60);
+  }
   function skit17(c, R, t, W, H) {
-    const G = gRoom(W, H), FL = G.FL, MX = G.MX, RW = G.RW, RH = G.RH, coat = R.COATS.find(q => q.id === 'guardian');
+    const G = gRoom(W, H), FL = G.FL, MX = G.MX, RW = G.RW, RH = G.RH, coat = Object.assign({}, R.COATS.find(q => q.id === 'guardian'), GUARD_FIRST);
     c.drawImage(G.bg, 0, 0);
     // the veins: faint; a dark pulse travels them away from the mouth, slow
     for (const v of G.veins) for (const [x, y, d] of v.pts) {
@@ -10680,7 +10739,7 @@ body.ninth #tbN{display:flex}
     }
     // worn: its own smoke drifts off it from then on
     if (t > 10.6) for (let k = 0; k < 12; k++) { const per = 1.4, u = ((t + k * per / 12) % per) / per; puff(c, fx + 2 - u * 6 + Math.sin(k) * 2, fl - 2 - u * 10, 2 + u * 3, 0.2 * Math.sin(u * Math.PI) * sm(10.6, 11.4, t), '40,44,46'); }
-    if (on > 0) guardianWorn(c, R, t, fx, fl, coat, on); else dweller(c, R, t, fx, fl, { walking });
+    if (on > 0) guardianWorn(c, R, t, fx, fl, coat, on); else if (R.coat && R.coat.id === 'guardian') guardianFirst(c, R, t, fx, fl, { walking }); else dweller(c, R, t, fx, fl, { walking });
     c.drawImage(G.fg, 0, 0);
     // a slow breath of darkness over everything with the pulse, and the edges sinking into black
     const vg = c.createRadialGradient(W * 0.55, H * 0.55, H * 0.25, W * 0.55, H * 0.55, W * 0.7); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,' + (0.42 + 0.08 * Math.sin(t * 1.15)).toFixed(3) + ')'); c.fillStyle = vg; c.fillRect(0, 0, W, H);
@@ -10791,14 +10850,15 @@ body.ninth #tbN{display:flex}
     const sh = R.SHEETS && (R.SHEETS.orb || R.SHEETS.orbT);
     if (sh) R.drawFrame(c, sh, Math.floor(t * 12 + k * 3) % 8, Math.round(x), Math.round(y + Math.sin(t * 2.2 + k) * 1), false);
   }
+  const FIGD = { cv: null };   // (a scrap canvas: the figure, before it is made smaller down the passage)
   function skit13(c, R, t, W, H) {
     const S = openA(W, H), o = S.o, GY = o.GY, DX = o.DX;
     c.drawImage(S.cv, 0, 0);
     // bats about the branches and across the moon
     for (let k = 0; k < 7; k++) { const u = ((t * (0.05 + 0.03 * hash(k, 261)) + hash(k, 262)) % 1), x = u * (W + 40) - 20, y = H * (0.12 + 0.35 * hash(k, 263)) + Math.sin(t * 3 + k * 2) * 6, fl = Math.floor(t * 12 + k) % 2; px(c, '#05060a', x, y, 1, 1); px(c, '#05060a', x - 1 - fl, y - fl, 1, 1); px(c, '#05060a', x + 1 + fl, y - fl, 1, 1); if (!fl) { px(c, '#05060a', x - 2, y, 1, 1); px(c, '#05060a', x + 2, y, 1, 1); } }
     // the figure's way along the lane
-    const fx = t < 6.1 ? -8 + (W * 0.52 + 8) * sm(0.4, 6.0, t) : t < 6.6 ? W * 0.52 : W * 0.52 + (DX - 4 - W * 0.52) * sm(6.6, 9.4, t);
-    const fy = GY, inside = t > 9.5;
+    const fx = t < 6.1 ? -8 + (W * 0.52 + 8) * sm(0.4, 6.0, t) : t < 6.6 ? W * 0.52 : W * 0.52 + (DX - W * 0.52) * sm(6.6, 8.9, t);
+    const fy = GY, inside = t > 9.8, deep = sm(8.9, 9.6, t), lamp = 1 - sm(9.35, 9.8, t);   // (deep: how far down the passage it has gone)
     // the eyes: one drifts over early, sweeping; the second comes in, finds the figure at 6 and holds; both linger at the door
     const eyes = [[-20 + (W + 40) * sm(0.0, 9.0, t), H * 0.2 + Math.sin(t * 0.9) * 4, 0.0], [W + 20 - (W * 0.5 + 20) * sm(2.5, 6.0, t) + (DX - W * 0.5 - 10) * sm(6.6, 9.6, t), H * 0.14 + Math.sin(t * 1.1 + 2) * 3, 1.7]];
     let near = 0;
@@ -10813,15 +10873,38 @@ body.ninth #tbN{display:flex}
     const found = t > 5.9 && t < 6.9;
     const hide = Math.max(sm(2.6, 3.0, t) * (1 - sm(3.6, 4.0, t)), t > 5.8 && t < 6.6 ? 1 : 0, t > 6.6 ? 0.5 : 0, near * (t < 5.8 ? 1 : 0));
     const showL = (1 - hide) * (inside ? 0 : 1);
-    if (!inside) {
-      if (showL > 0.02) { glowAt(c, fx + 3, fy - 6, 34, '255,232,180', (0.3 * showL).toFixed(3)); glowAt(c, fx + 3, fy + 1, 22, '255,232,180', (0.22 * showL).toFixed(3)); crystalLight(c, R, fx + 3, fy - 6, t, 1.4 * showL); }
+    // the light it carries, under the door's dark (as it always was), until it is in the doorway
+    if (!inside && deep <= 0 && showL > 0.02) { glowAt(c, fx + 3, fy - 6, 34, '255,232,180', (0.3 * showL).toFixed(3)); glowAt(c, fx + 3, fy + 1, 22, '255,232,180', (0.22 * showL).toFixed(3)); crystalLight(c, R, fx + 3, fy - 6, t, 1.4 * showL); }
+    // the door: open while it comes; it walks into the middle of its dark
+    const open = 1 - sm(9.6, 10.6, t), rr = o.dr - 1, vy = GY - o.dr * 0.55;
+    if (open > 0) for (let y = -Math.round(rr * 1.55); y < 0; y++) for (let x = -rr; x <= rr; x++) if (Math.hypot(x, y + o.dr * 0.55) < rr * open) px(c, '#010102', DX + x, GY + y);
+    if (!inside && deep > 0 && open > 0) {
+      // down the passage: it walks on into the mountain, smaller as it goes, rising toward the passage's far end; its light
+      // finds the ribs of the passage nearest it as it passes them, and goes out
+      const s = 1 - 0.72 * deep, gx = DX + 1, gy = Math.round(GY - (GY - vy - 2) * deep * 0.7), L = lamp * (0.85 + 0.15 * Math.sin(t * 9));
+      c.save(); c.beginPath(); c.arc(DX + 0.5, vy, rr * open, 0, Math.PI * 2); c.clip(); c.beginPath(); c.rect(0, 0, W, GY); c.clip();
+      glowAt(c, gx, gy - 6 * s, 20 * s + 4, '255,232,180', (0.2 * L).toFixed(3));
+      for (const q of [0.8, 0.58, 0.4, 0.27]) {               // the ribs, nearer ones bigger
+        const lit = L * Math.exp(-Math.abs(q - s) * 11), fl = Math.round(vy + (GY - vy) * q); if (lit < 0.05) continue;
+        c.globalAlpha = Math.min(0.55, lit * 0.75);
+        for (let a = -Math.PI; a <= 0.001; a += 0.02) { const X = Math.round(DX + Math.cos(a) * rr * q), Y = Math.round(vy + Math.sin(a) * rr * q); if (Y < fl) px(c, '#6e624e', X, Y); }
+        for (const sd of [-1, 1]) for (let y = Math.round(vy); y < fl; y++) px(c, '#564b3c', Math.round(DX + sd * Math.sqrt(Math.max(0, (rr * q) ** 2 - (y - vy) ** 2))), y);
+        px(c, '#4a4034', DX - Math.round(rr * q * 0.9), fl, Math.round(rr * q * 1.8), 1);        // its floor
+        c.globalAlpha = 1;
+      }
+      c.restore();
+      // the figure, at its size down the passage
+      const G = figSheets(R), fi = 2 + Math.floor(t * 6) % 8, sc = FIGD.cv || (FIGD.cv = document.createElement('canvas')); sc.width = 48; sc.height = 48;
+      const sx = sc.getContext('2d'); sx.imageSmoothingEnabled = false; if (G.run) R.drawFrame(sx, G.run, fi, 24, 40, false); if (G.runV) R.drawFrame(sx, G.runV, fi, 24, 40, false);
+      c.save(); c.imageSmoothingEnabled = false; c.globalAlpha = Math.min(1, 0.4 + 0.6 * lamp + 0.3 * (1 - deep));
+      const dw = Math.max(1, Math.round(48 * s)); c.drawImage(sc, 0, 0, 48, 48, Math.round(gx - 24 * s), Math.round(gy - 40 * s), dw, dw); c.restore();
+      if (L > 0.05) gem(c, R, gx + Math.round(3 * s), gy - Math.round(6 * s), t, L * s);
+    } else if (!inside) {
       drawFig(c, R, t, fx, fy, { walking: !(t > 6.0 && t < 6.6) && !(t > 2.8 && t < 3.6) });
       if (showL > 0.02) gem(c, R, fx + 3, fy - 6, t, showL);
     }
     if (found) { const u = sm(5.9, 6.9, t); glowAt(c, fx + 2, fy - 4, 18, '230,240,255', (0.55 * (1 - u)).toFixed(3)); for (let k = 0; k < 16; k++) { const an = -Math.PI * hash(k, 81), r = 2 + u * 14 * hash(k, 82); c.globalAlpha = 1 - u; px(c, '#e8f0ff', fx + 2 + Math.cos(an) * r, fy - 1 + Math.sin(an) * r * 0.6); } c.globalAlpha = 1; }
     // the door: open while it comes; it goes in; the spirals light from the outside in, and the slab is whole, shut
-    const open = 1 - sm(9.6, 10.6, t);
-    if (open > 0) { const r = o.dr - 1; for (let y = -Math.round(r * 1.55); y < 0; y++) for (let x = -r; x <= r; x++) if (Math.hypot(x, y + o.dr * 0.55) < r * open) px(c, '#010102', DX + x, GY + y); }
     if (t > 9.5) { const L = sm(9.7, 11.0, t), fade = 1 - sm(11.6, 13.0, t); for (const [x, y, a] of o.spiral) { const on = Math.max(0, Math.min(1, (L * 3 * Math.PI - (3 * Math.PI - a)) / 2)); if (on <= 0) continue; c.globalAlpha = on * fade * (0.6 + 0.4 * Math.sin(t * 4 - a)); px(c, '#f2e6c4', x, y); } c.globalAlpha = 1; glowAt(c, DX, o.dcy, 22, '255,236,200', (0.3 * L * fade).toFixed(3)); }
     if (t > 10.6) { const u = sm(10.6, 12.4, t); for (let k = 0; k < 22; k++) { const an = -Math.PI / 2 + (hash(k, 91) - 0.5) * 2.6, r = u * 22 * hash(k, 92); c.globalAlpha = 0.6 * (1 - u); px(c, k % 2 ? '#7c86a2' : '#c8d2ea', DX + Math.cos(an) * r, GY - 8 + Math.sin(an) * r * 0.7 + u * u * 8); } c.globalAlpha = 1; }
     // a little snow on the wind
