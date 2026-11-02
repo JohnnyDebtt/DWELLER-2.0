@@ -1564,28 +1564,43 @@ body.ninth #tbN{display:flex}
     }
   }
 
-  /* the Spore Map on a relic's false wall as you come near (sp.spore, 0..1, from main.js): its cracks blaze, a web of
-     them through the face and all round its edge, it throws a strong green light round it, and spores lift off it,
-     brighter the nearer you are, so with the map you cannot miss it */
-  function sporeGlow(ctx, f, sp, x0, y0, x1, y1, time) {
-    const k = sp.spore, pulse = 0.75 + 0.25 * Math.sin(time * 5), A = k * pulse, w = x1 - x0, h = y1 - y0, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-    const P = (c, x, y, ww, hh) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), ww || 1, hh || 1); };
-    ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    // the light it throws
-    const R = Math.max(w, h) * 0.9 + 26, g = ctx.createRadialGradient(cx, cy, 2, cx, cy, R);
-    g.addColorStop(0, a3('rgba(140,240,150,', 0.55 * A)); g.addColorStop(1, 'rgba(140,240,150,0)');
-    ctx.fillStyle = g; ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
-    // its edge, and its cracks blazing across the face
-    ctx.globalAlpha = A;
-    for (let x = x0; x < x1; x++) { P('#9ef0b0', x, y0); P('#9ef0b0', x, y1 - 1); }
-    for (let y = y0; y < y1; y++) { P('#9ef0b0', x0, y); P('#9ef0b0', x1 - 1, y); }
-    for (let c = 0; c < 4; c++) {
-      let x = x0 + 2 + ((c * 29 + 7) % Math.max(1, w - 4)), y = y0 + 1;
-      while (y < y1 - 1) { P('#e8fff0', x, y); P('#7ae898', x + 1, y); y++; if ((y * 7 + c * 3) % 4 === 0) x += ((y * 13 + c) % 3) - 1; x = Math.max(x0 + 1, Math.min(x1 - 3, x)); }
+  /* the Spore Map on a relic's false wall as you come near (sp.spore, 0..1, from main.js): three tiny mushrooms grow at
+     its face, one after another (one up from the floor at its foot, one out of the face, a little one high on it), each
+     glowing green and pulsing on the beat (90 BPM), a third of a beat after the last, stepped at 12 fps, shaking off a
+     spore on each pulse. Pass 'back' draws them behind her (and notes where their light goes, for the light mask, so the dark
+     leaves them bright); 'glow' their small halos and spores over the lit scene, and keeps how bright each is in
+     sp.shroomA for their hum. Sprites in (out from the face, up) pixels: s stalk, g gill, c cap, t its top */
+  const SHR = [
+    { at: 'floor', px: [['s', 4, 0], ['s', 4, 1], ['g', 3, 2], ['g', 5, 2], ['c', 2, 2], ['c', 4, 2], ['c', 6, 2], ['c', 3, 3], ['t', 4, 3], ['c', 5, 3]], gc: [4, 3], w: 5, R: 5 },
+    { at: 5, px: [['s', 0, 0], ['s', 1, 0], ['s', 1, 1], ['c', 0, 2], ['t', 1, 2], ['c', 2, 2]], gc: [1, 2], w: 3, R: 4 },
+    { at: 1, px: [['s', 0, 0], ['c', 0, 1], ['t', 1, 1]], gc: [1, 1], w: 2, R: 3.2 }];
+  const SHRL = [];   // [x, y, r, strength] of each mushroom's light this frame
+  function sporeShrooms(ctx, sp, x0, y0, x1, y1, time, pass) {
+    const k = sp.spore, dir = sp.side > 0 ? 1 : -1, fx = sp.side > 0 ? Math.round(x1) : Math.round(x0) - 1;
+    const t12 = Math.floor(time * 12) / 12, A = [0, 0, 0];
+    if (pass === 'back') SHRL.length = 0;
+    for (let i = 0; i < 3; i++) {
+      const m = SHR[i], g = Math.max(0, Math.min(1, (k - i * 0.2) / 0.35));
+      if (g <= 0) continue;
+      const by = m.at === 'floor' ? Math.round(y1) - 1 : Math.round(y0) + m.at + 2, ph = ((t12 * 1.5 - i / 3) % 1 + 1) % 1;
+      const b = 0.3 + 0.7 * Math.exp(-ph * 5), X = (u) => fx + dir * u, gx = X(m.gc[0]) + 0.5, gy = by - m.gc[1] + 0.5;
+      A[i] = b * g;
+      if (pass === 'back') {
+        const n = Math.max(1, Math.ceil(m.px.length * Math.min(1, g * 1.15)));   // (growing: stalk first, then its cap)
+        const C = { s: '#56806a', g: '#24452f', c: b > 0.75 ? '#9dfab6' : b > 0.5 ? '#6fe08e' : '#45b066', t: b > 0.75 ? '#f0fff4' : b > 0.5 ? '#b5f7c6' : '#7fd99a' };
+        for (let j = 0; j < n; j++) { const q = m.px[j]; ctx.fillStyle = C[q[0]]; ctx.fillRect(X(q[1]), by - q[2], 1, 1); }
+        SHRL.push([gx, gy, 3 + 2 * g, 0.55 + 0.45 * b]);
+        continue;
+      }
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      const R = m.R * (0.5 + 0.5 * g), gr = ctx.createRadialGradient(gx, gy, 0, gx, gy, R);
+      gr.addColorStop(0, a3('rgba(110,235,140,', 0.34 * b * g)); gr.addColorStop(1, 'rgba(110,235,140,0)');
+      ctx.fillStyle = gr; ctx.fillRect(gx - R, gy - R, R * 2, R * 2);
+      // a spore shaken off on each pulse, lifting and fading
+      if (g >= 1 && ph < 0.55) { ctx.globalAlpha = (1 - ph / 0.55) * 0.7; ctx.fillStyle = '#c8ffd8'; ctx.fillRect(X(m.gc[0] + (i === 1 ? 1 : 0)), by - m.gc[1] - 2 - Math.floor(ph * 9), 1, 1); }
+      ctx.restore();
     }
-    // spores lifting off it
-    for (let i = 0; i < 10; i++) { const u = (time * 0.5 + i / 10) % 1, sx = x0 + ((i * 41) % Math.max(1, w)) + Math.sin(time * 2 + i) * 2, sy = y0 + h * 0.8 - u * (h + 18); ctx.globalAlpha = A * Math.sin(u * Math.PI); P('#c8ffd8', sx, sy); }
-    ctx.restore();
+    if (pass !== 'back') sp.shroomA = A;
   }
   /* the way into the Core: veins of light in its rock, running toward the Guardian, a pulse travelling along each
      (the veins themselves drawn once onto a canvas the size of the level; only the pulses each frame); the arena's
@@ -1671,7 +1686,8 @@ body.ninth #tbN{display:flex}
   }
   /* ---- a relic in its hollow (relic.js draws the relic itself). pass 'back': the hollow, its pedestal and the relic,
      behind the false wall; 'glow': over the dark, the wall's tells while it stands (a faint seam of cracks, a little dust,
-     and with a Spore Map, near it, its cracks blazing), and the relic's own light once the wall is down */
+     in the level's own colour, and a little dust; with the Spore Map instead its mushrooms, see sporeShrooms), and the
+     relic's own light once the wall is down */
   const RELICFX = { dust: [], dustT: 0 };
   function relicFake(w) { return fakeCv.find(F => F.f[4] === 'relic'); }
   function drawRelicSpot(ctx, w, s, camX, camY, time, pass) {
@@ -1680,29 +1696,28 @@ body.ninth #tbN{display:flex}
     const f = F.f, x0 = f[0] * TS - camX, y0 = f[1] * TS - camY, x1 = (f[0] + f[2]) * TS - camX, y1 = (f[1] + f[3]) * TS - camY;
     if (x1 < -40 || x0 > 2000 || y1 < -40 || y0 > 2000) return;
     const P = (c, x, y, ww, hh) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), ww || 1, hh || 1); };
-    const rx = Math.round(sp.x - camX), fy = Math.round(sp.y - camY), col = RLX.RELICS[sp.id].col;
+    const rx = Math.round(sp.x - camX), fy = Math.round(sp.y - camY);
     if (pass === 'back') {
       P('#07060b', x0, y0, x1 - x0, y1 - y0);
       for (let k = 0; k < 10; k++) P(k % 3 ? '#16141f' : '#211d2e', x0 + 1 + (k * 37) % Math.max(1, x1 - x0 - 2), y0 + 1 + (k * 13) % Math.max(1, y1 - y0 - 2));
       P('#3a3550', rx - 4, fy - 2, 9, 1); P('#221f33', rx - 3, fy - 1, 7, 1);         // a low slab of stone
       // (the relic itself only once its wall is down: while the wall stands, not a pixel of it may show through)
       if (!sp.got && F.open) RLX.draw(ctx, sp.id, rx, fy - 8, time, { sc: 1, glow: 0 });
+      if (sp.map && !F.open) sporeShrooms(ctx, sp, x0, y0, x1, y1, time, 'back');
       return;
     }
     if (!F.open) {
-      ctx.globalAlpha = 0.3 + 0.12 * Math.sin(time * 2.2);
-      const sx = sp.side > 0 ? x1 - 2 : x0 + 1; let y = y0 + 1, x = sx;      // (the face you walk into)
-      while (y < y1 - 1) { P('rgba(' + col.join(',') + ',1)', x, y); if ((Math.round(y) * 7) % 5 === 0) { x += ((Math.round(y) * 13) % 3) - 1; P('rgba(' + col.join(',') + ',1)', x, y); } y++; }
-      ctx.globalAlpha = 1;
+      if (!sp.map) {   // (the seam on the face you walk into, in the level's colour; the Spore Map's mushrooms replace it)
+        ctx.globalAlpha = 0.3 + 0.12 * Math.sin(time * 2.2);
+        const sx = sp.side > 0 ? x1 - 2 : x0 + 1, sc = TH.lamp[1]; let y = y0 + 1, x = sx;
+        while (y < y1 - 1) { P(sc, x, y); if ((Math.round(y) * 7) % 5 === 0) { x += ((Math.round(y) * 13) % 3) - 1; P(sc, x, y); } y++; }
+        ctx.globalAlpha = 1;
+      }
       RELICFX.dustT -= 1 / 60;
       if (RELICFX.dustT <= 0) { RELICFX.dustT = 0.35 + Math.random() * 0.5; RELICFX.dust.push({ x: (sp.side > 0 ? (f[0] + f[2]) * TS - 2 : f[0] * TS + 1) + (Math.random() - 0.5) * 3, y: f[1] * TS, v: 4 + Math.random() * 6 }); }
       for (const d of RELICFX.dust) { d.y += d.v / 60; d.v += 10 / 60; ctx.globalAlpha = Math.max(0, 0.6 * (1 - (d.y - f[1] * TS) / (f[3] * TS + 6))); P('#c8b8c8', d.x - camX, d.y - camY); }
       RELICFX.dust = RELICFX.dust.filter(d => d.y < (f[1] + f[3]) * TS + 6); ctx.globalAlpha = 1;
-      if (sp.spore > 0) sporeGlow(ctx, f, sp, x0, y0, x1, y1, time);
-      if (sp.pulseT !== undefined) {   // the Spore Map: one quick ring of light from the wall, once
-        const u = (sceneTime - sp.pulseT) / 0.9;
-        if (u >= 0 && u < 1) { const r = 4 + u * 40, cxp = (x0 + x1) / 2, cyp = (y0 + y1) / 2; ctx.globalAlpha = (1 - u) * 0.7; for (let k = 0; k < 40; k++) { const an = k / 40 * 6.283; P('rgb(140,214,136)', cxp + Math.cos(an) * r, cyp + Math.sin(an) * r * 0.7); } ctx.globalAlpha = 1; }
-      }
+      if (sp.map) sporeShrooms(ctx, sp, x0, y0, x1, y1, time, 'glow');
     } else if (!sp.got) {
       RLX.draw(ctx, sp.id, rx, fy - 8, time, { sc: 1, glow: 1.2 });
     }
@@ -1957,6 +1972,22 @@ body.ninth #tbN{display:flex}
 
   /* The darkness pass: builds the light mask, dithers it to a few bands, composites a dark overlay. */
   const AMBIENT = 0.34, STEPS = 9;
+  /* How the darkness lands on the Dweller. The cave's darkness is dithered (a checkerboard of steps, so the light fades
+     softly across the rock); on a figure as small as she is that checkerboard speckles her and she reads soft. So over
+     her own pixels the darkness is smooth instead, pixel by pixel, still following the light (a beam still cuts across
+     her), and a little lighter than over the cave (dark: 0.9 of it). To go back to the dither on her as on everything
+     else: HER_LIGHT.smooth = false (and dark: 1 for the same darkness as the cave) */
+  const HER_LIGHT = { smooth: true, dark: 0.9 };
+  const HM = { c: null, x: null, on: false, x0: 0, y0: 0, d: null };
+  function herMask(s, camX, camY) {
+    if (!HM.c) { HM.c = document.createElement('canvas'); HM.c.width = HM.c.height = 128; HM.x = HM.c.getContext('2d', { willReadFrequently: true }); }
+    const [name, idx] = playerFrame(s), sh = SHEETS[name];
+    let fx = Math.round(s.x + 2.5 - camX); const fy = Math.round(s.y + s.h - camY);
+    if (s.st === 'climb' && TH.style !== 'foundry' && TH.style !== 'ember') fx += Math.round(Math.sin(sceneTime * 1.2 + (s.y + 3) * 0.09) * 1.2);   // (as drawPlayer)
+    const flip = s.st === 'wall' ? s.wdir < 0 : s.st === 'climb' ? s.face > 0 : s.face < 0;
+    HM.x.clearRect(0, 0, 128, 128); drawFrame(HM.x, sh, idx, 64, 96, flip);
+    HM.x0 = fx - 64; HM.y0 = fy - 96; HM.d = HM.x.getImageData(0, 0, 128, 128).data;
+  }
   function lightPass(ctx, Gm, camX, camY, W, H) {
     const w = Gm.w, s = Gm.s;
     ensureLight(W, H);
@@ -1990,11 +2021,12 @@ body.ninth #tbN{display:flex}
     // the hidden seeker leaks a little light through its false wall; the companion glows softly
     if (w.secret && !s.cmp) softDisc(lctx, w.secret.x - camX, w.secret.y - camY, 22, 0.22);
     if (s.cmp) softDisc(lctx, s.cmpX - camX, s.cmpY - camY, 14, 0.18);
-    if (w.level.relicHere && !w.level.relicHere.got) { const F = relicFake(w), sp = w.level.relicHere; softDisc(lctx, sp.x - camX, sp.y - 8 - camY, F && F.open ? 30 : 8, F && F.open ? 0.45 : 0.05); }
+    if (w.level.relicHere && !w.level.relicHere.got) { const F = relicFake(w), sp = w.level.relicHere; softDisc(lctx, sp.x - camX, sp.y - 8 - camY, F && F.open ? 30 : 8, F && F.open ? 0.45 : 0.05); if (sp.map && F && !F.open) for (const q of SHRL) softDisc(lctx, q[0], q[1], q[2], q[3]); }
     if (s.immune && !s.dead) softDisc(lctx, s.x + 2.5 - camX, s.y + s.h / 2 - camY, 46, 0.5);
     if (w.boss && !s.bBurst && s.bWake) { const B = w.boss, ecl = s.cmpL >= 0 && w.lights[s.cmpL] && w.lights[s.cmpL].boss && s.cmpK > 0; softDisc(lctx, B.x - camX, B.y - camY, 70, ecl ? 0.12 : 0.34); }
     else if (w.boss && !s.bBurst) softDisc(lctx, w.boss.x - camX, w.boss.y - camY, 50, 0.12);
     if (Gm.lift) Gm.lift(lctx, camX, camY, softDisc);   // a room that lights itself (the Codex)
+    if (HM.on) herMask(s, camX, camY);
     // quantize
     const darkBGR = (TH.dark[2] << 16) | (TH.dark[1] << 8) | TH.dark[0], amb = TH.amb || AMBIENT;   // (the darkest worlds keep a little more of the cave)
     litRead(lctx);
@@ -2007,6 +2039,7 @@ body.ninth #tbN{display:flex}
     let o = 0;
     for (let y = 0; y < H; y++) {
       const by = (y & 3) * 4, ty = Math.floor((cy0 + y) / 6), b = (y / LB) | 0, sn = b * LKS + LSC[b];
+      const hr = HM.on && y >= HM.y0 && y < HM.y0 + 128 ? (y - HM.y0) * 128 - HM.x0 : -1;   // (her row in her outline, if she is in this row)
       // the lit spans of this row, one after another (black between them, where nothing was drawn)
       let sk = b * LKS, rx0 = W, rx1 = W, d = null, ro = 0;
       if (sk < sn) { rx0 = LS0[sk]; rx1 = LS1[sk]; d = LRD[sk]; ro = ((y - LSY[sk]) * LSW[sk] - rx0) * 4; }
@@ -2014,10 +2047,11 @@ body.ninth #tbN{display:flex}
         if (x >= rx1) { sk++; if (sk < sn) { rx0 = LS0[sk]; rx1 = LS1[sk]; d = LRD[sk]; ro = ((y - LSY[sk]) * LSW[sk] - rx0) * 4; } else { rx0 = rx1 = W; } }
         let L = 0;
         if (x >= rx0) { const i = ro + x * 4; L = d[i]; if (d[i + 1] > L) L = d[i + 1]; if (d[i + 2] > L) L = d[i + 2]; }
-        let q = Math.floor(L / 255 * STEPS + (BAYER[by + (x & 3)] + 0.5) / 16) / STEPS;
+        let q = Math.floor(L / 255 * STEPS + (BAYER[by + (x & 3)] + 0.5) / 16) / STEPS, her = 1;
+        if (hr >= 0 && x >= HM.x0 && x < HM.x0 + 128 && HM.d[(hr + x) * 4 + 3]) { q = L / 255; her = HER_LIGHT.dark; }   // (her: smooth, a little lighter)
         if (q > 1) q = 1;
         const am = sep && D.solidAt(w, Math.floor((cx0 + x) / 6), ty) ? AMBIENT : amb;
-        const a = 1 - (am + (1 - am) * q);
+        const a = (1 - (am + (1 - am) * q)) * her;
         o32[o] = ((a * 250) << 24) | darkBGR; // alpha + theme dark colour (ABGR)
         if (lm) lm[o] = (q > 0.66 ? 255 : (q * 386) | 0) << 24;
       }
@@ -5772,7 +5806,8 @@ body.ninth #tbN{display:flex}
         ctx.fillRect(cx - 1, fy - 19 - Math.round(Math.sin(time * 3)), 2, 2);
       }
     }
-    if ((!s.won || s.wonT < 30) && !drawClaimed(ctx, w, s, camX, camY, time, false)) drawPlayer(ctx, s, camX, camY, 'body', s.burn > 0.02 && !s.dead && !s.immune ? 0.15 + s.burn * 0.6 : 0);
+    HM.on = false;
+    if ((!s.won || s.wonT < 30) && !drawClaimed(ctx, w, s, camX, camY, time, false)) { drawPlayer(ctx, s, camX, camY, 'body', s.burn > 0.02 && !s.dead && !s.immune ? 0.15 + s.burn * 0.6 : 0); HM.on = HER_LIGHT.smooth; }
     drawParticles(ctx, camX, camY);
     if (ctx !== sceneCtx) { sceneCtx.drawImage(OCC.L, 0, 0); ctx = sceneCtx; }
     lightPass(ctx, Gm, camX, camY, W, H);
@@ -6138,6 +6173,7 @@ body.ninth #tbN{display:flex}
   // drips: a different kind for each level. Sources are found once per level, kept sorted by x, and only the ones
   // on screen are visited, so a frame costs a handful of rectangles however big the level is
   const D = { src: null, w: null };
+  const DRIP_DENSITY = 0.3;   // (how many of the places a drip could fall from have one: half what it was at first, 0.6)
   const HEART_BEAT = 60 / 90;                                      // (the heart's drops all let go on the 90 bpm beat)
   const KINDS = {
     descent:  { every: [4, 9], per: [2.2, 4.8], hang: 0.55, g: 160 },
@@ -6152,7 +6188,7 @@ body.ninth #tbN{display:flex}
     const K = KINDS[D.kind]; seed = 99 + w.W * 7 + w.H;   // (the same drips in the same places every visit)
     for (let tx = 2; tx < w.W - 2; tx += K.every[0] + Math.floor(rnd() * (K.every[1] - K.every[0]))) for (let ty = 1; ty < w.H - 2; ty++) {
       if (w.solid[ty * w.W + tx] === 1 && w.solid[(ty + 1) * w.W + tx] !== 1) { let f = ty + 1; while (f < w.H && w.solid[f * w.W + tx] !== 1) f++;
-        if (f - ty > 4 && f - ty < 40 && f < w.H && rnd() < 0.6) { let per = K.per[0] + rnd() * (K.per[1] - K.per[0]); if (D.kind === 'heart') per = HEART_BEAT * Math.round(per / HEART_BEAT);
+        if (f - ty > 4 && f - ty < 40 && f < w.H && rnd() < DRIP_DENSITY) { let per = K.per[0] + rnd() * (K.per[1] - K.per[0]); if (D.kind === 'heart') per = HEART_BEAT * Math.round(per / HEART_BEAT);
           D.src.push({ x: tx * 6 + 1 + Math.floor(rnd() * 4), y: (ty + 1) * 6, fy: f * 6, ph: D.kind === 'heart' ? HEART_BEAT * Math.floor(rnd() * 8) : rnd() * 5, per, sd: Math.floor(rnd() * 1000) }); } } }
     D.src.sort((a, b) => a.x - b.x);
   }
@@ -8040,11 +8076,20 @@ body.ninth #tbN{display:flex}
     // a hidden relic hums behind its false wall: two low harmonics of 48 Hz, louder as you come near (0..1)
     /* under water the music goes dull and far away (sound effects stay clear) */
     muffle(on) { if (!this.eng) return; const t = this.ctx.currentTime; this.eng.muff.frequency.cancelScheduledValues(t); this.eng.muff.frequency.setTargetAtTime(on ? 420 : 22000, t, on ? 0.08 : 0.25); },
-    relicHum(v) {
+    relicHum(v, sp) {
       if (!this.eng) return;
       const c = this.ctx, t = c.currentTime;
       if (!this.hum) { if (v <= 0) return; const g = c.createGain(); g.gain.value = 0; g.connect(this.eng.sfxVol); const trem = c.createGain(); trem.gain.value = 0.75; trem.connect(g); const os = [[96, 0.5], [144, 0.3], [192, 0.12]].map(([f, a]) => { const o = c.createOscillator(); o.frequency.value = f; const og = c.createGain(); og.gain.value = a; o.connect(og); og.connect(trem); o.start(t); return o; }); const l = c.createOscillator(); l.frequency.value = 0.75; const lg = c.createGain(); lg.gain.value = 0.25; l.connect(lg); lg.connect(trem.gain); l.start(t); this.hum = { g, os, l }; }
       this.hum.g.gain.setTargetAtTime(this.muted ? 0 : 0.09 * v * v, t, 0.3);
+      // with the Spore Map, its three mushrooms on the wall hum too: a soft voice each (384, 456, 504 Hz: 1, 19/16 and
+      // 21/16 of 384, floor to top), each swelling with its own mushroom's pulse (sp, their brightness 0..1, or null)
+      if (!this.spo) { if (!sp) return; this.spo = [384, 456, 504].map((f, i) => {
+        const g = c.createGain(); g.gain.value = 0; g.connect(this.eng.sfxVol);
+        const l = c.createOscillator(); l.frequency.value = 4.5 + i * 0.7; const lg = c.createGain(); lg.gain.value = f * 0.004; l.connect(lg); l.start(t);
+        const os = [[1, 1], [2, 0.22]].map(([m, a]) => { const o = c.createOscillator(); o.frequency.value = f * m; lg.connect(o.frequency); const og = c.createGain(); og.gain.value = a; o.connect(og); og.connect(g); o.start(t); return o; });
+        return { g, os, l };
+      }); }
+      for (let i = 0; i < 3; i++) { const a = sp ? sp[i] || 0 : 0; this.spo[i].g.gain.setTargetAtTime(this.muted ? 0 : 0.028 * a * a, t, 0.04); }
     },
     keptStop() {
       const K = this.kept; if (!K) return; this.kept = null;
@@ -10334,7 +10379,7 @@ body.ninth #tbN{display:flex}
   'use strict';
   const RELICS = [
     { id: 'plumb', name: 'PLUMB LINE', from: 'THE SHAFT', stratum: 'descent', col: [170, 190, 214], text: 'YOU START EVERY RUN HOLDING ONE RANDOM UPGRADE' },
-    { id: 'spore', name: 'SPORE MAP', from: 'THE ROOTS', stratum: 'mycelium', col: [140, 214, 136], text: 'A FAKE WALL BLAZES WITH LIGHT WHEN YOU COME NEAR' },
+    { id: 'spore', name: 'SPORE MAP', from: 'THE ROOTS', stratum: 'mycelium', col: [140, 214, 136], text: 'MUSHROOMS GROW WHERE RELICS DWELL' },
     { id: 'prism', name: 'PRISM', from: 'THE GEODE', stratum: 'glass', col: [184, 160, 245], text: 'UPGRADE OFFERS SHOW FOUR CHOICES INSTEAD OF THREE' },
     { id: 'coal', name: 'BANKED COAL', from: 'THE MAGMA', stratum: 'ember', col: [240, 132, 72], text: 'ONCE A RUN, A FULL BURN IS TAKEN FROM YOU' },
     { id: 'gear', name: 'SPARE GEAR', from: 'THE WORKINGS', stratum: 'foundry', col: [206, 128, 88], text: 'ONCE A RUN, REROLL AN UPGRADE OFFER' },
@@ -14599,11 +14644,12 @@ body.ninth #tbN{display:flex}
       cardText = 'A RELIC  -  ' + q.name + '  -  REACH THE BOTTOM TO KEEP IT'; cardT = 0;
       for (let k = 0; k < 30; k++) { const a = Math.random() * 6.283, s2 = 8 + Math.random() * 30; R.spawn(sp.x, sp.y - 10, Math.cos(a) * s2, Math.sin(a) * s2 - 10, 0.6 + Math.random() * 0.8, 'rgb(' + q.col.join(',') + ')', 1, 6, true); }
     }
-    // the hum of a hidden relic, louder as you come near (and with the Spore Map, its one pulse and its wall's glow)
+    // the hum of a hidden relic, louder as you come near (and with the Spore Map, its mushrooms growing on the wall,
+    // and their hum: render.js keeps how bright each is in sp.shroomA)
     const d = Math.hypot(S.x + 2.5 - sp.x, S.y + S.h / 2 - sp.y);
-    A.Live.relicHum(sp.got ? 0 : Math.max(0, 1 - d / 160));
-    if (hasRelic(1) && !sp.pulsed && d < 70) { sp.pulsed = true; sp.pulseT = gameTime; }
-    sp.spore = hasRelic(1) ? Math.max(0, Math.min(1, 1 - (d - 40) / 130)) : 0;   // (the Spore Map: how near you are, for the wall's glow: from 170 px, full at 40)
+    sp.map = hasRelic(1);
+    sp.spore = sp.map ? Math.max(0, Math.min(1, 1 - (d - 40) / 130)) : 0;   // (how near you are, for the mushrooms: from 170 px, all grown by about 40)
+    A.Live.relicHum(sp.got ? 0 : Math.max(0, 1 - d / 160), sp.got || !sp.map ? null : sp.shroomA);
   }
   function nearTake() { return KEPT && !KEPT.taken && KEPT.fly < 0 && S.x + 2.5 > KEPT.room.ledgeX - 22 && S.onG; }
   function keptInteract() {
